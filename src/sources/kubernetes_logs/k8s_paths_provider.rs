@@ -2,13 +2,13 @@
 
 #![deny(missing_docs)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::runtime::reflector::{ObjectRef, store::Store};
-use vector_lib::file_source::paths_provider::PathsProvider;
+use vector_lib::file_source::paths_provider::{FileOrdering, PathsProvider};
 
-use super::path_helpers::build_pod_logs_directory;
+use super::path_helpers::{build_pod_logs_directory, parse_container_log_path};
 use crate::kubernetes::pod_manager_logic::extract_static_pod_config_hashsum;
 
 /// A paths provider implementation that uses the state obtained from the
@@ -42,6 +42,14 @@ impl K8sPathsProvider {
 
 impl PathsProvider for K8sPathsProvider {
     type IntoIter = Vec<PathBuf>;
+
+    fn file_ordering(&self, path: &Path) -> Option<FileOrdering> {
+        let path = parse_container_log_path(path.to_str()?)?;
+        Some(FileOrdering {
+            group: path.attempt.into(),
+            rotation: path.rotation.map(str::to_owned),
+        })
+    }
 
     fn paths(&self) -> Vec<PathBuf> {
         let state = self.pod_state.state();
@@ -212,7 +220,25 @@ fn filter_paths<'a>(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "linux")]
+    use bytes::Bytes;
+    #[cfg(target_os = "linux")]
+    use futures::{
+        FutureExt as _, StreamExt as _,
+        channel::{mpsc, oneshot},
+    };
     use std::path::PathBuf;
+    #[cfg(target_os = "linux")]
+    use std::{
+        fs,
+        io::Write as _,
+        sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
+    };
+    #[cfg(target_os = "linux")]
+    use vector_lib::file_source_common::{
+        FingerprintStrategy, Fingerprinter, ReadFrom, checkpointer::Checkpointer,
+    };
 
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 
@@ -220,6 +246,256 @@ mod tests {
         build_container_exclusion_patterns, extract_excluded_containers_for_pod,
         extract_pod_logs_directory, filter_paths, list_pod_log_paths,
     };
+
+    #[cfg(target_os = "linux")]
+    struct RotationPaths {
+        directory: PathBuf,
+        kubernetes: super::K8sPathsProvider,
+        rotate_during_discovery: Option<std::sync::atomic::AtomicUsize>,
+    }
+
+    #[cfg(target_os = "linux")]
+    impl vector_lib::file_source::paths_provider::PathsProvider for RotationPaths {
+        type IntoIter = Vec<PathBuf>;
+
+        fn paths(&self) -> Self::IntoIter {
+            let rotate = self
+                .rotate_during_discovery
+                .as_ref()
+                .is_some_and(|scans| scans.fetch_add(1, Ordering::SeqCst) == 1);
+            let current = self.directory.join("busy/0.log");
+            if rotate {
+                fs::write(&current, "prefix\n").unwrap();
+            }
+            let paths = glob::glob(self.directory.join("*/*.log*").to_str().unwrap())
+                .unwrap()
+                .map(Result::unwrap)
+                .collect();
+            if rotate {
+                fs::rename(&current, self.directory.join("busy/0.log.20261124-190000")).unwrap();
+                fs::write(current, "suffix\n").unwrap();
+            }
+            paths
+        }
+
+        fn file_ordering(
+            &self,
+            path: &std::path::Path,
+        ) -> Option<vector_lib::file_source::paths_provider::FileOrdering> {
+            self.kubernetes.file_ordering(path)
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn rotation_file_server(
+        directory: &std::path::Path,
+        data: &std::path::Path,
+    ) -> vector_lib::file_source::file_server::FileServer<
+        RotationPaths,
+        crate::internal_events::FileSourceInternalEventsEmitter,
+    > {
+        vector_lib::file_source::file_server::FileServer {
+            paths_provider: RotationPaths {
+                directory: directory.to_owned(),
+                rotate_during_discovery: None,
+                kubernetes: super::K8sPathsProvider::new(
+                    kube::runtime::reflector::store::Writer::default().as_reader(),
+                    kube::runtime::reflector::store::Writer::default().as_reader(),
+                    vec![],
+                    vec![],
+                    false,
+                ),
+            },
+            max_read_bytes: 1,
+            ignore_checkpoints: false,
+            read_from: ReadFrom::Beginning,
+            ignore_before: None,
+            max_line_bytes: 1024,
+            line_delimiter: Bytes::from_static(b"\n"),
+            data_dir: data.to_owned(),
+            glob_minimum_cooldown: Duration::from_millis(10),
+            fingerprinter: Fingerprinter::new(
+                FingerprintStrategy::FirstLinesChecksum {
+                    ignored_header_bytes: 0,
+                    lines: 1,
+                },
+                1024,
+                true,
+            ),
+            oldest_first: false,
+            remove_after: None,
+            emitter: crate::internal_events::FileSourceInternalEventsEmitter {
+                include_file_metric_tag: false,
+            },
+            rotate_wait: Duration::from_mins(1),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn rotation_during_discovery_finds_predecessor_before_reading() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        fs::create_dir(directory.path().join("busy")).unwrap();
+        fs::create_dir(directory.path().join("quiet")).unwrap();
+        fs::write(directory.path().join("quiet/0.log"), "quiet\n").unwrap();
+        let mut server = rotation_file_server(directory.path(), data.path());
+        server.paths_provider.rotate_during_discovery = Some(AtomicUsize::new(0));
+        let (sender, mut receiver) = mpsc::channel(2);
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let shutdown = shutdown_rx.map(|_| ()).shared();
+        let task = tokio::spawn(server.run(
+            sender,
+            shutdown.clone(),
+            shutdown,
+            Checkpointer::new(data.path()),
+        ));
+        let lines = receiver
+            .by_ref()
+            .flat_map(futures::stream::iter)
+            .take(3)
+            .collect::<Vec<_>>();
+        let lines = tokio::time::timeout(Duration::from_secs(5), lines)
+            .await
+            .unwrap();
+        shutdown_tx.send(()).unwrap();
+        task.await.unwrap().unwrap();
+        assert_eq!(
+            lines
+                .iter()
+                .map(|line| line.text.as_ref())
+                .collect::<Vec<_>>(),
+            vec![b"quiet".as_slice(), b"prefix", b"suffix"]
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn rotated_files_preserve_order_and_share_read_time() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        fs::create_dir(directory.path().join("busy")).unwrap();
+        fs::create_dir(directory.path().join("quiet")).unwrap();
+        // Create the successor first to exercise ordering independently of inode creation time.
+        fs::write(directory.path().join("busy/0.log"), "suffix\n").unwrap();
+        fs::write(
+            directory.path().join("busy/0.log.20261124-190000"),
+            "prefix one\nprefix two\n",
+        )
+        .unwrap();
+        fs::write(directory.path().join("quiet/0.log"), "quiet\n").unwrap();
+        let server = rotation_file_server(directory.path(), data.path());
+        let (sender, mut receiver) = mpsc::channel(2);
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let shutdown = shutdown_rx.map(|_| ()).shared();
+        let task = tokio::spawn(server.run(
+            sender,
+            shutdown.clone(),
+            shutdown,
+            Checkpointer::new(data.path()),
+        ));
+        let lines = receiver
+            .by_ref()
+            .flat_map(futures::stream::iter)
+            .take(4)
+            .collect::<Vec<_>>();
+        let lines = tokio::time::timeout(Duration::from_secs(5), lines)
+            .await
+            .unwrap();
+        shutdown_tx.send(()).unwrap();
+        task.await.unwrap().unwrap();
+        assert_eq!(
+            lines
+                .iter()
+                .map(|line| line.text.as_ref())
+                .collect::<Vec<_>>(),
+            vec![b"prefix one".as_slice(), b"quiet", b"prefix two", b"suffix"]
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn rotation_waits_for_late_predecessor_writes() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        fs::create_dir(directory.path().join("busy")).unwrap();
+        fs::create_dir(directory.path().join("quiet")).unwrap();
+        let current = directory.path().join("busy/0.log");
+        let mut writer = fs::File::create(&current).unwrap();
+        writer.write_all(b"prefix\n").unwrap();
+        fs::write(directory.path().join("quiet/0.log"), "quiet one\n").unwrap();
+        let server = rotation_file_server(directory.path(), data.path());
+        let (sender, mut receiver) = mpsc::channel(2);
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let shutdown = shutdown_rx.map(|_| ()).shared();
+        let task = tokio::spawn(server.run(
+            sender,
+            shutdown.clone(),
+            shutdown,
+            Checkpointer::new(data.path()),
+        ));
+        let first = tokio::time::timeout(Duration::from_secs(5), receiver.next())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            first
+                .iter()
+                .map(|line| line.text.as_ref())
+                .collect::<Vec<_>>(),
+            vec![b"prefix".as_slice(), b"quiet one"]
+        );
+        // An empty polling batch confirms that the reader has reached the live file's EOF.
+        while !tokio::time::timeout(Duration::from_secs(5), receiver.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .is_empty()
+        {}
+        fs::rename(
+            &current,
+            directory.path().join("busy/0.log.20261124-190000"),
+        )
+        .unwrap();
+        fs::write(&current, "suffix\n").unwrap();
+        fs::create_dir(directory.path().join("new-quiet")).unwrap();
+        fs::write(directory.path().join("new-quiet/0.log"), "quiet two\n").unwrap();
+        loop {
+            let batch = tokio::time::timeout(Duration::from_secs(5), receiver.next())
+                .await
+                .unwrap()
+                .unwrap();
+            if !batch.is_empty() {
+                assert_eq!(
+                    batch
+                        .iter()
+                        .map(|line| line.text.as_ref())
+                        .collect::<Vec<_>>(),
+                    vec![b"quiet two".as_slice()]
+                );
+                break;
+            }
+        }
+        writer.write_all(b"late prefix\n").unwrap();
+        drop(writer);
+        let remaining = receiver
+            .by_ref()
+            .flat_map(futures::stream::iter)
+            .take(2)
+            .collect::<Vec<_>>();
+        let remaining = tokio::time::timeout(Duration::from_secs(5), remaining)
+            .await
+            .unwrap();
+        shutdown_tx.send(()).unwrap();
+        task.await.unwrap().unwrap();
+        assert_eq!(
+            remaining
+                .iter()
+                .map(|line| line.text.as_ref())
+                .collect::<Vec<_>>(),
+            vec![b"late prefix".as_slice(), b"suffix"]
+        );
+    }
 
     #[test]
     fn test_extract_pod_logs_directory() {

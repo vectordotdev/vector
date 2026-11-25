@@ -1,6 +1,6 @@
 use std::{
     cmp,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     path::PathBuf,
     sync::Arc,
     time::{self, Duration},
@@ -60,6 +60,18 @@ where
     pub rotate_wait: Duration,
 }
 
+#[derive(Hash, PartialEq, Eq)]
+enum ReadGroupKey {
+    File(FileFingerprint),
+    Sequence(PathBuf),
+}
+
+struct ReadGroup {
+    ordered: bool,
+    ready: bool,
+    files: Vec<FileFingerprint>,
+}
+
 /// `FileServer` as Source
 ///
 /// The 'run' of `FileServer` performs the cooperative scheduling of reads over
@@ -110,6 +122,7 @@ where
         S2: Future + Unpin + Send + 'static,
     {
         let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = IndexMap::default();
+        let mut read_groups = Vec::new();
 
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
@@ -194,6 +207,7 @@ where
 
                 // Search (glob) for files to detect major file changes.
                 let start = time::Instant::now();
+                let previously_watched = fp_map.keys().copied().collect();
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
@@ -263,6 +277,12 @@ where
                         }
                     }
                 }
+                read_groups = self.read_groups(&fp_map, &previously_watched);
+                if read_groups.iter().any(|group| !group.ready) {
+                    // A rotation can replace a listed path before we open it. Confirm
+                    // discovery after opening new files, while known groups keep reading.
+                    next_glob_time = time::Instant::now();
+                }
                 stats.record("discovery", start.elapsed());
             }
 
@@ -294,75 +314,95 @@ where
 
             // Collect lines by polling files.
             let mut global_bytes_read: usize = 0;
-            let mut maxed_out_reading_single_file = false;
-            for (&file_id, watcher) in &mut fp_map {
-                if !watcher.should_read() {
+            let mut maxed_out_reading_group = false;
+            for group in &read_groups {
+                if !group.ready {
                     continue;
                 }
-
-                let start = time::Instant::now();
-                let mut bytes_read: usize = 0;
-                while let Ok(RawLineResult {
-                    raw_line: Some(line),
-                    discarded_for_size_and_truncated,
-                }) = watcher.read_line().await
-                {
-                    for buf in &discarded_for_size_and_truncated {
-                        self.emitter.emit_file_line_too_long(
-                            &buf.clone(),
-                            self.max_line_bytes,
-                            buf.len(),
-                        );
+                let mut group_bytes_read = 0;
+                for (index, &file_id) in group.files.iter().enumerate() {
+                    let Some(watcher) = fp_map.get_mut(&file_id) else {
+                        continue;
+                    };
+                    let has_successor = group.ordered && index + 1 < group.files.len();
+                    if !watcher.should_read() {
+                        if has_successor && !watcher.finished_reading().await {
+                            break;
+                        }
+                        continue;
                     }
 
-                    let sz = line.bytes.len();
-                    trace!(
-                        message = "Read bytes.",
-                        path = ?watcher.path,
-                        bytes = ?sz
-                    );
-                    stats.record_bytes(sz);
-
-                    bytes_read += sz;
-
-                    lines.push(Line {
-                        text: line.bytes,
-                        filename: watcher.path.to_str().expect("not a valid path").to_owned(),
-                        file_id,
-                        start_offset: line.offset,
-                        end_offset: watcher.get_file_position(),
-                    });
-
-                    if bytes_read > self.max_read_bytes {
-                        maxed_out_reading_single_file = true;
-                        break;
-                    }
-                }
-                stats.record("reading", start.elapsed());
-
-                if bytes_read > 0 {
-                    global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                } else {
-                    // Should the file be removed
-                    if let Some(grace_period) = self.remove_after
-                        && watcher.last_read_success().elapsed() >= grace_period
+                    let start = time::Instant::now();
+                    let mut bytes_read: usize = 0;
+                    while let Ok(RawLineResult {
+                        raw_line: Some(line),
+                        discarded_for_size_and_truncated,
+                    }) = watcher.read_line().await
                     {
-                        // Try to remove
-                        match remove_file(&watcher.path).await {
-                            Ok(()) => {
-                                self.emitter.emit_file_deleted(&watcher.path);
-                                watcher.set_dead();
-                            }
-                            Err(error) => {
-                                // We will try again after some time.
-                                self.emitter.emit_file_delete_error(&watcher.path, error);
+                        for buf in &discarded_for_size_and_truncated {
+                            self.emitter.emit_file_line_too_long(
+                                &buf.clone(),
+                                self.max_line_bytes,
+                                buf.len(),
+                            );
+                        }
+
+                        let sz = line.bytes.len();
+                        trace!(
+                            message = "Read bytes.",
+                            path = ?watcher.path,
+                            bytes = ?sz
+                        );
+                        stats.record_bytes(sz);
+
+                        bytes_read += sz;
+                        group_bytes_read += sz;
+
+                        lines.push(Line {
+                            text: line.bytes,
+                            filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                            file_id,
+                            start_offset: line.offset,
+                            end_offset: watcher.get_file_position(),
+                        });
+
+                        if group_bytes_read > self.max_read_bytes {
+                            maxed_out_reading_group = true;
+                            break;
+                        }
+                    }
+                    stats.record("reading", start.elapsed());
+
+                    if bytes_read > 0 {
+                        global_bytes_read = global_bytes_read.saturating_add(bytes_read);
+                    } else {
+                        // Should the file be removed
+                        if let Some(grace_period) = self.remove_after
+                            && watcher.last_read_success().elapsed() >= grace_period
+                        {
+                            // Try to remove
+                            match remove_file(&watcher.path).await {
+                                Ok(()) => {
+                                    self.emitter.emit_file_deleted(&watcher.path);
+                                    watcher.set_dead();
+                                }
+                                Err(error) => {
+                                    // We will try again after some time.
+                                    self.emitter.emit_file_delete_error(&watcher.path, error);
+                                }
                             }
                         }
                     }
+
+                    if group_bytes_read > self.max_read_bytes
+                        || (has_successor && !watcher.finished_reading().await)
+                    {
+                        break;
+                    }
                 }
 
-                // Do not move on to newer files if we are behind on an older file
-                if self.oldest_first && maxed_out_reading_single_file {
+                // Preserve oldest_first for callers that request global prioritization.
+                if self.oldest_first && maxed_out_reading_group {
                     break;
                 }
             }
@@ -451,6 +491,41 @@ where
             }
             stats.record("sleeping", start.elapsed());
         }
+    }
+
+    fn read_groups(
+        &self,
+        files: &IndexMap<FileFingerprint, FileWatcher>,
+        previously_watched: &HashSet<FileFingerprint>,
+    ) -> Vec<ReadGroup> {
+        let mut groups: IndexMap<ReadGroupKey, Vec<(Option<String>, FileFingerprint)>> =
+            IndexMap::new();
+        for (&file_id, watcher) in files {
+            let (key, rotation) = match self.paths_provider.file_ordering(&watcher.path) {
+                Some(ordering) => (ReadGroupKey::Sequence(ordering.group), ordering.rotation),
+                None => (ReadGroupKey::File(file_id), None),
+            };
+            groups.entry(key).or_default().push((rotation, file_id));
+        }
+        groups
+            .into_iter()
+            .map(|(key, mut files)| {
+                let ordered = matches!(key, ReadGroupKey::Sequence(_));
+                if ordered {
+                    files.sort_by(|left, right| {
+                        (left.0.is_none(), &left.0).cmp(&(right.0.is_none(), &right.0))
+                    });
+                }
+                ReadGroup {
+                    ordered,
+                    ready: !ordered
+                        || files
+                            .iter()
+                            .all(|(_, file_id)| previously_watched.contains(file_id)),
+                    files: files.into_iter().map(|(_, file_id)| file_id).collect(),
+                }
+            })
+            .collect()
     }
 
     async fn watch_new_file(

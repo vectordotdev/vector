@@ -20,7 +20,9 @@ use crate::{
     event,
     event::{Event, LogEvent, Value},
     internal_events::{KubernetesMergedLineTooBigError, KubernetesMergedLineTruncated},
-    sources::kubernetes_logs::transform_utils::get_message_path,
+    sources::kubernetes_logs::{
+        path_helpers::parse_container_log_path, transform_utils::get_message_path,
+    },
 };
 
 /// The key we use for `file` field.
@@ -286,10 +288,15 @@ fn merge_partial_events_with_custom_expiration(
             // merged into a partial line on the other. See `BucketKey`.
             let stream = event
                 .get(&stream_path)
-                .and_then(|x| x.as_str())
+                .and_then(Value::to_str_lossy)
                 .map(|x| x.to_string())
                 .unwrap_or_default();
 
+            // Kubelet renames a container attempt's current log during rotation.
+            // Keep the original event metadata, but use one key for its rotated files.
+            let file = parse_container_log_path(&file)
+                .map(|path| path.attempt.to_owned())
+                .unwrap_or(file);
             let key = BucketKey { file, stream };
 
             state.add_event(event, &key, &message_path, expiration_time);
@@ -353,6 +360,116 @@ mod test {
 
         let output: Vec<Event> = output_stream.collect().await;
         assert_eq!(output.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn merge_record_across_rotated_files() {
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let (partial_path, file_path, stream_path) = match namespace {
+                LogNamespace::Legacy => (
+                    event_path!("_partial"),
+                    event_path!(FILE_KEY),
+                    event_path!("stream"),
+                ),
+                LogNamespace::Vector => (
+                    metadata_path!("kubernetes_logs", "_partial"),
+                    metadata_path!("kubernetes_logs", FILE_KEY),
+                    metadata_path!("kubernetes_logs", "stream"),
+                ),
+            };
+            let message_path = get_message_path(namespace);
+            let mut prefix = LogEvent::default();
+            prefix.insert(&message_path, "hello ");
+            prefix.insert(partial_path, true);
+            prefix.insert(
+                file_path,
+                "/var/log/pods/ns_pod_uid/container/0.log.20261124-190000",
+            );
+            prefix.insert(stream_path, "stdout");
+
+            let mut suffix = LogEvent::default();
+            suffix.insert(&message_path, "world");
+            suffix.insert(file_path, "/var/log/pods/ns_pod_uid/container/0.log");
+            suffix.insert(stream_path, "stdout");
+
+            let output: Vec<Event> = merge_partial_events(
+                futures::stream::iter([prefix.into(), suffix.into()]),
+                namespace,
+                Some(11),
+                OversizedAction::Drop,
+            )
+            .collect()
+            .await;
+
+            assert_eq!(output.len(), 1);
+            assert_eq!(
+                output[0].as_log().get(&message_path),
+                Some(&value!("hello world"))
+            );
+            assert_eq!(
+                output[0].as_log().get(file_path),
+                Some(&value!(
+                    "/var/log/pods/ns_pod_uid/container/0.log.20261124-190000"
+                ))
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rotated_records_keep_streams_and_container_attempts_separate() {
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let (partial_path, file_path, stream_path) = match namespace {
+                LogNamespace::Legacy => (
+                    event_path!("_partial"),
+                    event_path!(FILE_KEY),
+                    event_path!("stream"),
+                ),
+                LogNamespace::Vector => (
+                    metadata_path!("kubernetes_logs", "_partial"),
+                    metadata_path!("kubernetes_logs", FILE_KEY),
+                    metadata_path!("kubernetes_logs", "stream"),
+                ),
+            };
+            let message_path = get_message_path(namespace);
+            let events = [
+                ("out-", "0.log.20261124-190000", "stdout", true),
+                ("err-", "0.log.20261124-190000", "stderr", true),
+                ("done", "0.log", "stderr", false),
+                ("restart", "1.log", "stdout", false),
+                ("done", "0.log", "stdout", false),
+            ]
+            .map(|(message, filename, stream, partial)| {
+                let mut event = LogEvent::default();
+                event.insert(&message_path, message);
+                event.insert(
+                    file_path,
+                    format!("/var/log/pods/ns_pod_uid/container/{filename}"),
+                );
+                event.insert(stream_path, stream);
+                event.insert(partial_path, partial);
+                Event::from(event)
+            });
+            let output: Vec<Event> = merge_partial_events(
+                futures::stream::iter(events),
+                namespace,
+                None,
+                OversizedAction::Drop,
+            )
+            .collect()
+            .await;
+
+            assert_eq!(
+                output
+                    .iter()
+                    .map(|event| event.as_log().get(&message_path))
+                    .collect::<Vec<_>>(),
+                vec![
+                    Some(&value!("err-done")),
+                    Some(&value!("restart")),
+                    Some(&value!("out-done"))
+                ]
+            );
+        }
     }
 
     #[tokio::test]

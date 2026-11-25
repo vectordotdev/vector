@@ -22,6 +22,9 @@ vector-common = { path = "../vector-common", default-features = false }
 file-source-common = { path = "../file-source-common" }
 async-compression.workspace = true
 
+[target.'cfg(target_os = "linux")'.dependencies]
+libc.workspace = true
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
 quickcheck.workspace = true

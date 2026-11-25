@@ -1,6 +1,8 @@
 use async_compression::tokio::bufread::GzipDecoder;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
+#[cfg(target_os = "linux")]
+use std::os::fd::AsRawFd as _;
 use std::{
     io::{self, SeekFrom},
     path::PathBuf,
@@ -13,7 +15,7 @@ use tokio::{
     io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncSeekExt, BufReader, ReadBuf},
     time::Instant,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
@@ -24,6 +26,12 @@ use vector_common::compression::gzip_multiple_decoder;
 
 const EOF_READ_BACKOFF_MIN: Duration = Duration::from_millis(1);
 const EOF_READ_BACKOFF_MAX: Duration = Duration::from_millis(250);
+
+enum WriterState {
+    Unknown,
+    Closed,
+    Unsupported,
+}
 
 #[cfg(test)]
 mod tests;
@@ -145,6 +153,7 @@ pub struct FileWatcher {
     inode: u64,
     is_dead: bool,
     reached_eof: bool,
+    writer_state: WriterState,
     last_read_attempt: Instant,
     last_read_success: Instant,
     read_retry_delay: Duration,
@@ -261,6 +270,7 @@ impl FileWatcher {
             inode: ino,
             is_dead: false,
             reached_eof: false,
+            writer_state: WriterState::Unknown,
             last_read_attempt: ts,
             last_read_success: ts,
             read_retry_delay: EOF_READ_BACKOFF_MIN,
@@ -304,6 +314,7 @@ impl FileWatcher {
                     FileReader::Plain(reader)
                 };
                 self.reader = new_reader;
+                self.writer_state = WriterState::Unknown;
 
                 self.devno = file_info.portable_dev();
                 self.inode = file_info.portable_ino();
@@ -401,17 +412,18 @@ impl FileWatcher {
                 successfully_read: None,
                 discarded_for_size_and_truncated,
             }) => {
-                if self.file_findable() {
+                if self.file_findable() && !matches!(self.writer_state, WriterState::Closed) {
                     self.track_read_eof();
                     Ok(RawLineResult {
                         raw_line: None,
                         discarded_for_size_and_truncated,
                     })
                 } else {
-                    self.set_dead();
-                    // File has been deleted, so return what we have in the buffer, even though it
-                    // didn't end with a newline. This is not a perfect signal for when we should
-                    // give up waiting for a newline, but it's decent.
+                    if !self.file_findable() {
+                        self.set_dead();
+                    }
+                    // A closed writer cannot finish an unterminated line. As with a
+                    // deleted file, emit the remaining bytes instead of waiting forever.
                     let buf = self.buf.split().freeze();
                     if buf.is_empty() {
                         // EOF
@@ -472,6 +484,9 @@ impl FileWatcher {
 
     #[inline]
     pub fn should_read(&self) -> bool {
+        if matches!(self.writer_state, WriterState::Closed) {
+            return !self.file_findable() || !self.reached_eof || !self.buf.is_empty();
+        }
         if self.reached_eof && self.last_read_attempt.elapsed() < self.read_retry_delay {
             return false;
         }
@@ -489,6 +504,73 @@ impl FileWatcher {
     pub fn reached_eof(&self) -> bool {
         self.reached_eof
     }
+
+    /// Whether an ordered predecessor has been drained after its writer closed.
+    pub(super) async fn finished_reading(&mut self) -> bool {
+        if !self.reached_eof {
+            return false;
+        }
+        match self.writer_state {
+            WriterState::Closed => return self.buf.is_empty(),
+            WriterState::Unsupported => return true,
+            WriterState::Unknown => {}
+        }
+        let FileReader::Plain(reader) = &self.reader else {
+            return true;
+        };
+        match writer_closed(reader.get_ref()).await {
+            Ok(false) => return false,
+            Ok(true) => self.writer_state = WriterState::Closed,
+            Err(error) => {
+                warn!(
+                    message = "Cannot verify rotated log writer closure; using EOF ordering.",
+                    path = ?self.path,
+                    %error,
+                    internal_log_rate_limit = true,
+                );
+                self.writer_state = WriterState::Unsupported;
+                return true;
+            }
+        }
+        // The writer may have appended and closed between our EOF and the
+        // closure check. Drain those bytes before advancing to its successor.
+        if self
+            .reader
+            .file_size()
+            .await
+            .is_none_or(|size| size > self.file_position)
+        {
+            self.reached_eof = false;
+            return false;
+        }
+        self.buf.is_empty()
+    }
+}
+
+#[cfg(target_os = "linux")]
+async fn writer_closed(file: &File) -> io::Result<bool> {
+    // An independent open file description releases its lease on drop, without
+    // changing the reader's descriptor. The proc path also survives unlink/rename.
+    let probe = File::open(format!("/proc/self/fd/{}", file.as_raw_fd())).await?;
+    // SAFETY: probe owns a live, read-only file descriptor for this call.
+    let result = unsafe { libc::fcntl(probe.as_raw_fd(), libc::F_SETLEASE, libc::F_RDLCK) };
+    if result == 0 {
+        return Ok(true);
+    }
+    let error = io::Error::last_os_error();
+    if error.raw_os_error() == Some(libc::EAGAIN) {
+        Ok(false)
+    } else {
+        Err(error)
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+async fn writer_closed(_file: &File) -> io::Result<bool> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "writer closure checks require Linux file leases",
+    ))
 }
 
 async fn is_gzipped<R: AsyncRead + Unpin>(r: &mut BufReader<R>) -> io::Result<bool> {

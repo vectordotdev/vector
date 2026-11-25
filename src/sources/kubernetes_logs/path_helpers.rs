@@ -12,6 +12,42 @@ const K8S_LOGS_DIR: &str = "/var/log/pods";
 /// The delimiter used in the log path.
 const LOG_PATH_DELIMITER: &str = "_";
 
+/// A container attempt's log path and its optional rotation timestamp.
+pub(super) struct ContainerLogPath<'a> {
+    /// The path through `<restart-count>.log`, shared by that attempt's rotations.
+    pub attempt: &'a str,
+    /// Rotated files sort by timestamp; the current file has no timestamp.
+    pub rotation: Option<&'a str>,
+}
+
+/// Recognizes kubelet's current and timestamp-suffixed container log paths.
+pub(super) fn parse_container_log_path(path: &str) -> Option<ContainerLogPath<'_>> {
+    let (_, filename) = path.rsplit_once('/')?;
+    let (attempt, suffix) = filename.split_once(".log")?;
+    if attempt.is_empty() || !attempt.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let rotation = if suffix.is_empty() {
+        None
+    } else {
+        let timestamp = suffix.strip_prefix('.')?;
+        if timestamp.len() != 15
+            || timestamp.as_bytes()[8] != b'-'
+            || !timestamp
+                .bytes()
+                .enumerate()
+                .all(|(index, byte)| index == 8 || byte.is_ascii_digit())
+        {
+            return None;
+        }
+        Some(timestamp)
+    };
+    Some(ContainerLogPath {
+        attempt: path.strip_suffix(suffix)?,
+        rotation,
+    })
+}
+
 /// Builds absolute log directory path for a pod sandbox.
 ///
 /// Based on <https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L178>
@@ -66,6 +102,18 @@ pub(super) struct LogFileInfo<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn container_attempt_survives_rotation_without_combining_restarts() {
+        let current = parse_container_log_path("/var/log/pods/ns_pod_uid/app/0.log").unwrap();
+        let rotated =
+            parse_container_log_path("/var/log/pods/ns_pod_uid/app/0.log.20261124-190000").unwrap();
+        let restarted = parse_container_log_path("/var/log/pods/ns_pod_uid/app/1.log").unwrap();
+        assert_eq!(current.attempt, rotated.attempt);
+        assert_eq!(current.rotation, None);
+        assert_eq!(rotated.rotation, Some("20261124-190000"));
+        assert_ne!(current.attempt, restarted.attempt);
+    }
 
     #[test]
     fn test_build_pod_logs_directory() {

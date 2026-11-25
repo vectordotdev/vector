@@ -2,6 +2,8 @@ mod bytes_unread;
 mod experiment;
 mod experiment_no_truncations;
 
+#[cfg(target_os = "linux")]
+use std::io::Write as _;
 use std::{fs, path::PathBuf, str, thread};
 
 use async_compression::tokio::bufread::GzipEncoder;
@@ -10,6 +12,45 @@ use quickcheck::{Arbitrary, Gen};
 use tokio::{io::AsyncReadExt as _, time::Instant};
 
 use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileReader, FileWatcher};
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn rotated_file_waits_for_writer_and_drains_late_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("0.log.20261124-190000");
+    let mut writer = fs::File::create(&path).unwrap();
+    writer.write_all(b"prefix\n").unwrap();
+    let mut watcher = FileWatcher::new(
+        path,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+        "prefix"
+    );
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    assert!(!watcher.finished_reading().await);
+
+    writer.write_all(b"late prefix").unwrap();
+    drop(writer);
+    assert!(!watcher.finished_reading().await);
+    assert_eq!(
+        watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+        "late prefix"
+    );
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    assert!(watcher.finished_reading().await);
+    assert!(!watcher.should_read());
+    watcher.set_file_findable(false);
+    assert!(watcher.should_read());
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    assert!(watcher.dead());
+}
 
 // Welcome.
 //
@@ -230,6 +271,7 @@ fn watcher_for_timing() -> FileWatcher {
         inode: 0,
         is_dead: false,
         reached_eof: false,
+        writer_state: super::WriterState::Unknown,
         last_read_attempt: now,
         last_read_success: now,
         read_retry_delay: EOF_READ_BACKOFF_MIN,
