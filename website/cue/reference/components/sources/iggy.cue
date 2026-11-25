@@ -100,7 +100,6 @@ components: sources: iggy: {
 
 	telemetry: metrics: {
 		iggy_consumer_committed_offset: components.sources.internal_metrics.output.metrics.iggy_consumer_committed_offset
-		iggy_consumer_lag_messages:     components.sources.internal_metrics.output.metrics.iggy_consumer_lag_messages
 		iggy_consumer_polled_offset:    components.sources.internal_metrics.output.metrics.iggy_consumer_polled_offset
 	}
 

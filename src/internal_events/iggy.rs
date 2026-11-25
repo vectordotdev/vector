@@ -86,19 +86,10 @@ pub(crate) struct IggyOffsetPolled<'a> {
     pub topic: &'a str,
     pub partition: u32,
     pub message_offset: u64,
-    pub current_offset: u64,
 }
 
 impl InternalEvent for IggyOffsetPolled<'_> {
     fn emit(self) {
-        let lag = self.current_offset.saturating_sub(self.message_offset);
-        gauge!(
-            GaugeName::IggyConsumerLagMessages,
-            "stream" => self.stream.to_string(),
-            "topic" => self.topic.to_string(),
-            "partition" => self.partition.to_string(),
-        )
-        .set(LossyF64(lag));
         gauge!(
             GaugeName::IggyConsumerPolledOffset,
             "stream" => self.stream.to_string(),

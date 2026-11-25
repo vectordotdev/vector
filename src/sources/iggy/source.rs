@@ -718,7 +718,6 @@ async fn process_received_message(
         topic: metadata.topic,
         partition: partition_id,
         message_offset: offset,
-        current_offset: received.current_offset,
     });
 
     let (batch, status_receiver) = BatchNotifier::new_with_receiver();

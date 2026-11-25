@@ -594,25 +594,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags: {}
 		}
-		iggy_consumer_lag_messages: {
-			description:       "The number of messages between the last consumed offset and the partition's current high-water offset."
-			type:              "gauge"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				stream: {
-					description: "The Iggy stream name."
-					required:    true
-				}
-				topic: {
-					description: "The Iggy topic name."
-					required:    true
-				}
-				partition: {
-					description: "The Iggy partition ID."
-					required:    true
-				}
-			}
-		}
 		iggy_consumer_polled_offset: {
 			description:       "The offset of the last message polled from the broker for a partition. This advances as soon as a message is received from the SDK and does not imply downstream delivery; see `iggy_consumer_committed_offset` for the offset most recently stored on the server."
 			type:              "gauge"
