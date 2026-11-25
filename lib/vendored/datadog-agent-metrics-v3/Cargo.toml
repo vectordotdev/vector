@@ -13,3 +13,7 @@ publish = false
 [dependencies]
 foldhash = { version = "0.2", default-features = false, features = ["std"] }
 protobuf.workspace = true
+
+# `src/` is an unchanged copy of the upstream Saluki crate, so this crate must not
+# inherit `[workspace.lints]`. See README.md before changing anything here.
+[lints]

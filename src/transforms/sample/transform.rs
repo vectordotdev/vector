@@ -15,7 +15,7 @@ use crate::{
     internal_events::SampleEventDiscarded,
     sinks::prelude::TemplateRenderingError,
     template::UnconfinedTemplate,
-    transforms::{FunctionTransform, OutputBuffer},
+    transforms::{StatefulTransform, TransformOutputsBuf},
 };
 
 #[allow(
@@ -198,13 +198,26 @@ pub struct Sample {
     name: String,
     static_mode: SampleMode,
     key_source: SampleKeySource,
-    next_group_state: GroupState,
-    group_states: LruCache<Option<String>, GroupState>,
-    group_state_bytes: usize,
     max_state_bytes: usize,
     exclude: Option<Condition>,
     rate_key: OptionalValuePath,
     include_group_tag: bool,
+}
+
+/// Mutable sampling history retained by one inline execution.
+#[derive(Clone)]
+pub struct SampleState {
+    next_group_state: GroupState,
+    group_states: LruCache<Option<String>, GroupState>,
+    group_state_bytes: usize,
+}
+
+impl SampleState {
+    #[cfg(test)]
+    #[must_use]
+    pub const fn retained_state_bytes(&self) -> usize {
+        self.group_state_bytes
+    }
 }
 
 impl Sample {
@@ -213,7 +226,7 @@ impl Sample {
     #![allow(dead_code)]
     #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new(
+    pub const fn new(
         name: String,
         static_mode: SampleMode,
         key_field: Option<String>,
@@ -239,7 +252,7 @@ impl Sample {
 
     #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new_with_dynamic(
+    pub const fn new_with_dynamic(
         name: String,
         static_mode: SampleMode,
         fields: DynamicSampleFields,
@@ -260,7 +273,7 @@ impl Sample {
         )
     }
 
-    fn new_with_source(
+    const fn new_with_source(
         name: String,
         static_mode: SampleMode,
         key_source: SampleKeySource,
@@ -269,17 +282,10 @@ impl Sample {
         sample_rate_key: OptionalValuePath,
         include_group_tag: bool,
     ) -> Self {
-        let next_group_state = GroupState {
-            static_state: static_mode.new_state(),
-            dynamic_event_counter: 0,
-        };
         Self {
             name,
             static_mode,
             key_source,
-            next_group_state,
-            group_states: LruCache::unbounded(),
-            group_state_bytes: 0,
             max_state_bytes,
             exclude,
             rate_key: sample_rate_key,
@@ -293,35 +299,31 @@ impl Sample {
     /// A group whose entry alone exceeds the limit is sampled but not retained, so each of its
     /// events is admitted like a new group.
     fn sample_group(
-        &mut self,
+        &self,
+        state: &mut SampleState,
         group_by_key: Option<String>,
         sample: impl FnOnce(&mut GroupState) -> bool,
     ) -> bool {
-        if let Some(state) = self.group_states.get_mut(&group_by_key) {
+        if let Some(state) = state.group_states.get_mut(&group_by_key) {
             return sample(state);
         }
 
-        let mut state = self.next_group_state.take_next();
-        let should_sample = sample(&mut state);
+        let mut group_state = state.next_group_state.take_next();
+        let should_sample = sample(&mut group_state);
 
         let entry_bytes = group_state_entry_bytes(&group_by_key);
         if entry_bytes <= self.max_state_bytes {
-            while self.group_state_bytes + entry_bytes > self.max_state_bytes {
-                let Some((evicted_key, _)) = self.group_states.pop_lru() else {
+            while state.group_state_bytes + entry_bytes > self.max_state_bytes {
+                let Some((evicted_key, _)) = state.group_states.pop_lru() else {
                     break;
                 };
-                self.group_state_bytes -= group_state_entry_bytes(&evicted_key);
+                state.group_state_bytes -= group_state_entry_bytes(&evicted_key);
             }
-            self.group_states.put(group_by_key, state);
-            self.group_state_bytes += entry_bytes;
+            state.group_states.put(group_by_key, group_state);
+            state.group_state_bytes += entry_bytes;
         }
 
         should_sample
-    }
-
-    #[cfg(test)]
-    pub const fn retained_state_bytes(&self) -> usize {
-        self.group_state_bytes
     }
 
     #[cfg(test)]
@@ -417,13 +419,26 @@ impl Sample {
     }
 }
 
-impl FunctionTransform for Sample {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+impl StatefulTransform for Sample {
+    type State = SampleState;
+
+    fn new_state(&self) -> SampleState {
+        SampleState {
+            next_group_state: GroupState {
+                static_state: self.static_mode.new_state(),
+                dynamic_event_counter: 0,
+            },
+            group_states: LruCache::unbounded(),
+            group_state_bytes: 0,
+        }
+    }
+
+    fn transform(&self, state: &mut SampleState, event: Event, output: &mut TransformOutputsBuf) {
         let mut event = {
             if let Some(condition) = self.exclude.as_ref() {
                 let (result, event) = condition.check(event);
                 if result {
-                    output.push(event);
+                    output.push(None, event);
                     return;
                 }
                 event
@@ -447,7 +462,7 @@ impl FunctionTransform for Sample {
             EventSampleMode::sample_rate_label,
         );
 
-        let should_sample = self.sample_group(group_by_key, |group_state| {
+        let should_sample = self.sample_group(state, group_by_key, |group_state| {
             if let Some(mode) = event_sample_mode {
                 mode.sample(&mut group_state.dynamic_event_counter)
             } else {
@@ -474,7 +489,7 @@ impl FunctionTransform for Sample {
                     Event::Metric(_) => panic!("component can never receive metric events"),
                 }
             }
-            output.push(event);
+            output.push(None, event);
         } else {
             emit(SampleEventDiscarded {
                 group: discarded_group,

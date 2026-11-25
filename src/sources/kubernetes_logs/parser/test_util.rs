@@ -11,7 +11,7 @@ use vrl::{value, value::Value};
 use crate::{
     event::{Event, LogEvent},
     sources::kubernetes_logs::Config,
-    transforms::{FunctionTransform, OutputBuffer},
+    transforms::OutputBuffer,
 };
 
 /// Build a log event for test purposes.
@@ -59,18 +59,15 @@ pub(super) fn make_log_event(
 
 /// Shared logic for testing parsers.
 ///
-/// Takes a parser builder and a list of test cases.
-pub(super) fn test_parser<B, L, S, F>(builder: B, loader: L, cases: Vec<(S, Vec<Event>)>)
-where
-    B: Fn() -> F,
-    F: FunctionTransform,
-    L: Fn(S) -> Event,
-{
+pub(super) fn test_parser<S>(
+    parse: impl Fn(&mut OutputBuffer, Event),
+    loader: impl Fn(S) -> Event,
+    cases: Vec<(S, Vec<Event>)>,
+) {
     for (message, expected) in cases {
         let input = loader(message);
-        let mut parser = (builder)();
         let mut output = OutputBuffer::default();
-        parser.transform(&mut output, input);
+        parse(&mut output, input);
 
         let actual = output.into_events().collect::<Vec<_>>();
 

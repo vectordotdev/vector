@@ -2,6 +2,8 @@ version: 2
 updates:
   - package-ecosystem: "cargo"
     directory: "/"
+    cooldown:
+      default-days: 7
     schedule:
       interval: "monthly"
       time: "04:00" # UTC

@@ -111,7 +111,7 @@ fn has_added_deprecation_announcement(repo_root: &Path, merge_base: &str) -> Res
 
     let notices = deprecation::read_all(repo_root)?;
     let current = CargoToml::load_from(&repo_root.join("Cargo.toml"))?;
-    let current = Version::parse(&current.package.version)?;
+    let current = Version::parse(&current.workspace.package.version)?;
     // Release pages match the full version, with development suffixes removed.
     let release = Version::new(current.major, current.minor, current.patch);
     let has_announcement = notices.active.iter().any(|notice| {

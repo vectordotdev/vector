@@ -302,9 +302,9 @@ fn build_closed_schema_flatten_eligibility_mappings(
             .collect::<HashSet<_>>();
 
         if would_not_unmark.len() >= would_unmark.len() {
-            eligible_to_flatten.insert(child_schema_ref.clone(), would_unmark);
+            eligible_to_flatten.insert(child_schema_ref, would_unmark);
         } else {
-            eligible_to_flatten.insert(child_schema_ref.clone(), would_not_unmark);
+            eligible_to_flatten.insert(child_schema_ref, would_not_unmark);
         }
     }
 
