@@ -352,6 +352,68 @@ impl<S> OutputUtilization<S> {
     }
 }
 
+/// Lets an idle worker take over a stage that has a backlog.
+///
+/// When a task wakes another task (for example by sending into its input buffer), tokio's
+/// multi-thread scheduler puts the woken task in the current worker's LIFO slot. That slot can't be
+/// stolen, and filling it doesn't wake an idle worker, so the woken stage only runs once the current
+/// task stops. If the current task keeps finding ready input, adjacent stages take turns on one
+/// worker while the others stay parked.
+///
+/// This adapter yields once whenever an item is ready right after the previous one: it holds the
+/// item back, wakes its own task and returns `Poll::Pending`. Tokio reschedules a task that woke
+/// itself during its poll at the back of the stealable queue and notifies an idle worker, if any.
+/// The worker then runs the stage in its LIFO slot while an idle worker picks this one up. When
+/// input runs out after each item, this never yields.
+///
+/// Don't use it where the inner stream is recovered from the wrapper, because a held item would be
+/// dropped with it.
+#[pin_project]
+pub struct YieldWhenBusy<S: Stream> {
+    #[pin]
+    inner: S,
+    held: Option<S::Item>,
+    /// The previous poll returned an item, so this task hasn't waited since.
+    busy: bool,
+}
+
+impl<S: Stream> YieldWhenBusy<S> {
+    #[must_use]
+    pub const fn new(inner: S) -> Self {
+        Self {
+            inner,
+            held: None,
+            busy: false,
+        }
+    }
+}
+
+impl<S: Stream> Stream for YieldWhenBusy<S> {
+    type Item = S::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        if let Some(item) = this.held.take() {
+            return Poll::Ready(Some(item));
+        }
+        match this.inner.poll_next(cx) {
+            Poll::Ready(Some(item)) if *this.busy => {
+                *this.held = Some(item);
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+            Poll::Ready(item) => {
+                *this.busy = item.is_some();
+                Poll::Ready(item)
+            }
+            Poll::Pending => {
+                *this.busy = false;
+                Poll::Pending
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use mock_instant::global::MockClock;
@@ -701,6 +763,61 @@ mod tests {
 
         MockClock::advance(Duration::from_secs(5));
         check_timer_utilization(&emitter, &key, 0.0, "0.0 (waiting on input)");
+    }
+
+    /// Counts how many times the task was woken.
+    #[derive(Default)]
+    struct WakeCounter(std::sync::atomic::AtomicUsize);
+
+    impl futures::task::ArcWake for WakeCounter {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            arc_self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Back-to-back ready items each cost one self-woken yield; items keep their order and none
+    /// are lost.
+    #[test]
+    fn test_yield_when_busy_yields_between_ready_items() {
+        let counter = Arc::new(WakeCounter::default());
+        let waker = futures::task::waker(Arc::clone(&counter));
+        let mut cx = std::task::Context::from_waker(&waker);
+        let mut stream = YieldWhenBusy::new(futures::stream::iter([1, 2, 3]));
+
+        assert_eq!(
+            Pin::new(&mut stream).poll_next(&mut cx),
+            Poll::Ready(Some(1))
+        );
+        for expected in [2, 3] {
+            assert!(Pin::new(&mut stream).poll_next(&mut cx).is_pending());
+            assert_eq!(
+                Pin::new(&mut stream).poll_next(&mut cx),
+                Poll::Ready(Some(expected))
+            );
+        }
+        assert_eq!(Pin::new(&mut stream).poll_next(&mut cx), Poll::Ready(None));
+        assert_eq!(counter.0.load(Ordering::Relaxed), 2);
+    }
+
+    /// An item that arrives after the input ran dry is returned without yielding.
+    #[test]
+    fn test_yield_when_busy_no_yield_after_wait() {
+        let counter = Arc::new(WakeCounter::default());
+        let waker = futures::task::waker(Arc::clone(&counter));
+        let mut cx = std::task::Context::from_waker(&waker);
+        let (tx, rx) = futures::channel::mpsc::unbounded::<u32>();
+        let mut stream = YieldWhenBusy::new(rx);
+
+        for i in 0..3 {
+            tx.unbounded_send(i).unwrap();
+            assert_eq!(
+                Pin::new(&mut stream).poll_next(&mut cx),
+                Poll::Ready(Some(i))
+            );
+            assert!(Pin::new(&mut stream).poll_next(&mut cx).is_pending());
+        }
+        // Only the channel woke the task (for the 2nd and 3rd sends), never a yield.
+        assert_eq!(counter.0.load(Ordering::Relaxed), 2);
     }
 
     /// Removed components are no longer reported, and re-adding a key does not

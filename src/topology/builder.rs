@@ -44,7 +44,7 @@ use vector_lib::{
     transform::update_runtime_schema_definition,
     utilization::{
         OutputUtilization, Utilization, UtilizationComponentSender, UtilizationEmitter,
-        UtilizationRegistry,
+        UtilizationRegistry, YieldWhenBusy,
     },
 };
 use vector_lib::{gauge, internal_event::GaugeName};
@@ -910,7 +910,7 @@ impl<'a> Builder<'a> {
             .utilization_registry
             .add_component(key.clone(), gauge!(GaugeName::Utilization));
         let output_sender = sender.clone();
-        let input_rx = Utilization::new(sender, input_rx.into_stream());
+        let input_rx = YieldWhenBusy::new(Utilization::new(sender, input_rx.into_stream()));
 
         let events_received = register(EventsReceived);
         let filtered = input_rx
@@ -1338,12 +1338,13 @@ impl Runner {
         let mut outputs_buf = self.outputs.new_buf_with_capacity(INLINE_BATCH_SIZE);
         let mut executor = Arc::clone(&self.transform).create_executor();
 
-        let mut input_rx = self
-            .input_rx
-            .take()
-            .expect("can't run runner twice")
-            .into_stream()
-            .filter(move |events| ready(filter_events_type(events, self.input_type)));
+        let mut input_rx = YieldWhenBusy::new(
+            self.input_rx
+                .take()
+                .expect("can't run runner twice")
+                .into_stream()
+                .filter(move |events| ready(filter_events_type(events, self.input_type))),
+        );
 
         self.timer_tx.start_wait();
         while let Some(events) = input_rx.next().await {
@@ -1365,8 +1366,11 @@ impl Runner {
             .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
-        let mut input_rx =
-            super::ready_arrays::ReadyArrays::with_capacity(input_rx, ready_array_capacity());
+        // Yield per batch of arrays, not per array, so batches keep their size.
+        let mut input_rx = YieldWhenBusy::new(super::ready_arrays::ReadyArrays::with_capacity(
+            input_rx,
+            ready_array_capacity(),
+        ));
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
