@@ -38,10 +38,6 @@ impl Configurable for QueryNode {
 }
 
 impl Configurable for VrlValue {
-    fn is_optional() -> bool {
-        true
-    }
-
     fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
