@@ -3,7 +3,10 @@
 use super::{config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{
     prelude::*,
-    util::{http::HttpRequest, partitioner::render_partition_value},
+    util::{
+        http::HttpRequest,
+        partitioner::{PartitionError, render_partition_value, report_partition_error},
+    },
 };
 use vector_lib::internal_event::emit;
 
@@ -50,7 +53,7 @@ where
                 batch_settings.timeout,
                 |_| batch_settings.as_byte_size_config(),
             )
-            .filter_map(|result| async move { result.ok() })
+            .filter_map(report_partition_error)
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -114,7 +117,7 @@ impl KeyPartitioner {
 impl Partitioner for KeyPartitioner {
     type Item = Event;
     type Key = PartitionKey;
-    type Error = crate::template::TemplateRenderingError;
+    type Error = PartitionError;
 
     fn partition(
         &self,

@@ -17,7 +17,10 @@ use snafu::Snafu;
 use tracing::Instrument;
 use vector_lib::codecs::encoding::Framer;
 
-use crate::sinks::{prelude::*, util::partitioner::KeyPartitioner};
+use crate::sinks::{
+    prelude::*,
+    util::partitioner::{KeyPartitioner, report_partition_error},
+};
 
 /// `OpenDalSink` provides generic a service upon OpenDAL.
 ///
@@ -82,7 +85,7 @@ where
             .batched_partitioned(partitioner, settings.timeout, |_| {
                 settings.as_byte_size_config()
             })
-            .filter_map(|result| async move { result.ok() })
+            .filter_map(report_partition_error)
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {

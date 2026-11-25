@@ -5,7 +5,10 @@ use vector_lib::{
     sink::PreparationError,
 };
 
-use crate::{internal_events::TemplateRenderingError, template::UnconfinedTemplate};
+use crate::{
+    internal_events::TemplateRenderingError, sinks::util::partitioner::PartitionError,
+    template::UnconfinedTemplate,
+};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ChroniclePartitionKey {
@@ -38,7 +41,7 @@ impl ChroniclePartitioner {
 impl Partitioner for ChroniclePartitioner {
     type Item = Event;
     type Key = ChroniclePartitionKey;
-    type Error = crate::template::TemplateRenderingError;
+    type Error = PartitionError;
 
     fn partition(
         &self,
@@ -55,12 +58,9 @@ impl Partitioner for ChroniclePartitioner {
                 self.fallback_log_type.clone().expect("configured fallback")
             }
             Err(error) => {
-                emit(TemplateRenderingError {
-                    error: error.clone(),
-                    field: Some("log_type"),
-                    drop_event: true,
-                });
-                return Err(PreparationError::Permanent(error));
+                return Err(PreparationError::Permanent(PartitionError::new(
+                    "log_type", error,
+                )));
             }
         };
 
@@ -69,12 +69,7 @@ impl Partitioner for ChroniclePartitioner {
             .as_ref()
             .map(|namespace| {
                 namespace.render_string(item).map_err(|error| {
-                    emit(TemplateRenderingError {
-                        error: error.clone(),
-                        field: Some("namespace"),
-                        drop_event: true,
-                    });
-                    PreparationError::Permanent(error)
+                    PreparationError::Permanent(PartitionError::new("namespace", error))
                 })
             })
             .transpose()?;
