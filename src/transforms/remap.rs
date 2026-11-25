@@ -1405,9 +1405,7 @@ mod tests {
 
     #[test]
     fn check_remap_metric_value_samples_write() {
-        // `assert_eq!` tells `2` apart from `2.0`, so it fails if the next read sees the assigned
-        // integer instead of the stored float. The statistic isn't the default, so the output also
-        // shows that it's kept.
+        // Use `assert_eq!` to distinguish integers from floats.
         let tform = remap(RemapConfig {
             source: Some(
                 indoc! {r#"

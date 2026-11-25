@@ -365,13 +365,11 @@ fn set_metric_type(metric: &mut Metric, value: &Value) -> Result<(), String> {
     Ok(())
 }
 
-/// Sets a writable part of the value of the current type: the value of a counter or gauge, such
-/// as `.gauge.value = 100`, or the samples of a distribution, such as
-/// `.distribution.samples = [{"value": 2.5, "rate": 1}]`.
+/// Sets `.counter.value`, `.gauge.value`, or `.distribution.samples` on a metric of that type.
 ///
-/// The new value is converted before anything changes, so a rejected write leaves both the metric
-/// and the cached value as they were. The cache gets the converted value rather than `value`, so
-/// that an integer reads back as a float, like the output.
+/// Converts the new value before changing anything, so a rejected write leaves the metric and the
+/// cache unchanged. The cache gets the converted value, so an integer reads back as a float, like
+/// the output.
 fn set_metric_value(
     metric: &mut Metric,
     cached: &mut Value,
@@ -388,11 +386,10 @@ fn set_metric_value(
             *current = new_value;
             cached.insert(path, metric_float_to_vrl_value(new_value));
         }
-        // The statistic is kept.
         (MetricValue::Distribution { samples, .. }, "samples") => {
             let new_samples = value
                 .as_array()
-                .ok_or_else(|| "distribution samples must be an array".to_owned())?
+                .ok_or("distribution samples must be an array")?
                 .iter()
                 .map(sample_from_vrl_value)
                 .collect::<Result<Vec<_>, _>>()?;
@@ -423,7 +420,7 @@ fn set_metric_value(
 /// The rate must be an integer of at least 1. A rate of 0 would be skipped by statistics but
 /// written as `@inf` by the StatsD encoder.
 fn sample_from_vrl_value(value: &Value) -> Result<Sample, String> {
-    const EXPECTED: &str = "a sample must be an object with only a `value` and a `rate`";
+    const EXPECTED: &str = "a sample must be an object with exactly the `value` and `rate` fields";
     let sample = value.as_object().ok_or(EXPECTED)?;
     let (Some(sample_value), Some(rate), 2) =
         (sample.get("value"), sample.get("rate"), sample.len())

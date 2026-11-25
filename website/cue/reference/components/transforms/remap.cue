@@ -143,16 +143,15 @@ components: transforms: "remap": {
 				`100.0`, and integers larger than `9007199254740992` (2^53) in absolute value might be rounded.
 				Assigning anything else, such as a string, the field of another type, or a whole object like `.gauge`,
 				leaves the value unchanged and the program keeps running. To convert between counters and gauges, set
-				`type`.
+				`.type`.
 
 				You can replace `.distribution.samples` with a new array, for example,
-				`.distribution.samples = [{"value": 2.5, "rate": 1}]`. Each sample must have exactly a `value`, an integer
-				or a float, and a `rate`, an integer from 1 to `4294967295`. The rates of all samples must also add up to
-				at most `4294967295`. An empty array removes all samples, and the statistic is kept. If any sample is
-				invalid, none of the samples change. A single sample, such as `.distribution.samples[0].value`, can't be
-				assigned.
+				`.distribution.samples = [{"value": 2.5, "rate": 1}]`. Each sample must be an object with exactly two
+				fields, `value` (an integer or a float) and `rate` (an integer from 1 to `4294967295`). The rates must also
+				add up to at most `4294967295`. An empty array removes all samples and keeps `.distribution.statistic`. If
+				any sample is invalid, the samples don't change. Individual samples and their fields are read-only.
 
-				The other value fields are read-only, and `del()` on any value field returns `null` and leaves the value
+				The other value fields are read-only. `del()` on any value field returns `null` and leaves the value
 				unchanged.
 
 				Two kinds of numbers need special handling in VRL:
