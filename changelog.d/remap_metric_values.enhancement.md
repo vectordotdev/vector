@@ -1,17 +1,17 @@
 VRL can now read metric values in the `remap` transform, `filter` and `route`
-conditions, and unit tests, and can set some of them in the `remap` transform.
-Example paths include:
+conditions, and unit tests. Example paths include:
 
-- `.counter.value` and `.gauge.value`, which can also be set on a metric of that
-  type, for example, `.gauge.value = 100`
+- `.counter.value` and `.gauge.value`
 - `.set.values`
-- `.distribution.samples`, which can also be replaced with an array of
-  `{value, rate}` objects, for example,
-  `.distribution.samples = [{"value": 2.5, "rate": 1}]`
+- `.distribution.samples`
 - `.aggregated_histogram.buckets`
 - `.aggregated_summary.quantiles`
 - `.sketch.count`, `.sketch.min`, `.sketch.max`, `.sketch.sum`, and `.sketch.avg`
 
-Other metric value fields are read-only.
+The `remap` transform can also set `.counter.value` or `.gauge.value` on a
+metric of that type, for example, `.gauge.value = 100`, and replace
+`.distribution.samples` with an array of `{value, rate}` objects, for example,
+`.distribution.samples = [{"value": 2.5, "rate": 1}]`. Other metric value
+fields are read-only.
 
 authors: JinchengCao
