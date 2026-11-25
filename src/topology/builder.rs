@@ -733,7 +733,6 @@ impl<'a> Builder<'a> {
         let utilization_sender = self
             .utilization_registry
             .add_component(key.clone(), gauge!(GaugeName::Utilization));
-        let component_key = key.clone();
         let sink = async move {
             debug!("Sink starting.");
 
@@ -749,7 +748,7 @@ impl<'a> Builder<'a> {
                 .take()
                 .expect("Task started but input has been taken.");
 
-            let mut rx = Utilization::new(utilization_sender, component_key.clone(), rx);
+            let mut rx = Utilization::new(utilization_sender, rx);
 
             let events_received = register(EventsReceived);
             sink.run(
@@ -911,7 +910,7 @@ impl<'a> Builder<'a> {
             .utilization_registry
             .add_component(key.clone(), gauge!(GaugeName::Utilization));
         let output_sender = sender.clone();
-        let input_rx = Utilization::new(sender, key.clone(), input_rx.into_stream());
+        let input_rx = Utilization::new(sender, input_rx.into_stream());
 
         let events_received = register(EventsReceived);
         let filtered = input_rx
@@ -1317,7 +1316,7 @@ impl Runner {
     }
 
     fn on_events_received(&mut self, events: &EventArray) {
-        self.timer_tx.try_send_stop_wait();
+        self.timer_tx.stop_wait();
 
         self.events_received.emit(CountByteSize(
             events.len(),
@@ -1326,7 +1325,7 @@ impl Runner {
     }
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
-        self.timer_tx.try_send_start_wait();
+        self.timer_tx.start_wait();
         let now = Instant::now();
         outputs_buf.for_each_array_mut(|array| self.latency_recorder.on_send(array, now));
         self.outputs.send(outputs_buf).await
@@ -1346,7 +1345,7 @@ impl Runner {
             .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
-        self.timer_tx.try_send_start_wait();
+        self.timer_tx.start_wait();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
             executor.transform_all(events, &mut outputs_buf);
@@ -1372,7 +1371,7 @@ impl Runner {
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
 
-        self.timer_tx.try_send_start_wait();
+        self.timer_tx.start_wait();
         loop {
             tokio::select! {
                 biased;

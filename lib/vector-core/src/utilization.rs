@@ -1,7 +1,10 @@
 use std::{
     collections::HashMap,
     pin::Pin,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     task::{Context, Poll, ready},
     time::Duration,
 };
@@ -15,51 +18,34 @@ use mock_instant::global::Instant;
 use futures::{Stream, StreamExt};
 use metrics::Gauge;
 use pin_project::pin_project;
-use tokio::{
-    sync::mpsc::{Receiver, Sender, channel},
-    time::interval,
-};
+use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 use vector_common::{id::ComponentKey, shutdown::ShutdownSignal, stats};
 
 const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
 
-/// Stream wrappers used to approximate component utilization from poll timing.
+/// Input-side utilization wrapper.
 ///
-/// Current model:
-///
-///
+/// Counts the time the wrapped stream spends returning `Poll::Pending` as time spent waiting for
+/// upstream input. A poll that is immediately ready only costs one atomic load: the clock is read
+/// and the shared timer is locked only when the component actually changes state.
 #[pin_project]
 pub struct Utilization<S> {
-    intervals: IntervalStream,
-    timer_tx: UtilizationComponentSender,
-    component_key: ComponentKey,
+    timer: UtilizationComponentSender,
     inner: S,
 }
 
 impl<S> Utilization<S> {
-    /// Output-side utilization wrapper for task transforms.
-    ///
-    /// Measures the time after the wrapped stream yields an item until downstream
-    /// polls it again.
+    /// Wraps `inner` so that the time spent waiting on it is reported through `timer`.
     #[must_use]
-    pub fn new(
-        timer_tx: UtilizationComponentSender,
-        component_key: ComponentKey,
-        inner: S,
-    ) -> Self {
-        Self {
-            intervals: IntervalStream::new(interval(Duration::from_secs(5))),
-            timer_tx,
-            component_key,
-            inner,
-        }
+    pub const fn new(timer: UtilizationComponentSender, inner: S) -> Self {
+        Self { timer, inner }
     }
 
     /// Consumes this wrapper and returns the inner stream.
     ///
     /// This can't be constant because destructors can't be run in a const context, and we're
-    /// discarding `IntervalStream`/`Timer` when we call this.
+    /// discarding the timer handle when we call this.
     #[must_use]
     pub fn into_inner(self) -> S {
         self.inner
@@ -73,19 +59,23 @@ where
     type Item = S::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // The goal of this function is to measure the time between when the
-        // caller requests the next Event from the stream and before one is
-        // ready, with the side-effect of reporting every so often about how
-        // long the wait gap is.
+        // Poll first and only record a transition when the state changes: a component under
+        // steady load is never pending here, so it never reads the clock.
         //
-        // This will just measure the time, while UtilizationEmitter collects
-        // all the timers and emits utilization value periodically
+        // The waiting state lives in the shared timer rather than in this wrapper because other
+        // wrappers of the same component (`OutputUtilization`, the sync transform runner) also
+        // move it. Both calls below are a single atomic load when the state is already right.
         let this = self.project();
-        this.timer_tx.try_send_start_wait();
-        _ = this.intervals.poll_next_unpin(cx);
-        let result = ready!(this.inner.poll_next_unpin(cx));
-        this.timer_tx.try_send_stop_wait();
-        Poll::Ready(result)
+        match this.inner.poll_next_unpin(cx) {
+            Poll::Ready(item) => {
+                this.timer.stop_wait();
+                Poll::Ready(item)
+            }
+            Poll::Pending => {
+                this.timer.start_wait();
+                Poll::Pending
+            }
+        }
     }
 }
 
@@ -177,75 +167,94 @@ impl Timer {
     }
 }
 
-#[derive(Debug)]
-enum UtilizationTimerMessage {
-    StartWait(ComponentKey, Instant),
-    StopWait(ComponentKey, Instant),
+/// Timer state shared between a component's wrappers and the emitter.
+struct SharedTimer {
+    /// Mirror of `timer.waiting`, read without locking so that redundant
+    /// transitions (the common case) skip both the clock and the lock.
+    waiting: AtomicBool,
+    timer: parking_lot::Mutex<Timer>,
 }
 
+impl SharedTimer {
+    fn new(timer: Timer) -> Self {
+        Self {
+            waiting: AtomicBool::new(timer.waiting),
+            timer: parking_lot::Mutex::new(timer),
+        }
+    }
+
+    fn set_waiting(&self, waiting: bool) {
+        if self.waiting.load(Ordering::Relaxed) == waiting {
+            return;
+        }
+        let mut timer = self.timer.lock();
+        // Read the clock under the lock so that spans stay ordered with the
+        // emitter's reporting periods.
+        let now = Instant::now();
+        if waiting {
+            timer.start_wait(now);
+        } else {
+            timer.stop_wait(now);
+        }
+        self.waiting.store(waiting, Ordering::Relaxed);
+    }
+}
+
+/// Handle a component uses to report when it starts and stops waiting.
+///
+/// Cloning it is cheap: clones share the same timer.
 #[derive(Clone)]
 pub struct UtilizationComponentSender {
-    component_key: ComponentKey,
-    timer_tx: Sender<UtilizationTimerMessage>,
+    timer: Arc<SharedTimer>,
 }
 
 impl UtilizationComponentSender {
     /// Records that this component has started waiting.
     ///
-    /// If the channel is full or closed, the message is dropped and logged at debug level.
-    pub fn try_send_start_wait(&self) {
-        if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StartWait(
-            self.component_key.clone(),
-            Instant::now(),
-        )) {
-            debug!(component_id = ?self.component_key, error = ?err, "Couldn't send utilization start wait message.");
-        }
+    /// This is a single atomic load if the component is already waiting.
+    pub fn start_wait(&self) {
+        self.timer.set_waiting(true);
     }
 
     /// Records that this component has stopped waiting.
     ///
-    /// If the channel is full or closed, the message is dropped and logged at debug level.
-    pub fn try_send_stop_wait(&self) {
-        if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StopWait(
-            self.component_key.clone(),
-            Instant::now(),
-        )) {
-            debug!(component_id = ?self.component_key, error = ?err, "Couldn't send utilization stop wait message.");
-        }
+    /// This is a single atomic load if the component is not waiting.
+    pub fn stop_wait(&self) {
+        self.timer.set_waiting(false);
     }
 }
+
+type Timers = Arc<Mutex<HashMap<ComponentKey, Arc<SharedTimer>>>>;
 
 /// Registry for components sending utilization data.
 ///
 /// Cloning this is cheap and does not clone the underlying data.
 #[derive(Clone)]
 pub struct UtilizationRegistry {
-    timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
-    timer_tx: Sender<UtilizationTimerMessage>,
+    timers: Timers,
 }
 
 impl UtilizationRegistry {
     /// Adds a new component to this utilization metric emitter.
     ///
-    /// Returns a sender which can be used to send utilization information back to the emitter.
+    /// Returns a handle the component uses to report its wait spans. If a component with the same
+    /// key was already registered, it is replaced and handles to the old one stop being reported.
     ///
     /// # Panics
     ///
     /// Panics if the timer mutex is poisoned.
     #[must_use]
     pub fn add_component(&self, key: ComponentKey, gauge: Gauge) -> UtilizationComponentSender {
-        self.timers.lock().expect("mutex poisoned").insert(
-            key.clone(),
-            Timer::new(
-                gauge,
-                #[cfg(debug_assertions)]
-                key.id().into(),
-            ),
-        );
-        UtilizationComponentSender {
-            timer_tx: self.timer_tx.clone(),
-            component_key: key,
-        }
+        let timer = Arc::new(SharedTimer::new(Timer::new(
+            gauge,
+            #[cfg(debug_assertions)]
+            key.id().into(),
+        )));
+        self.timers
+            .lock()
+            .expect("mutex poisoned")
+            .insert(key, Arc::clone(&timer));
+        UtilizationComponentSender { timer }
     }
 
     /// Removes a component from this utilization metric emitter.
@@ -259,61 +268,44 @@ impl UtilizationRegistry {
 }
 
 pub struct UtilizationEmitter {
-    timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
-    timer_rx: Receiver<UtilizationTimerMessage>,
+    timers: Timers,
 }
 
 impl UtilizationEmitter {
     /// Creates an emitter and the registry components use to report wait spans.
     #[must_use]
     pub fn new() -> (Self, UtilizationRegistry) {
-        let (timer_tx, timer_rx) = channel(4096);
-        let timers = Arc::new(Mutex::new(HashMap::default()));
+        let timers = Timers::default();
         (
             Self {
                 timers: Arc::clone(&timers),
-                timer_rx,
             },
-            UtilizationRegistry { timers, timer_tx },
+            UtilizationRegistry { timers },
         )
     }
 
-    /// Drives utilization updates until `shutdown` resolves or the timer channel closes.
+    /// Reports the utilization of every registered component.
     ///
     /// # Panics
     ///
     /// Panics if the timer mutex is poisoned.
-    pub async fn run_utilization(mut self, mut shutdown: ShutdownSignal) {
+    fn update_utilization(&self) {
+        for timer in self.timers.lock().expect("mutex poisoned").values() {
+            timer.timer.lock().update_utilization();
+        }
+    }
+
+    /// Reports utilization periodically until `shutdown` resolves.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the timer mutex is poisoned.
+    pub async fn run_utilization(self, mut shutdown: ShutdownSignal) {
         let mut intervals = IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION));
         loop {
             tokio::select! {
-                message = self.timer_rx.recv() => {
-                    match message {
-                        Some(UtilizationTimerMessage::StartWait(key, start_time)) => {
-                            // Timer could be removed in the registry while message is still in the queue
-                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
-                                timer.start_wait(start_time);
-                            }
-                        }
-                        Some(UtilizationTimerMessage::StopWait(key, stop_time)) => {
-                            // Timer could be removed in the registry while message is still in the queue
-                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
-                                timer.stop_wait(stop_time);
-                            }
-                        }
-                        None => break,
-                    }
-                },
-
-                Some(_) = intervals.next() => {
-                    for timer in self.timers.lock().expect("mutex poisoned").values_mut() {
-                        timer.update_utilization();
-                    }
-                },
-
-                _ = &mut shutdown => {
-                    break
-                }
+                Some(_) = intervals.next() => self.update_utilization(),
+                _ = &mut shutdown => break,
             }
         }
     }
@@ -328,7 +320,7 @@ impl UtilizationEmitter {
 /// Both wrappers share a single timer per component, and the idempotent
 /// `start_wait`/`stop_wait` transitions ensure no double-counting.
 pub struct OutputUtilization<S> {
-    timer_tx: UtilizationComponentSender,
+    timer: UtilizationComponentSender,
     inner: S,
 }
 
@@ -340,10 +332,10 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
-        this.timer_tx.try_send_stop_wait();
+        this.timer.stop_wait();
         let result = ready!(this.inner.poll_next_unpin(cx));
         if result.is_some() {
-            this.timer_tx.try_send_start_wait();
+            this.timer.start_wait();
         }
         Poll::Ready(result)
     }
@@ -355,8 +347,8 @@ impl<S> OutputUtilization<S> {
     /// [`Utilization::new`], designed for use with task transforms where the
     /// framework cannot otherwise detect downstream backpressure.
     #[must_use]
-    pub const fn new(timer_tx: UtilizationComponentSender, inner: S) -> Self {
-        Self { timer_tx, inner }
+    pub const fn new(timer: UtilizationComponentSender, inner: S) -> Self {
+        Self { timer, inner }
     }
 }
 
@@ -540,7 +532,7 @@ mod tests {
 
         MockClock::set_time(Duration::from_secs(100));
 
-        let (mut emitter, registry) = UtilizationEmitter::new();
+        let (emitter, registry) = UtilizationEmitter::new();
         let key = ComponentKey::from("test_transform");
 
         let sender = registry.add_component(key.clone(), gauge!(GaugeName::Utilization));
@@ -551,7 +543,7 @@ mod tests {
 
         // Wire up the pipeline exactly like build_task_transform:
         //   Utilization(input) → transform.transform() → OutputUtilization(output)
-        let input_wrapped = Utilization::new(sender, key.clone(), input_rx);
+        let input_wrapped = Utilization::new(sender, input_rx);
         let transform = Box::new(MockTaskTransform {
             processing_time: Duration::from_secs(2),
         });
@@ -566,7 +558,7 @@ mod tests {
         assert!(Pin::new(&mut pipeline).poll_next(&mut cx).is_pending());
         MockClock::advance(Duration::from_secs(3));
         // T=103: 3s of input wait. Period: 0s work / 3s → util = 0.0.
-        check_timer_utilization(&mut emitter, &key, 0.0, "0.0 (phase 1: all input wait)");
+        check_timer_utilization(&emitter, &key, 0.0, "0.0 (phase 1: all input wait)");
 
         // -- Phase 2: send input, poll pipeline → transform processes --
         input_tx
@@ -577,7 +569,7 @@ mod tests {
         // T=105: MockClock advanced 2s inside transform. start_wait sent by
         // output wrapper. Period: 2s work / 0s wait → util = 1.0.
         // EWMA: 0.9×1.0 + 0.1×0.0 = 0.9
-        check_timer_utilization(&mut emitter, &key, 0.9, "0.9 (phase 2: all work)");
+        check_timer_utilization(&emitter, &key, 0.9, "0.9 (phase 2: all work)");
 
         // -- Phase 3: send another event, simulate downstream blocking --
         // Data is available in the input channel, but the transform is not
@@ -590,7 +582,7 @@ mod tests {
         // T=108: 3s downstream wait. Period: 0s work / 3s → util = 0.0.
         // EWMA: 0.9×0.0 + 0.1×0.9 = 0.09
         check_timer_utilization(
-            &mut emitter,
+            &emitter,
             &key,
             0.09,
             "0.09 (phase 3: downstream wait despite buffered input)",
@@ -601,46 +593,132 @@ mod tests {
         // T=110: MockClock advanced 2s inside transform. Period: 2s work / 0s wait → util = 1.0.
         // EWMA: 0.9×1.0 + 0.1×0.09 ≈ 0.909
         check_timer_utilization(
-            &mut emitter,
+            &emitter,
             &key,
             0.909,
             "0.909 (phase 4: queued event processed)",
         );
     }
 
-    /// Drain pending timer messages and assert the current EWMA utilization
-    /// for a single reporting period.
+    /// Run one reporting period for a single component and assert its current
+    /// EWMA utilization.
     fn check_timer_utilization(
-        emitter: &mut UtilizationEmitter,
+        emitter: &UtilizationEmitter,
         key: &ComponentKey,
         expected: f64,
         description: &str,
     ) {
-        drain_emitter_messages(emitter);
-        let mut timers = emitter.timers.lock().expect("mutex poisoned");
-        let timer = timers.get_mut(key).expect("timer should exist");
+        let timers = emitter.timers.lock().expect("mutex poisoned");
+        let mut timer = timers.get(key).expect("timer should exist").timer.lock();
         timer.update_utilization();
         let avg = timer.ewma.average().unwrap();
         assert_approx_eq(avg, expected, description);
     }
 
-    /// Drain all pending messages from the emitter's channel into the timers,
-    /// simulating what `run_utilization` does in a loop.
-    fn drain_emitter_messages(emitter: &mut UtilizationEmitter) {
-        while let Ok(message) = emitter.timer_rx.try_recv() {
-            let mut timers = emitter.timers.lock().expect("mutex poisoned");
-            match message {
-                UtilizationTimerMessage::StartWait(key, at) => {
-                    if let Some(timer) = timers.get_mut(&key) {
-                        timer.start_wait(at);
-                    }
-                }
-                UtilizationTimerMessage::StopWait(key, at) => {
-                    if let Some(timer) = timers.get_mut(&key) {
-                        timer.stop_wait(at);
-                    }
-                }
-            }
+    fn is_waiting(sender: &UtilizationComponentSender) -> bool {
+        let waiting = sender.timer.waiting.load(Ordering::Relaxed);
+        assert_eq!(
+            waiting,
+            sender.timer.timer.lock().waiting,
+            "mirror out of sync"
+        );
+        waiting
+    }
+
+    /// A stream that is always ready must never be counted as waiting.
+    #[test]
+    #[serial]
+    fn test_ready_stream_never_waits() {
+        MockClock::set_time(Duration::from_secs(100));
+        let (emitter, registry) = UtilizationEmitter::new();
+        let key = ComponentKey::from("ready");
+        let sender = registry.add_component(key.clone(), gauge!(GaugeName::Utilization));
+        let mut stream = Utilization::new(sender.clone(), futures::stream::repeat(1));
+
+        let waker = futures::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+        for _ in 0..1000 {
+            assert!(Pin::new(&mut stream).poll_next(&mut cx).is_ready());
+            assert!(!is_waiting(&sender));
         }
+        MockClock::advance(Duration::from_secs(5));
+        check_timer_utilization(&emitter, &key, 1.0, "1.0 (always ready)");
+    }
+
+    /// Pending polls start a wait span and the next ready poll ends it; repeated
+    /// pending polls don't restart it.
+    #[test]
+    #[serial]
+    fn test_pending_then_ready_records_wait() {
+        MockClock::set_time(Duration::from_secs(100));
+        let (emitter, registry) = UtilizationEmitter::new();
+        let key = ComponentKey::from("pending");
+        let sender = registry.add_component(key.clone(), gauge!(GaugeName::Utilization));
+        let (tx, rx) = futures::channel::mpsc::unbounded::<u32>();
+        let mut stream = Utilization::new(sender.clone(), rx);
+
+        let waker = futures::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        // T=100..104: pending, polled several times (spurious wakeups).
+        for _ in 0..4 {
+            assert!(Pin::new(&mut stream).poll_next(&mut cx).is_pending());
+            assert!(is_waiting(&sender));
+            MockClock::advance(Duration::from_secs(1));
+        }
+        // T=104: input arrives.
+        tx.unbounded_send(1).unwrap();
+        assert!(Pin::new(&mut stream).poll_next(&mut cx).is_ready());
+        assert!(!is_waiting(&sender));
+        // T=104..105: busy.
+        MockClock::advance(Duration::from_secs(1));
+        // 4s wait out of 5s → utilization 0.2.
+        check_timer_utilization(&emitter, &key, 0.2, "0.2 (4s of 5s waiting)");
+    }
+
+    /// When another wrapper of the same component clears the waiting state
+    /// while the input is still pending, the next pending poll must mark the
+    /// component as waiting again.
+    #[test]
+    #[serial]
+    fn test_pending_rearms_after_shared_stop() {
+        MockClock::set_time(Duration::from_secs(100));
+        let (emitter, registry) = UtilizationEmitter::new();
+        let key = ComponentKey::from("rearm");
+        let sender = registry.add_component(key.clone(), gauge!(GaugeName::Utilization));
+        let (_tx, rx) = futures::channel::mpsc::unbounded::<u32>();
+        let mut stream = Utilization::new(sender.clone(), rx);
+
+        let waker = futures::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        assert!(Pin::new(&mut stream).poll_next(&mut cx).is_pending());
+        // E.g. `OutputUtilization` being polled again by downstream.
+        sender.stop_wait();
+        assert!(!is_waiting(&sender));
+        assert!(Pin::new(&mut stream).poll_next(&mut cx).is_pending());
+        assert!(is_waiting(&sender));
+
+        MockClock::advance(Duration::from_secs(5));
+        check_timer_utilization(&emitter, &key, 0.0, "0.0 (waiting on input)");
+    }
+
+    /// Removed components are no longer reported, and re-adding a key does not
+    /// let handles to the old component affect the new one.
+    #[test]
+    #[serial]
+    fn test_readd_component_isolates_old_handles() {
+        MockClock::set_time(Duration::from_secs(100));
+        let (emitter, registry) = UtilizationEmitter::new();
+        let key = ComponentKey::from("reload");
+        let old = registry.add_component(key.clone(), gauge!(GaugeName::Utilization));
+        registry.remove_component(&key);
+        assert!(emitter.timers.lock().unwrap().get(&key).is_none());
+
+        let new = registry.add_component(key.clone(), gauge!(GaugeName::Utilization));
+        old.start_wait();
+        assert!(!is_waiting(&new));
+        MockClock::advance(Duration::from_secs(5));
+        check_timer_utilization(&emitter, &key, 1.0, "1.0 (old handle ignored)");
     }
 }
