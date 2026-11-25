@@ -446,10 +446,12 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
             Ok(())
         }
         Err(exit_code) => {
-            // Startup failed (for example, an invalid configuration). Register a control
-            // handler and report SERVICE_STOPPED with a nonzero exit code: if ServiceMain
+            // Startup did not run the service: either it failed (for example, an invalid
+            // configuration) or a subcommand such as `validate` ran and returned its exit
+            // code. Register a control handler and report SERVICE_STOPPED: if ServiceMain
             // returns without ever reporting a status, the service is left stuck in the
-            // START_PENDING state and configured recovery actions never run.
+            // START_PENDING state and configured recovery actions never run. A zero exit
+            // code is a clean stop, so recovery does not rerun a command that succeeded.
             let event_handler = move |_control_event| ServiceControlHandlerResult::NoError;
             let status_handle =
                 windows_service::service_control_handler::register(SERVICE_NAME, event_handler)?;
@@ -457,7 +459,11 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 service_type: SERVICE_TYPE,
                 current_state: ServiceState::Stopped,
                 controls_accepted: ServiceControlAccept::empty(),
-                exit_code: ServiceExitCode::ServiceSpecific(exit_code.unsigned_abs()),
+                exit_code: if exit_code == 0 {
+                    ServiceExitCode::Win32(NO_ERROR)
+                } else {
+                    ServiceExitCode::ServiceSpecific(exit_code.unsigned_abs())
+                },
                 checkpoint: 0,
                 wait_hint: Duration::default(),
                 process_id: None,
