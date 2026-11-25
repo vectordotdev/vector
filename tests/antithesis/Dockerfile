@@ -6,7 +6,7 @@ ARG SCENARIO=vector_e2e
 ############################
 # Vector SUT — build stage #
 ############################
-FROM rust:1.92-bookworm AS vector-build
+FROM rust:1.92-bookworm@sha256:e90e846de4124376164ddfbaab4b0774c7bdeef5e738866295e5a90a34a307a2 AS vector-build
 RUN apt-get update && apt-get install -y --no-install-recommends \
         protobuf-compiler cmake perl build-essential pkg-config libssl-dev clang binutils \
     && rm -rf /var/lib/apt/lists/*
@@ -41,7 +41,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 ##################################
 # Harness (workload) — build stage
 ##################################
-FROM rust:1.92-bookworm AS workload-build
+FROM rust:1.92-bookworm@sha256:e90e846de4124376164ddfbaab4b0774c7bdeef5e738866295e5a90a34a307a2 AS workload-build
 RUN apt-get update && apt-get install -y --no-install-recommends binutils \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
@@ -70,7 +70,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 #####################################
 # Runtime: Vector SUT (one per node) #
 #####################################
-FROM debian:stable-slim AS vector
+FROM debian:stable-slim@sha256:a64d9dbf633e2a2503afac76be521dc25d9b5765150b30d31a3914d4ae969cab AS vector
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=vector-build /usr/local/bin/vector /usr/bin/vector
@@ -86,7 +86,7 @@ ENTRYPOINT ["/usr/bin/vector"]
 ###################################
 # Runtime: workload (oracle + cmds) #
 ###################################
-FROM debian:stable-slim AS workload
+FROM debian:stable-slim@sha256:a64d9dbf633e2a2503afac76be521dc25d9b5765150b30d31a3914d4ae969cab AS workload
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=workload-build /usr/local/bin/oracle /usr/bin/oracle

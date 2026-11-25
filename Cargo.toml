@@ -395,6 +395,7 @@ databricks-zerobus-ingest-sdk = { version = "3.1.1", optional = true, features =
 # GCP
 goauth = { version = "0.16.0", optional = true }
 smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
+google-cloud-auth = { version = "1.19.0", default-features = false, optional = true }
 
 # AMQP
 lapin = { version = "4.3.0", default-features = false, features = ["tokio", "native-tls"], optional = true }
@@ -411,8 +412,8 @@ greptimedb-ingester = { version = "0.19.1", default-features = false, features =
 # External libs
 arc-swap = { workspace = true, default-features = false }
 async-compression = { workspace = true, features = ["zstd"], optional = true }
-arrow = { version = "60.1.0", default-features = false, features = ["ipc"], optional = true }
-parquet = { version = "60.1.0", default-features = false, features = [
+arrow = { version = "60.2.0", default-features = false, features = ["ipc"], optional = true }
+parquet = { version = "60.2.0", default-features = false, features = [
   "arrow",
   "snap",
   "zstd",
@@ -708,7 +709,7 @@ aws-core = [
 # Anything that requires Protocol Buffers.
 protobuf-build = ["dep:tonic-prost-build", "dep:prost-build"]
 
-gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
+gcp = ["dep:base64", "dep:goauth", "dep:google-cloud-auth", "dep:smpl_jwt"]
 
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]
