@@ -101,6 +101,44 @@ components: sources: kubernetes_logs: {
 					examples: ["coredns"]
 				}
 			}
+			"kubernetes.container_cpu_request_millicores": {
+				description: "CPU request of the container producing the log, in millicores. Fractional millicores are rounded up. Omitted if the request is missing or cannot be represented as a non-negative 64-bit integer."
+				required:    false
+				type: uint: examples: [500, 1000]
+			}
+			"kubernetes.container_memory_request_bytes": {
+				description: "Memory request of the container producing the log, in bytes. Fractional bytes are rounded up. Omitted if the request is missing or cannot be represented as a non-negative 64-bit integer."
+				required:    false
+				type: uint: examples: [268435456, 1073741824]
+			}
+			"kubernetes.pod_cpu_request_millicores": {
+				description: """
+					Effective CPU request of the Pod, in millicores, derived from the cached Pod spec.
+					Uses the larger of the application plus restartable-init-container sum and the peak
+					initialization request, accounting for restartable init containers running during each
+					initialization stage. An explicit Pod-level CPU request overrides this aggregate.
+					Pod overhead is then added. Each contributing quantity is rounded up to millicores.
+					Missing requests contribute zero; the field is omitted if none are specified or a
+					contributing quantity or total cannot be represented as a non-negative 64-bit integer.
+					This reflects desired requests, not allocated resources reported in Pod status.
+					"""
+				required: false
+				type: uint: examples: [600, 2000]
+			}
+			"kubernetes.pod_memory_request_bytes": {
+				description: """
+					Effective memory request of the Pod, in bytes, derived from the cached Pod spec.
+					Uses the larger of the application plus restartable-init-container sum and the peak
+					initialization request, accounting for restartable init containers running during each
+					initialization stage. An explicit Pod-level memory request overrides this aggregate.
+					Pod overhead is then added. Each contributing quantity is rounded up to bytes.
+					Missing requests contribute zero; the field is omitted if none are specified or a
+					contributing quantity or total cannot be represented as a non-negative 64-bit integer.
+					This reflects desired requests, not allocated resources reported in Pod status.
+					"""
+				required: false
+				type: uint: examples: [301989888, 1073741824]
+			}
 			"kubernetes.namespace_labels": {
 				description: "Set of labels attached to the Namespace."
 				required:    false

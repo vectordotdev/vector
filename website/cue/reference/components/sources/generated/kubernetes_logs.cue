@@ -308,6 +308,19 @@ generated: components: sources: kubernetes_logs: configuration: {
 		description: "Configuration for how the events are enriched with Pod metadata."
 		required:    false
 		type: object: options: {
+			container_cpu_request_millicores: {
+				description: """
+					Overrides the name of the log field used to add the container's CPU request
+					in millicores to each event.
+
+					Off by default, the field is only added to the event if this is set.
+					"""
+				required: false
+				type: string: {
+					default: ""
+					examples: [".k8s.container_cpu_request_millicores", "k8s.container_cpu_request_millicores", ""]
+				}
+			}
 			container_id: {
 				description: """
 					Event field for the Container's ID.
@@ -344,6 +357,19 @@ generated: components: sources: kubernetes_logs: configuration: {
 					examples: [".k8s.container_image_id", "k8s.container_image_id", ""]
 				}
 			}
+			container_memory_request_bytes: {
+				description: """
+					Overrides the name of the log field used to add the container's memory request
+					in bytes to each event.
+
+					Off by default, the field is only added to the event if this is set.
+					"""
+				required: false
+				type: string: {
+					default: ""
+					examples: [".k8s.container_memory_request_bytes", "k8s.container_memory_request_bytes", ""]
+				}
+			}
 			container_name: {
 				description: """
 					Event field for the Container's name.
@@ -366,6 +392,26 @@ generated: components: sources: kubernetes_logs: configuration: {
 				type: string: {
 					default: ".kubernetes.pod_annotations"
 					examples: [".k8s.pod_annotations", "k8s.pod_annotations", ""]
+				}
+			}
+			pod_cpu_request_millicores: {
+				description: """
+					Overrides the name of the log field used to add the Pod's effective CPU request
+					in millicores to each event.
+
+					Includes application containers, restartable init containers, peak initialization
+					requests, and Pod overhead. An explicit Pod-level CPU request overrides the
+					container aggregate before overhead is added. Uses desired requests from the Pod spec.
+					Each quantity is rounded up to millicores before aggregation.
+
+					Off by default in the legacy log namespace; always included in Vector metadata
+					when available. Omitted if no CPU request is specified or a contributing quantity
+					or total cannot be represented as a non-negative 64-bit integer.
+					"""
+				required: false
+				type: string: {
+					default: ""
+					examples: ["k8s.pod_cpu_request_millicores", ""]
 				}
 			}
 			pod_ip: {
@@ -402,6 +448,26 @@ generated: components: sources: kubernetes_logs: configuration: {
 				type: string: {
 					default: ".kubernetes.pod_labels"
 					examples: [".k8s.pod_labels", "k8s.pod_labels", ""]
+				}
+			}
+			pod_memory_request_bytes: {
+				description: """
+					Overrides the name of the log field used to add the Pod's effective memory request
+					in bytes to each event.
+
+					Includes application containers, restartable init containers, peak initialization
+					requests, and Pod overhead. An explicit Pod-level memory request overrides the
+					container aggregate before overhead is added. Uses desired requests from the Pod spec.
+					Each quantity is rounded up to bytes before aggregation.
+
+					Off by default in the legacy log namespace; always included in Vector metadata
+					when available. Omitted if no memory request is specified or a contributing quantity
+					or total cannot be represented as a non-negative 64-bit integer.
+					"""
+				required: false
+				type: string: {
+					default: ""
+					examples: ["k8s.pod_memory_request_bytes", ""]
 				}
 			}
 			pod_name: {

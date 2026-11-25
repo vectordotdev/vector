@@ -71,6 +71,7 @@ mod parser;
 mod partial_events_merger;
 mod path_helpers;
 mod pod_metadata_annotator;
+mod resource_quantity;
 mod transform_utils;
 mod util;
 
@@ -423,6 +424,54 @@ impl SourceConfig for Config {
                     .map(LegacyKey::Overwrite),
                 &owned_value_path!("container_name"),
                 Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .container_cpu_request_millicores
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("container_cpu_request_millicores"),
+                Kind::integer().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .container_memory_request_bytes
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("container_memory_request_bytes"),
+                Kind::integer().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_cpu_request_millicores
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_cpu_request_millicores"),
+                Kind::integer().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_memory_request_bytes
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_memory_request_bytes"),
+                Kind::integer().or_undefined(),
                 None,
             )
             .with_source_metadata(
@@ -1311,6 +1360,7 @@ mod tests {
     use std::time::Duration;
 
     use indoc::indoc;
+    use serde_json::json;
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::OversizedAction,
@@ -1322,6 +1372,50 @@ mod tests {
 
     use super::Config;
     use crate::config::SourceConfig;
+
+    #[test]
+    fn resource_request_schema_uses_custom_legacy_paths() {
+        let config: Config = serde_json::from_value(json!({
+            "pod_annotation_fields": {
+                "container_cpu_request_millicores": "custom.cpu",
+                "container_memory_request_bytes": "custom.memory",
+                "pod_cpu_request_millicores": "custom.pod_cpu",
+                "pod_memory_request_bytes": "custom.pod_memory",
+            },
+        }))
+        .unwrap();
+        let actual = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true)
+            .unwrap();
+        let expected = Config::default()
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true)
+            .unwrap()
+            .with_event_field(
+                &owned_value_path!("custom", "cpu"),
+                Kind::integer().or_undefined(),
+                None,
+            )
+            .with_event_field(
+                &owned_value_path!("custom", "memory"),
+                Kind::integer().or_undefined(),
+                None,
+            )
+            .with_event_field(
+                &owned_value_path!("custom", "pod_cpu"),
+                Kind::integer().or_undefined(),
+                None,
+            )
+            .with_event_field(
+                &owned_value_path!("custom", "pod_memory"),
+                Kind::integer().or_undefined(),
+                None,
+            );
+        assert_eq!(actual, expected);
+    }
 
     #[test]
     fn generate_config() {
@@ -1592,6 +1686,26 @@ mod tests {
                     .with_metadata_field(
                         &owned_value_path!("kubernetes_logs", "container_name"),
                         Kind::bytes().or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "container_cpu_request_millicores"),
+                        Kind::integer().or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "container_memory_request_bytes"),
+                        Kind::integer().or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "pod_cpu_request_millicores"),
+                        Kind::integer().or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "pod_memory_request_bytes"),
+                        Kind::integer().or_undefined(),
                         None
                     )
                     .with_metadata_field(
