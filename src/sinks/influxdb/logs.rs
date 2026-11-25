@@ -72,8 +72,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 pub struct InfluxDbLogsConfig {
     /// The name of the InfluxDB measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
-    #[configurable(metadata(docs::required = true))]
-    pub measurement: Option<String>,
+    pub measurement: String,
 
     /// The endpoint to send data to.
     ///
@@ -186,7 +185,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
     type Validated = ValidatedInfluxDbLogs;
 
     fn validate(&self) -> crate::Result<ValidatedInfluxDbLogs> {
-        let measurement = self.get_measurement()?;
+        let measurement = self.measurement.clone();
         let tags: HashSet<KeyString> = self.tags.iter().cloned().collect();
 
         let batch = self.batch.into_batcher_settings()?;
@@ -608,12 +607,6 @@ where
 }
 
 impl InfluxDbLogsConfig {
-    fn get_measurement(&self) -> Result<String, &'static str> {
-        self.measurement
-            .clone()
-            .ok_or("The `measurement` option is required.")
-    }
-
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let config = self.clone();
 
@@ -684,23 +677,6 @@ mod tests {
         "#};
 
         serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
-    }
-
-    #[test]
-    fn test_config_measurement_required() {
-        let config = indoc! {r#"
-            endpoint: "http://localhost:9999"
-            version: "2"
-            bucket: "my-bucket"
-            org: "my-org"
-            token: "my-token"
-        "#};
-
-        let sink_config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
-        assert_eq!(
-            Err("The `measurement` option is required."),
-            sink_config.get_measurement()
-        );
     }
 
     #[test]
@@ -884,7 +860,7 @@ mod tests {
     #[test]
     fn prepares_valid_config() {
         let config = InfluxDbLogsConfig {
-            measurement: Some("vector".to_string()),
+            measurement: "vector".to_string(),
             endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
             settings: v2_settings(),
             tags: vec![],
@@ -910,7 +886,7 @@ mod tests {
     #[test]
     fn validate_retains_config_keys_without_log_schema_fallback() {
         let config = InfluxDbLogsConfig {
-            measurement: Some("vector".to_string()),
+            measurement: "vector".to_string(),
             endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
             settings: v2_settings(),
             host_key: Some(OptionalValuePath::new("custom_host")),
@@ -1509,7 +1485,7 @@ mod integration_tests {
         let cx = SinkContext::default();
 
         let config = InfluxDbLogsConfig {
-            measurement: Some(measure.clone()),
+            measurement: measure.clone(),
             endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
             tags: Vec::default(),
             settings: InfluxDbSettings::V2(InfluxDb2Settings {
