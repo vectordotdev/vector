@@ -20,7 +20,6 @@ pub const DOCS_META_EXAMPLES: &str = "docs::examples";
 pub const DOCS_META_HIDDEN: &str = "docs::hidden";
 pub const DOCS_META_HUMAN_NAME: &str = "docs::human_name";
 pub const DOCS_META_NUMERIC_TYPE: &str = "docs::numeric_type";
-pub const DOCS_META_OPTIONAL: &str = "docs::optional";
 pub const DOCS_META_SYNTAX_OVERRIDE: &str = "docs::syntax_override";
 pub const DOCS_META_TEMPLATEABLE: &str = "docs::templateable";
 pub const DOCS_META_TYPE_OVERRIDE: &str = "docs::type_override";
