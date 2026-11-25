@@ -92,12 +92,22 @@ struct PartitionState {
     /// correctly. The lowest unsettled offset caps the checkpoint, so a skip
     /// cannot commit past an earlier message that has not been acknowledged.
     in_flight_offsets: BTreeMap<u64, usize>,
-    /// The checkpoint each polled offset arrived with, kept until its offset is
-    /// committed. A commit of the checkpoint carries the partition incarnation
-    /// and owner that delivered the message, so the SDK refuses it after a
-    /// rebalance or a recreated partition instead of storing the offset under
-    /// the new context.
+    /// The checkpoint of the current pending offset, plus the last delivered
+    /// one as the fallback stamped for skips and replays. Both carry the
+    /// partition incarnation and owner that delivered them, so the SDK refuses
+    /// a commit after a rebalance or a recreated partition instead of storing
+    /// the offset under the new context. Other polled offsets are dropped:
+    /// retention must stay bounded when the broker accepts reads while stores
+    /// stall, and any commit reads only the pending offset.
     checkpoints: BTreeMap<u64, Checkpoint>,
+    /// The highest checkpoint ever delivered, kept after its offset is
+    /// committed so a skip raised above it can still commit under the same
+    /// incarnation and owner.
+    last_checkpoint: Option<Checkpoint>,
+    /// A commit request for this partition is queued or in flight. Further
+    /// acknowledgements coalesce into the next request instead of filling the
+    /// queue with consecutive offsets.
+    commit_queued: bool,
 }
 
 /// What the source should do about an outstanding rejection.
@@ -110,12 +120,26 @@ enum RetryOutcome {
     Idle,
 }
 
+/// Delay before replaying a rejected offset. The delay doubles per attempt, so
+/// a sink that fails a record immediately cannot spin the poll loop and broker
+/// reads, and it resets with the retry budget once the fence clears.
+fn replay_delay(attempts: u32) -> Duration {
+    const CAP: Duration = Duration::from_secs(30);
+    Duration::from_millis(100)
+        .saturating_mul(1 << attempts.min(8))
+        .min(CAP)
+}
+
 /// A seek the loop must issue before polling again: recovery of a stopped
 /// partition resumes after the last polled message (`next`), while a rejected
 /// offset is replayed from that offset.
 struct PendingSeek {
     at: tokio::time::Instant,
     strategy: PollingStrategy,
+    /// The SDK generation of the slot that queued the seek. A newer
+    /// generation for the partition replaces it, so a seek issued for the old
+    /// history must not rewind the new one.
+    generation: Option<u64>,
     /// The seek recovers from a lost partition history. It starts a new SDK
     /// generation of a different history, so the offsets, fences, and
     /// finalizers tracked for the old one are stale and must be dropped.
@@ -127,6 +151,18 @@ impl PartitionState {
         self.in_flight += 1;
         *self.in_flight_offsets.entry(offset).or_default() += 1;
         self.checkpoints.insert(offset, checkpoint);
+        if self
+            .last_checkpoint
+            .is_none_or(|last| offset > last.offset())
+        {
+            self.last_checkpoint = Some(checkpoint);
+        }
+        // One commit reads one offset's checkpoint; the last delivered one
+        // covers skips and replays. Keep only those two so a broker that keeps
+        // serving reads while stores fail cannot grow the map per message.
+        let last = self.last_checkpoint.map(|checkpoint| checkpoint.offset());
+        self.checkpoints
+            .retain(|&polled, _| self.pending == Some(polled) || Some(polled) == last);
     }
 
     fn settle(&mut self, offset: u64) {
@@ -250,12 +286,22 @@ impl PartitionState {
         };
     }
 
-    /// Take the safe commit offset together with the checkpoint of that
-    /// offset, if a delivered message supplied one. Skips raise `pending` past
-    /// the last delivered message, so a skip-only commit has no checkpoint.
-    fn take_pending(&mut self) -> Option<(u64, Option<Checkpoint>)> {
-        let pending = self.pending.take()?;
-        Some((pending, self.checkpoints.get(&pending).copied()))
+    /// Take the safe commit offset with a checkpoint that carries the
+    /// partition incarnation and owner that delivered it. A skip raises
+    /// `pending` past the last delivered message; its commit reuses the last
+    /// delivered checkpoint's context at the skipped offset, so the SDK still
+    /// refuses a store issued for an older history. A partition with no
+    /// delivered checkpoint cannot commit safely and stays pending.
+    fn take_pending(&mut self) -> Option<(u64, Checkpoint)> {
+        let pending = self.pending?;
+        let checkpoint = if let Some(checkpoint) = self.checkpoints.get(&pending).copied() {
+            checkpoint
+        } else {
+            let last = self.last_checkpoint?;
+            Checkpoint::stamped(last.partition_id(), pending, last.context(), last.stamp())
+        };
+        self.pending = None;
+        Some((pending, checkpoint))
     }
 
     fn committed_through(&mut self, offset: u64) {
@@ -329,6 +375,12 @@ struct PartitionSlot {
     /// When the last settled-only commit ran. Pacing is per partition so a
     /// commit on another partition cannot suppress this one.
     last_settled_commit: Option<Instant>,
+    /// Earliest time a failed store may be retried. Without it, a broker that
+    /// rejects stores while lag stays above the eager threshold is retried on
+    /// every acknowledgement and every result, bypassing the commit interval.
+    commit_retry_at: Option<Instant>,
+    /// Delay growth for failed stores, reset by the first success.
+    commit_backoff: ExponentialBackoff,
 }
 
 impl PartitionSlot {
@@ -342,6 +394,10 @@ impl PartitionSlot {
                 generation: None,
                 own_seek: None,
                 last_settled_commit: None,
+                commit_retry_at: None,
+                commit_backoff: ExponentialBackoff::from_millis(2)
+                    .factor(250)
+                    .max_delay(Duration::from_secs(30)),
             },
             stream,
         )
@@ -353,6 +409,22 @@ impl PartitionSlot {
     /// still serves messages must be reset through `PartitionSlots::reset`.
     fn close_acks(&mut self) {
         self.finalizer = OrderedFinalizer::<u64>::new(None).0;
+    }
+
+    /// Whether this partition has progress that warrants a store now.
+    /// `Some(true)` asks the caller to record the settled-only pacing.
+    fn commit_due(&self, commit_after: u64, settled_gap: Duration) -> Option<bool> {
+        let lag = self.state.lag();
+        if lag == 0 || self.state.commit_queued {
+            return None;
+        }
+        if lag >= commit_after {
+            return Some(false);
+        }
+        let paced = self
+            .last_settled_commit
+            .is_none_or(|last| last.elapsed() >= settled_gap);
+        (self.state.is_settled() && paced).then_some(true)
     }
 }
 
@@ -420,14 +492,17 @@ impl PartitionSlots {
     /// replaced; either way the replacement starts on the generation that
     /// triggered the reset, because a slot left without it resets again on the
     /// next message and drops that message's finalizer, committing past an
-    /// unacknowledged record.
-    fn adopt_generation(&mut self, partition_id: u32, offset: u64, generation: u64) {
+    /// unacknowledged record. Returns whether the slot was replaced.
+    fn adopt_generation(&mut self, partition_id: u32, offset: u64, generation: u64) -> bool {
         let slot = self.entry(partition_id);
         let previous = slot.generation.replace(generation);
         let own_seek = slot.own_seek.take();
         if previous != Some(generation) && !seek_started(own_seek, offset) {
             self.reset(partition_id);
             self.entry(partition_id).generation = Some(generation);
+            true
+        } else {
+            false
         }
     }
 }
@@ -439,6 +514,7 @@ fn queue_seek(
     partition_id: u32,
     strategy: PollingStrategy,
     at: tokio::time::Instant,
+    generation: Option<u64>,
     resets_history: bool,
 ) {
     if !resets_history
@@ -453,9 +529,21 @@ fn queue_seek(
         PendingSeek {
             at,
             strategy,
+            generation,
             resets_history,
         },
     );
+}
+
+/// Drop a seek queued for a generation that a new assignment replaced: its
+/// offsets belong to the old history and retrying it would rewind the new one.
+fn drop_stale_seek(pending: &mut HashMap<u32, PendingSeek>, partition_id: u32, generation: u64) {
+    if pending
+        .get(&partition_id)
+        .is_some_and(|seek| seek.generation.is_some_and(|queued| queued != generation))
+    {
+        pending.remove(&partition_id);
+    }
 }
 
 fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus, offset: u64) {
@@ -492,14 +580,15 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
     }
 }
 
-/// One offset the poll loop wants stored. `checkpoint` is `None` for an offset
-/// that no message delivered, such as a record the broker could not decode.
-/// `slot` pins the request to the partition slot it was issued for.
+/// One offset the poll loop wants stored. The checkpoint pins the partition
+/// incarnation and owner even when the offset itself was never delivered, such
+/// as a record the broker could not decode. `slot` pins the request to the
+/// partition slot it was issued for.
 struct CommitRequest {
     partition_id: u32,
     slot: SlotId,
     offset: u64,
-    checkpoint: Option<Checkpoint>,
+    checkpoint: Checkpoint,
 }
 
 struct CommitResult {
@@ -534,25 +623,26 @@ async fn run_commit_worker(
         if slot.retired() {
             continue;
         }
-        let mut result = match checkpoint {
-            Some(checkpoint) => state.commit(checkpoint).await,
-            // Nothing was delivered at this offset: it is past a record the
-            // broker could not decode or a permanently rejected event, so only
-            // its offset is available to store.
-            None => state.store_offset(offset, Some(partition_id)).await,
+        let result = tokio::select! {
+            biased;
+            // A forced shutdown or source error drops the receiver. Cancelling
+            // the store here keeps the worker, the broker client, and a
+            // pending reauthentication from outliving the source.
+            () = results.closed() => break,
+            result = async {
+                let mut result = state.commit(checkpoint).await;
+                // The SDK never refreshes an HTTP access token, so renew it
+                // from the connection string and retry the store once.
+                if matches!(&result, Err(error) if is_unauthenticated(error))
+                    && logs_in_over_http(&url)
+                    && login_if_http(&client, &url).await.is_ok()
+                    && !slot.retired()
+                {
+                    result = state.commit(checkpoint).await;
+                }
+                result
+            } => result,
         };
-        // The SDK never refreshes an HTTP access token, so renew it from the
-        // connection string and retry the store once.
-        if matches!(&result, Err(error) if is_unauthenticated(error))
-            && logs_in_over_http(&url)
-            && login_if_http(&client, &url).await.is_ok()
-            && !slot.retired()
-        {
-            result = match checkpoint {
-                Some(checkpoint) => state.commit(checkpoint).await,
-                None => state.store_offset(offset, Some(partition_id)).await,
-            };
-        }
         if results
             .send(CommitResult {
                 partition_id,
@@ -568,26 +658,59 @@ async fn run_commit_worker(
     }
 }
 
-/// Hand each partition's pending offset to the commit worker. `pending` is
-/// taken here so a later tick cannot enqueue it twice; a full queue restores
-/// it, and a failed store re-derives it from the acknowledgements that arrived
-/// while the store was in flight.
+/// Hand one partition's pending offset to the commit worker. `pending` is taken
+/// here so later acknowledgements coalesce into the next request; a full queue
+/// restores it, and a failed store re-derives it from the acknowledgements that
+/// arrived while the store was in flight.
+fn try_enqueue_commit(
+    partition_id: u32,
+    slot: &mut PartitionSlot,
+    commits: &mpsc::Sender<CommitRequest>,
+) -> bool {
+    if slot.state.commit_queued || slot.commit_retry_at.is_some_and(|at| Instant::now() < at) {
+        return false;
+    }
+    let Some((offset, checkpoint)) = slot.state.take_pending() else {
+        return false;
+    };
+    if commits
+        .try_send(CommitRequest {
+            partition_id,
+            slot: slot.id.clone(),
+            offset,
+            checkpoint,
+        })
+        .is_ok()
+    {
+        slot.state.commit_queued = true;
+        true
+    } else {
+        slot.state.pending = Some(offset);
+        false
+    }
+}
+
+/// Hand each partition's pending offset to the commit worker.
 fn enqueue_commits(partitions: &mut PartitionSlots, commits: &mpsc::Sender<CommitRequest>) {
     for (&partition_id, slot) in &mut partitions.slots {
-        let Some((offset, checkpoint)) = slot.state.take_pending() else {
-            continue;
-        };
-        if commits
-            .try_send(CommitRequest {
-                partition_id,
-                slot: slot.id.clone(),
-                offset,
-                checkpoint,
-            })
-            .is_err()
-        {
-            slot.state.pending = Some(offset);
-        }
+        try_enqueue_commit(partition_id, slot, commits);
+    }
+}
+
+/// Queue the partition's pending offset when it is due for a store, recording
+/// the settled-only pacing the acknowledgement and result paths share.
+fn schedule_commit(
+    partition_id: u32,
+    slot: &mut PartitionSlot,
+    commit_after: u64,
+    settled_gap: Duration,
+    commits: &mpsc::Sender<CommitRequest>,
+) {
+    if let Some(settled) = slot.commit_due(commit_after, settled_gap)
+        && try_enqueue_commit(partition_id, slot, commits)
+        && settled
+    {
+        slot.last_settled_commit = Some(Instant::now());
     }
 }
 
@@ -616,6 +739,9 @@ fn apply_commit_result(
                 .filter(|current| current.id.same(&slot))
             {
                 current.state.committed_through(offset);
+                current.state.commit_queued = false;
+                current.commit_retry_at = None;
+                current.commit_backoff.reset();
                 emit(IggyOffsetCommitted {
                     stream,
                     topic,
@@ -648,6 +774,16 @@ fn apply_commit_result(
                 // one: an acknowledgement may have raised it while the store
                 // was in flight, and rewinding would replay delivered records.
                 current.state.recompute_pending();
+                current.state.commit_queued = false;
+                // Keep the progress, but do not let the eager threshold turn a
+                // broker that rejects stores into a hot retry loop.
+                current.commit_retry_at = Some(
+                    Instant::now()
+                        + current
+                            .commit_backoff
+                            .next()
+                            .unwrap_or(Duration::from_secs(30)),
+                );
             }
             emit(IggyOffsetUpdateError { error });
         }
@@ -956,11 +1092,19 @@ pub(crate) async fn run_iggy_source(
 
     loop {
         let now = tokio::time::Instant::now();
-        let due_seek = pending_seeks
-            .iter()
-            .find(|(_, seek)| seek.at <= now)
-            .map(|(partition_id, seek)| (*partition_id, seek.strategy, seek.resets_history));
-        if let Some((partition_id, strategy, resets_history)) = due_seek {
+        let due_seek =
+            pending_seeks
+                .iter()
+                .find(|(_, seek)| seek.at <= now)
+                .map(|(partition_id, seek)| {
+                    (
+                        *partition_id,
+                        seek.strategy,
+                        seek.generation,
+                        seek.resets_history,
+                    )
+                });
+        if let Some((partition_id, strategy, generation, resets_history)) = due_seek {
             let seek = tokio::select! {
                 result = consumer.seek(partition_id, strategy) => result,
                 _ = &mut shutdown => {
@@ -1001,6 +1145,7 @@ pub(crate) async fn run_iggy_source(
                         partition_id,
                         strategy,
                         tokio::time::Instant::now() + delay,
+                        generation,
                         resets_history,
                     );
                 }
@@ -1016,40 +1161,41 @@ pub(crate) async fn run_iggy_source(
                 if !partitions.ack_streams.is_empty() =>
             {
                 let mut retry = RetryOutcome::Idle;
-                let should_commit = match partitions.get_mut(partition_id) {
-                    Some(slot) => {
-                        record_ack(&mut slot.state, partition_id, status, offset);
-                        if !matches!(status, BatchStatus::Delivered) {
-                            // Only the fenced message spends the replay budget;
-                            // a rejection queued behind the fence waits for its
-                            // turn instead of exhausting the lower offset's
-                            // attempts before it was ever replayed.
-                            if slot.state.fence() == Some(offset) {
-                                retry = slot.state.retry();
-                            }
-                            None
-                        } else if slot.state.lag() >= commit_after {
-                            Some(false)
-                        } else {
-                            let paced = slot
-                                .last_settled_commit
-                                .is_none_or(|t| t.elapsed() >= settled_commit_gap);
-                            (slot.state.lag() > 0 && slot.state.is_settled() && paced)
-                                .then_some(true)
-                        }
+                if let Some(slot) = partitions.get_mut(partition_id) {
+                    record_ack(&mut slot.state, partition_id, status, offset);
+                    if matches!(status, BatchStatus::Delivered) {
+                        schedule_commit(
+                            partition_id,
+                            slot,
+                            commit_after,
+                            settled_commit_gap,
+                            &commit_tx,
+                        );
+                    } else if slot.state.fence() == Some(offset) {
+                        // Only the fenced message spends the replay budget; a
+                        // rejection queued behind the fence waits for its turn
+                        // instead of exhausting the lower offset's attempts
+                        // before it was ever replayed.
+                        retry = slot.state.retry();
                     }
-                    None => None,
-                };
+                }
+                let generation = partitions.get(partition_id).and_then(|slot| slot.generation);
                 match retry {
                     RetryOutcome::Seek(retry_offset) => {
                         // Replay the rejected message so a transient
                         // downstream failure does not fence the partition
-                        // until the process restarts.
+                        // until the process restarts, but pace the seek: a
+                        // sink that keeps failing the same record would
+                        // otherwise read and redeliver it in a tight loop.
+                        let attempts = partitions
+                            .get(partition_id)
+                            .map_or(0, |slot| slot.state.retry_attempts);
                         queue_seek(
                             &mut pending_seeks,
                             partition_id,
                             PollingStrategy::offset(retry_offset),
-                            tokio::time::Instant::now(),
+                            tokio::time::Instant::now() + replay_delay(attempts),
+                            generation,
                             false,
                         );
                     }
@@ -1077,24 +1223,27 @@ pub(crate) async fn run_iggy_source(
                                 partition_id,
                                 PollingStrategy::offset(next),
                                 tokio::time::Instant::now(),
+                                generation,
                                 false,
                             );
                         }
                     }
                     RetryOutcome::Idle => {}
                 }
-                if let Some(settled) = should_commit {
-                    if settled
-                        && let Some(slot) = partitions.get_mut(partition_id)
-                    {
-                        slot.last_settled_commit = Some(Instant::now());
-                    }
-                    enqueue_commits(&mut partitions, &commit_tx);
-                }
             }
 
             Some(done) = commit_results.recv() => {
+                let partition_id = done.partition_id;
                 apply_commit_result(done, &mut partitions, stream, topic);
+                if let Some(slot) = partitions.get_mut(partition_id) {
+                    schedule_commit(
+                        partition_id,
+                        slot,
+                        commit_after,
+                        settled_commit_gap,
+                        &commit_tx,
+                    );
+                }
             }
 
             _ = commit_timer.tick() => {
@@ -1127,11 +1276,16 @@ pub(crate) async fn run_iggy_source(
                         if let Some(generation) =
                             received.checkpoint().stamp().map(|stamp| stamp.generation)
                         {
-                            partitions.adopt_generation(
-                                received.partition_id,
+                            let partition_id = received.partition_id;
+                            if partitions.adopt_generation(
+                                partition_id,
                                 received.message.header.offset,
                                 generation,
-                            );
+                            ) {
+                                // A seek queued for the old assignment must not
+                                // rewind the one that replaced it.
+                                drop_stale_seek(&mut pending_seeks, partition_id, generation);
+                            }
                         }
 
                         let checkpoint = received.checkpoint();
@@ -1180,6 +1334,7 @@ pub(crate) async fn run_iggy_source(
                                     partition_id,
                                     PollingStrategy::next(),
                                     tokio::time::Instant::now(),
+                                    partitions.get(partition_id).and_then(|slot| slot.generation),
                                     resets_history,
                                 );
                             }
@@ -1195,6 +1350,7 @@ pub(crate) async fn run_iggy_source(
                                 offset = ?failed_offset,
                             );
                             let slot = partitions.entry(partition_id);
+                            let generation = slot.generation;
                             let failed = failed_offset.or_else(|| {
                                 (strategy.kind == PollingKind::Offset)
                                     .then_some(strategy.value)
@@ -1212,6 +1368,7 @@ pub(crate) async fn run_iggy_source(
                                         partition_id,
                                         PollingStrategy::offset(fence),
                                         tokio::time::Instant::now(),
+                                        generation,
                                         false,
                                     );
                                 }
@@ -1224,6 +1381,7 @@ pub(crate) async fn run_iggy_source(
                                         partition_id,
                                         strategy,
                                         tokio::time::Instant::now(),
+                                        generation,
                                         false,
                                     );
                                 }
@@ -1387,8 +1545,8 @@ mod tests {
 
     use super::{
         CommitResult, MAX_IN_FLIGHT, MAX_REDELIVERY_ATTEMPTS, PartitionSlot, PartitionSlots,
-        PartitionState, RetryOutcome, apply_commit_result, at_capacity, enqueue_commits,
-        queue_seek, record_ack, seek_started, stopped_partition,
+        PartitionState, RetryOutcome, apply_commit_result, at_capacity, drop_stale_seek,
+        enqueue_commits, queue_seek, record_ack, seek_started, stopped_partition,
     };
     use crate::event::BatchStatus;
     use tokio::sync::mpsc;
@@ -1536,16 +1694,31 @@ mod tests {
         let mut s = PartitionState::default();
         s.mark_in_flight(5, checkpoint(5));
         record_ack(&mut s, 0, BatchStatus::Delivered, 5);
-        assert_eq!(s.take_pending(), Some((5, Some(checkpoint(5)))));
+        assert_eq!(s.take_pending(), Some((5, checkpoint(5))));
     }
 
     #[test]
-    fn skipped_offset_commits_without_a_checkpoint() {
+    fn a_skip_commits_under_the_last_delivered_incarnation() {
         let mut s = PartitionState::default();
         s.mark_in_flight(3, checkpoint(3));
         record_ack(&mut s, 0, BatchStatus::Delivered, 3);
         s.skip_through(7);
-        assert_eq!(s.take_pending(), Some((7, None)));
+
+        // The skipped offset was never delivered, so its commit reuses the
+        // last delivered checkpoint's context at that offset; a checkpoint of
+        // another history would be refused by the SDK.
+        assert_eq!(s.take_pending(), Some((7, checkpoint(7))));
+    }
+
+    #[test]
+    fn a_skip_without_a_delivered_checkpoint_stays_pending() {
+        let mut s = PartitionState::default();
+        s.skip_through(7);
+
+        // No delivered checkpoint carries the incarnation, so the offset
+        // cannot be stored safely and is kept for a later delivery.
+        assert_eq!(s.pending, Some(7));
+        assert_eq!(s.take_pending(), None);
     }
 
     #[test]
@@ -1622,6 +1795,46 @@ mod tests {
 
         enqueue_commits(&mut partitions, &tx);
         assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn a_queued_commit_coalesces_later_acknowledgements() {
+        let mut partitions = PartitionSlots::default();
+        let mut slot = PartitionSlot::new().0;
+        slot.state.mark_in_flight(1, checkpoint(1));
+        slot.state.mark_in_flight(2, checkpoint(2));
+        record_ack(&mut slot.state, 0, BatchStatus::Delivered, 1);
+        partitions.slots.insert(0, slot);
+
+        let (tx, mut rx) = mpsc::channel(8);
+        enqueue_commits(&mut partitions, &tx);
+        let first = rx.try_recv().expect("first request");
+        assert_eq!(first.offset, 1);
+
+        // Acknowledging while the store is in flight must not queue another
+        // request; the newest pending offset is sent once this one resolves.
+        record_ack(
+            &mut partitions.slots.get_mut(&0).expect("slot").state,
+            0,
+            BatchStatus::Delivered,
+            2,
+        );
+        enqueue_commits(&mut partitions, &tx);
+        assert!(rx.try_recv().is_err());
+
+        apply_commit_result(
+            CommitResult {
+                partition_id: 0,
+                slot: first.slot,
+                offset: first.offset,
+                result: Ok(()),
+            },
+            &mut partitions,
+            "stream",
+            "topic",
+        );
+        enqueue_commits(&mut partitions, &tx);
+        assert_eq!(rx.try_recv().expect("coalesced request").offset, 2);
     }
 
     #[test]
@@ -1901,13 +2114,37 @@ mod tests {
     fn replay_does_not_replace_a_pending_history_reset() {
         let mut seeks = HashMap::new();
         let at = tokio::time::Instant::now();
-        queue_seek(&mut seeks, 7, PollingStrategy::next(), at, true);
+        queue_seek(&mut seeks, 7, PollingStrategy::next(), at, None, true);
 
         // A replay of the lost history must not replace the recovery seek.
-        queue_seek(&mut seeks, 7, PollingStrategy::offset(3), at, false);
+        queue_seek(&mut seeks, 7, PollingStrategy::offset(3), at, None, false);
 
         let seek = seeks.get(&7).expect("seek is queued");
         assert!(seek.resets_history);
         assert_eq!(seek.strategy.kind, PollingKind::Next);
+    }
+
+    #[test]
+    fn a_new_generation_drops_the_seek_queued_for_the_old_one() {
+        let mut seeks = HashMap::new();
+        let at = tokio::time::Instant::now();
+        queue_seek(
+            &mut seeks,
+            7,
+            PollingStrategy::offset(3),
+            at,
+            Some(4),
+            false,
+        );
+
+        // The assignment replaced the partition before the retry ran; its
+        // offsets belong to the old history.
+        drop_stale_seek(&mut seeks, 7, 5);
+        assert!(!seeks.contains_key(&7));
+
+        // A seek without a recorded generation cannot be proven stale.
+        queue_seek(&mut seeks, 7, PollingStrategy::offset(3), at, None, false);
+        drop_stale_seek(&mut seeks, 7, 5);
+        assert!(seeks.contains_key(&7));
     }
 }
