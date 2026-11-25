@@ -39,6 +39,33 @@ const fn has_no_recorded_value(flags: u32) -> bool {
     flags & NO_RECORDED_VALUE_MASK == NO_RECORDED_VALUE_MASK
 }
 
+/// Decode rule for a scalar: `NO_RECORDED_VALUE` wins over whatever the point carries.
+///
+/// Only cumulative (Absolute) points emit the Prometheus staleness marker. A flagged
+/// **delta** point means "no observation this interval" and decodes to `0.0`, which is a
+/// no-op when added to a running total in `MetricSet::incremental_to_absolute`. Emitting
+/// `NaN` for a delta would corrupt the cached running total and poison every subsequent
+/// valid sample for that series.
+fn value_or_stale(flags: u32, kind: MetricKind, value: f64) -> f64 {
+    if has_no_recorded_value(flags) && kind == MetricKind::Absolute {
+        PROMETHEUS_STALE_NAN
+    } else {
+        value
+    }
+}
+
+/// Decode rule for an optional histogram sum. `Some` is what makes a `prometheus_remote_write`
+/// sink emit the `_sum` staleness marker, so a cumulative flagged point returns `Some(NaN)`.
+/// A flagged delta returns `None` for the same reason as `value_or_stale`: adding `NaN` to the
+/// running sum would corrupt all future samples.
+fn sum_or_stale(flags: u32, kind: MetricKind, sum: Option<f64>) -> Option<f64> {
+    if has_no_recorded_value(flags) && kind == MetricKind::Absolute {
+        Some(PROMETHEUS_STALE_NAN)
+    } else {
+        sum
+    }
+}
+
 /// OTLP represents an absent measurement as a zero paired with `NO_RECORDED_VALUE`.
 fn no_recorded_value_if_nan(value: f64) -> (f64, u32) {
     if value.is_nan() {
@@ -276,17 +303,17 @@ impl SumMetric {
             reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
         )]
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
-        let value = if has_no_recorded_value(self.point.flags) {
-            PROMETHEUS_STALE_NAN
-        } else {
-            self.point.value.to_f64().unwrap_or(0.0)
-        };
-        let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
         let kind = if self.aggregation_temporality == AggregationTemporality::Delta as i32 {
             MetricKind::Incremental
         } else {
             MetricKind::Absolute
         };
+        let value = value_or_stale(
+            self.point.flags,
+            kind,
+            self.point.value.to_f64().unwrap_or(0.0),
+        );
+        let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
 
         // as per otel doc non_monotonic sum would be better transformed to gauge in time-series
         let metric_value = if self.is_monotonic {
@@ -310,11 +337,13 @@ impl GaugeMetric {
             reason = "preserve existing unsigned OTLP timestamp conversion; out-of-range handling is deferred"
         )]
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
-        let value = if has_no_recorded_value(self.point.flags) {
-            PROMETHEUS_STALE_NAN
-        } else {
-            self.point.value.to_f64().unwrap_or(0.0)
-        };
+        // OTLP's Gauge message has no aggregation temporality: every point is a point-in-time
+        // measurement, decoded as Absolute, so a flagged point always carries the marker.
+        let value = value_or_stale(
+            self.point.flags,
+            MetricKind::Absolute,
+            self.point.value.to_f64().unwrap_or(0.0),
+        );
         let attributes = build_metric_tags(self.resource, self.scope, self.point.attributes);
 
         MetricEvent::new(
@@ -363,13 +392,7 @@ impl HistogramMetric {
             MetricKind::Absolute
         };
 
-        // `NO_RECORDED_VALUE` wins over whatever the point carries. `Some` is what makes a
-        // `prometheus_remote_write` sink emit the marker, since it only writes `_sum` for `Some`.
-        let sum = if has_no_recorded_value(self.point.flags) {
-            Some(PROMETHEUS_STALE_NAN)
-        } else {
-            self.point.sum
-        };
+        let sum = sum_or_stale(self.point.flags, kind, self.point.sum);
 
         MetricEvent::new(
             metric_name,
@@ -444,12 +467,7 @@ impl ExpHistogramMetric {
             MetricKind::Absolute
         };
 
-        // Same rule as `HistogramMetric`: the flag wins over the carried sum.
-        let sum = if has_no_recorded_value(self.point.flags) {
-            Some(PROMETHEUS_STALE_NAN)
-        } else {
-            self.point.sum
-        };
+        let sum = sum_or_stale(self.point.flags, kind, self.point.sum);
 
         MetricEvent::new(
             metric_name,
@@ -478,22 +496,20 @@ impl SummaryMetric {
 
         // `NO_RECORDED_VALUE` is a whole-point signal, so the quantile values go stale with the
         // sum. Leaving them at 0.0 would make a `prometheus_remote_write` sink publish
-        // `foo{quantile="0.5"} 0`, a fabricated observation.
-        let stale = has_no_recorded_value(self.point.flags);
+        // `foo{quantile="0.5"} 0`, a fabricated observation. OTLP's Summary message has no
+        // aggregation temporality (always decoded as Absolute), so the marker is always safe
+        // here: there is no running total for it to poison.
+        let flags = self.point.flags;
         let quantiles: Vec<Quantile> = self
             .point
             .quantile_values
             .iter()
             .map(|q| Quantile {
                 quantile: q.quantile,
-                value: if stale { PROMETHEUS_STALE_NAN } else { q.value },
+                value: value_or_stale(flags, MetricKind::Absolute, q.value),
             })
             .collect();
-        let sum = if stale {
-            PROMETHEUS_STALE_NAN
-        } else {
-            self.point.sum
-        };
+        let sum = value_or_stale(flags, MetricKind::Absolute, self.point.sum);
 
         MetricEvent::new(
             metric_name,
@@ -858,22 +874,21 @@ impl OTLPDataConverter {
         // `ValueAtQuantile.value` are both non-optional, so unlike the histogram's sum a
         // staleness NaN cannot be carried by omission, and OTLP cannot say "this one quantile
         // is stale". The decoder mirrors this by staling the sum and every quantile value.
-        let stale = sum.is_nan() || quantiles.iter().any(|q| q.value.is_nan());
-        let flags = if stale { NO_RECORDED_VALUE_MASK } else { 0 };
-        let sum = if sum.is_nan() { 0.0 } else { sum };
+        let mut stale = sum.is_nan();
+        let sum = if stale { 0.0 } else { sum };
         for quantile in &mut quantiles {
             if quantile.value.is_nan() {
+                stale = true;
                 quantile.value = 0.0;
+            } else if quantile.value < 0.0 {
+                return Err(format!(
+                    "summary quantile value {} must not be negative",
+                    quantile.value
+                )
+                .into());
             }
         }
-        // Negative quantile values remain malformed.
-        if let Some(quantile) = quantiles.iter().find(|q| q.value < 0.0) {
-            return Err(format!(
-                "summary quantile value {} must not be negative",
-                quantile.value
-            )
-            .into());
-        }
+        let flags = if stale { NO_RECORDED_VALUE_MASK } else { 0 };
         quantiles.sort_by(|a, b| a.quantile.total_cmp(&b.quantile));
 
         reject_duplicate_values(
@@ -1119,41 +1134,19 @@ mod tests {
     fn nan_counter_encodes_no_recorded_value() {
         // Incremental: a NaN counter value must flag NO_RECORDED_VALUE on a zero-valued point,
         // and critically must stay monotonic so it decodes back as a Counter, not a Gauge.
-        let metric = MetricEvent::new(
-            "requests",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: f64::NAN },
-        )
-        .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
+        for kind in [MetricKind::Incremental, MetricKind::Absolute] {
+            let metric =
+                MetricEvent::new("requests", kind, MetricValue::Counter { value: f64::NAN })
+                    .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
 
-        let data = encode_data(&metric);
-        match data {
-            Data::Sum(sum) => {
-                assert!(sum.is_monotonic);
-                let point = sum.data_points.into_iter().next().unwrap();
-                assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(0.0)));
-                assert_eq!(point.flags, NO_RECORDED_VALUE_MASK);
+            let data = encode_data(&metric);
+            match data {
+                Data::Sum(ref sum) => assert!(sum.is_monotonic),
+                other => panic!("expected Data::Sum, got {other:?}"),
             }
-            other => panic!("expected Data::Sum, got {other:?}"),
-        }
-
-        // Absolute: same substitution, same flag.
-        let metric = MetricEvent::new(
-            "requests",
-            MetricKind::Absolute,
-            MetricValue::Counter { value: f64::NAN },
-        )
-        .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
-
-        let data = encode_data(&metric);
-        match data {
-            Data::Sum(sum) => {
-                assert!(sum.is_monotonic);
-                let point = sum.data_points.into_iter().next().unwrap();
-                assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(0.0)));
-                assert_eq!(point.flags, NO_RECORDED_VALUE_MASK);
-            }
-            other => panic!("expected Data::Sum, got {other:?}"),
+            let point = number_data_point(data);
+            assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(0.0)));
+            assert_eq!(point.flags, NO_RECORDED_VALUE_MASK);
         }
     }
 
@@ -1172,42 +1165,36 @@ mod tests {
 
     #[test]
     fn nan_gauge_encodes_no_recorded_value() {
-        // Absolute gauge -> Data::Gauge.
-        let metric = MetricEvent::new(
-            "requests",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: f64::NAN },
-        )
-        .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
+        // Absolute gauge -> Data::Gauge; Incremental gauge -> non-monotonic Data::Sum.
+        // Both must flag NO_RECORDED_VALUE with a zero value.
+        let abs_data = encode_data(
+            &MetricEvent::new(
+                "cpu",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: f64::NAN },
+            )
+            .with_timestamp(Some(Utc.timestamp_nanos(1_000))),
+        );
+        assert!(matches!(abs_data, Data::Gauge(_)), "expected Data::Gauge");
+        let point = number_data_point(abs_data);
+        assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(0.0)));
+        assert_eq!(point.flags, NO_RECORDED_VALUE_MASK);
 
-        let data = encode_data(&metric);
-        match data {
-            Data::Gauge(gauge) => {
-                let point = gauge.data_points.into_iter().next().unwrap();
-                assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(0.0)));
-                assert_eq!(point.flags, NO_RECORDED_VALUE_MASK);
-            }
-            other => panic!("expected Data::Gauge, got {other:?}"),
-        }
-
-        // Incremental gauge -> non-monotonic Data::Sum.
-        let metric = MetricEvent::new(
-            "requests",
-            MetricKind::Incremental,
-            MetricValue::Gauge { value: f64::NAN },
-        )
-        .with_timestamp(Some(Utc.timestamp_nanos(1_000)));
-
-        let data = encode_data(&metric);
-        match data {
-            Data::Sum(sum) => {
-                assert!(!sum.is_monotonic);
-                let point = sum.data_points.into_iter().next().unwrap();
-                assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(0.0)));
-                assert_eq!(point.flags, NO_RECORDED_VALUE_MASK);
-            }
+        let incr_data = encode_data(
+            &MetricEvent::new(
+                "cpu",
+                MetricKind::Incremental,
+                MetricValue::Gauge { value: f64::NAN },
+            )
+            .with_timestamp(Some(Utc.timestamp_nanos(1_000))),
+        );
+        match incr_data {
+            Data::Sum(ref sum) => assert!(!sum.is_monotonic),
             other => panic!("expected Data::Sum, got {other:?}"),
         }
+        let point = number_data_point(incr_data);
+        assert_eq!(point.value, Some(NumberDataPointValue::AsDouble(0.0)));
+        assert_eq!(point.flags, NO_RECORDED_VALUE_MASK);
     }
 
     #[test]
@@ -1561,8 +1548,8 @@ mod tests {
         assert_eq!(PROMETHEUS_STALE_NAN.to_bits(), 0x7ff0_0000_0000_0002);
     }
 
-    fn decoded_metric(metric: impl Into<Event>) -> MetricEvent {
-        metric.into().into_metric()
+    fn decoded_metric(event: Event) -> MetricEvent {
+        event.into_metric()
     }
 
     fn stale_number_point(flags: u32, value: f64) -> NumberDataPoint {
@@ -1738,6 +1725,78 @@ mod tests {
                 }
             }
             other => panic!("expected an aggregated summary, got {other:?}"),
+        }
+    }
+
+    /// A flagged **delta** Sum decodes to 0.0, not the staleness NaN. Adding NaN to a running
+    /// total poisons it and corrupts every subsequent valid sample; 0.0 is a safe no-op.
+    #[test]
+    fn no_recorded_value_delta_sum_decodes_to_zero_not_stale_nan() {
+        for is_monotonic in [true, false] {
+            let event = SumMetric {
+                aggregation_temporality: AggregationTemporality::Delta as i32,
+                resource: None,
+                scope: None,
+                is_monotonic,
+                point: stale_number_point(NO_RECORDED_VALUE_MASK, 0.0),
+            }
+            .into_metric("requests".to_string());
+
+            match (is_monotonic, decoded_metric(event).value().clone()) {
+                (true, MetricValue::Counter { value }) | (false, MetricValue::Gauge { value }) => {
+                    assert_eq!(value.to_bits(), 0.0_f64.to_bits());
+                }
+                (_, other) => panic!("unexpected metric value {other:?}"),
+            }
+        }
+    }
+
+    /// A flagged **delta** histogram decodes with sum = None, not Some(NaN). Adding NaN to a
+    /// histogram sum through `MetricValue::add` would propagate NaN to all future samples.
+    #[test]
+    fn no_recorded_value_delta_histogram_decodes_sum_to_none() {
+        let event = HistogramMetric {
+            aggregation_temporality: AggregationTemporality::Delta as i32,
+            resource: None,
+            scope: None,
+            point: HistogramDataPoint {
+                count: 0,
+                sum: None,
+                bucket_counts: vec![0],
+                flags: NO_RECORDED_VALUE_MASK,
+                ..Default::default()
+            },
+        }
+        .into_metric("latency".to_string());
+
+        match decoded_metric(event).value() {
+            MetricValue::AggregatedHistogram { sum, .. } => {
+                assert!(sum.is_none(), "delta stale sum must be None, got {sum:?}");
+            }
+            other => panic!("expected an aggregated histogram, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn no_recorded_value_delta_exponential_histogram_decodes_sum_to_none() {
+        let event = ExpHistogramMetric {
+            aggregation_temporality: AggregationTemporality::Delta as i32,
+            resource: None,
+            scope: None,
+            point: ExponentialHistogramDataPoint {
+                count: 0,
+                sum: None,
+                flags: NO_RECORDED_VALUE_MASK,
+                ..Default::default()
+            },
+        }
+        .into_metric("latency".to_string());
+
+        match decoded_metric(event).value() {
+            MetricValue::AggregatedHistogram { sum, .. } => {
+                assert!(sum.is_none(), "delta stale sum must be None, got {sum:?}");
+            }
+            other => panic!("expected an aggregated histogram, got {other:?}"),
         }
     }
 

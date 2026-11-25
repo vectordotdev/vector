@@ -350,3 +350,73 @@ async fn conflicting_auth_headers_rejected() {
         Ok(_) => panic!("Expected an error for conflicting auth settings, but build succeeded"),
     }
 }
+
+/// A flagged OTLP delta point must not poison the sink's cumulative running total.
+///
+/// The `opentelemetry` source decodes a delta `Sum` flagged `NO_RECORDED_VALUE` and the sink
+/// normalizes it with `incremental_to_absolute`, which adds every delta to a cached total.
+/// `NaN + x` is `NaN`, so a staleness NaN there would turn every later valid delta for the
+/// series into `NaN` until the cache entry expires. The decoder emits a `0.0` delta instead.
+#[cfg(feature = "sources-opentelemetry")]
+#[test]
+fn stale_otlp_delta_does_not_poison_running_total() {
+    use vector_lib::opentelemetry::proto::{
+        common::v1::InstrumentationScope,
+        metrics::v1::{
+            AggregationTemporality, Metric as OtlpMetric, NumberDataPoint, ResourceMetrics,
+            ScopeMetrics, Sum, metric::Data, number_data_point::Value,
+        },
+    };
+
+    let point = |flags: u32, value: f64| NumberDataPoint {
+        time_unix_nano: 1_000_000_000,
+        value: Some(Value::AsDouble(value)),
+        flags,
+        ..Default::default()
+    };
+    let request = |flags: u32, value: f64| ResourceMetrics {
+        scope_metrics: vec![ScopeMetrics {
+            scope: Some(InstrumentationScope::default()),
+            metrics: vec![OtlpMetric {
+                name: "requests".into(),
+                data: Some(Data::Sum(Sum {
+                    data_points: vec![point(flags, value)],
+                    aggregation_temporality: AggregationTemporality::Delta as i32,
+                    is_monotonic: true,
+                })),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+
+    let mut set = MetricSet::default();
+    let mut normalize = PrometheusMetricNormalize;
+    let mut total = |flags: u32, value: f64| {
+        let event = request(flags, value)
+            .into_event_iter()
+            .next()
+            .expect("one event");
+        let normalized = normalize
+            .normalize(&mut set, event.into_metric())
+            .expect("metric is emitted");
+        match normalized.value() {
+            MetricValue::Counter { value } => *value,
+            other => panic!("expected a counter, got {other:?}"),
+        }
+    };
+
+    // valid -> stale -> valid, as an autoscaled series would produce.
+    assert_eq!(total(0, 5.0), 5.0);
+    assert_eq!(
+        total(1, 0.0),
+        5.0,
+        "a stale delta must leave the total as is"
+    );
+    assert_eq!(
+        total(0, 2.0),
+        7.0,
+        "the series must recover after a stale delta"
+    );
+}

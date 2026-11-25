@@ -8,15 +8,18 @@ cardinality changes produce continuously.
 
 A `NaN` counter or gauge value now encodes as a zero-valued OTLP point flagged with
 `NO_RECORDED_VALUE`, OTLP's own equivalent of the Prometheus staleness marker. The `opentelemetry`
-source's decode path is now the mirror of this: a data point flagged `NO_RECORDED_VALUE` decodes
-to the Prometheus staleness `NaN` instead of a fabricated `0.0`, so the source can newly emit `NaN`
-metric values where it previously emitted zero.
+source's decode path is now the mirror of this: a **cumulative** data point flagged
+`NO_RECORDED_VALUE` decodes to the Prometheus staleness `NaN` instead of a fabricated `0.0`, so the
+source can newly emit `NaN` metric values where it previously emitted zero. A flagged **delta**
+point decodes to `0.0` (or, for a histogram sum, `None`) instead: `prometheus_remote_write`'s sink
+normalization adds every delta onto a cached running total, and adding `NaN` there would poison
+that total so every later valid sample for the series also came out as `NaN`.
 
 A `NaN` histogram sum is omitted (OTLP's histogram `sum` is optional) and only flags
 `NO_RECORDED_VALUE` when the histogram has no observations; a histogram with real bucket counts
 keeps those counts and is not flagged. A `NaN` anywhere in a summary (its sum or any quantile
 value) flags the whole point and stales every quantile value, since OTLP has no way to mark a
-single quantile as stale.
+single quantile as stale. OTLP summaries have no delta form, so this case is always cumulative.
 
 This does not fix the case of a `prometheus_remote_write` source receiving a stale histogram or
 summary: Vector's remote-write parser already rejects a `NaN` `_count` for those metric types with

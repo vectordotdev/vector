@@ -316,11 +316,21 @@ components: sources: opentelemetry: {
 				the decoded metric reach a downstream `prometheus_remote_write` sink as a valid
 				staleness marker instead of a fabricated zero.
 
+				This substitution only applies to a **cumulative** data point (OTLP aggregation
+				temporality `Cumulative`, Vector `MetricKind::Absolute`). A flagged **delta**
+				point (`Delta` temporality, `MetricKind::Incremental`) decodes to a zero value (or,
+				for a histogram sum, to no sum at all) instead of `NaN`. Sinks that reconstruct a
+				cumulative total from deltas, such as `prometheus_remote_write`'s own
+				normalization, add every delta onto a cached running total; adding `NaN` there
+				would poison that total so every later valid sample for the series also comes out
+				as `NaN`. `Summary` data points have no delta form in OTLP, so this does not apply
+				to them.
+
 				For a `Sum` or `Gauge` data point, the flagged value itself goes stale. For a
 				`Histogram` or `ExponentialHistogram` data point, the `sum` field goes stale (and
-				is populated even when the point carried no sum at all). For a `Summary` data
-				point, the `sum` and every quantile value go stale, since OTLP has no way to mark
-				a single quantile as stale on its own.
+				is populated even when the point carried no sum at all) for a cumulative point
+				only. For a `Summary` data point, the `sum` and every quantile value go stale,
+				since OTLP has no way to mark a single quantile as stale on its own.
 				"""
 		}
 	}
