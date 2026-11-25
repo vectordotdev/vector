@@ -197,6 +197,11 @@ impl SourceConfig for IggySourceConfig {
         if self.poll_interval_ms == 0 {
             return Err("`poll_interval_ms` must be at least 1".into());
         }
+        // Reject a malformed connection string while the topology is built.
+        // The SDK parses it lazily in `connect_and_init`, where a deterministic
+        // parse failure would retry forever instead of failing the reload.
+        IggyClientBuilder::from_connection_string(&secure_connection_string(&self.url))
+            .map_err(|error| format!("`url` is not a valid Iggy connection string: {error}"))?;
         // The SDK's HTTP client has no consumer group state and refuses the
         // join, so reject the combination here instead of failing the source
         // after it connects.
