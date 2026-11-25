@@ -73,10 +73,10 @@ generated: components: sinks: gcp_pubsub: configuration: {
 
 			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
 			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
-			running on. If this is not on a GCE instance, then you must define it with an API key or service account
+			running on, using Vector's proxy settings if configured. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
 
-			Token requests for these credentials do not use the component's `proxy` settings. To send them
+			Token requests for service account key files and `external_account` credentials ignore proxy settings in the configuration file. To send them
 			through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
 
 			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually

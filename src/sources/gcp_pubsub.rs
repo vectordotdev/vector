@@ -271,7 +271,7 @@ impl SourceConfig for PubsubConfig {
             }
         };
 
-        let auth = self.auth.build(Scope::PubSub).await?;
+        let auth = self.auth.build(Scope::PubSub, &cx.proxy).await?;
 
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
         auth.apply_uri(&mut uri);
@@ -291,7 +291,7 @@ impl SourceConfig for PubsubConfig {
         builder.http2_max_header_list_size(vector_common::constants::HTTP2_MAX_HEADER_LIST_SIZE);
         let client = Http2Client::new(tls.into(), &cx.proxy, builder)?;
 
-        let token_generator = auth.spawn_regenerate_token();
+        let token_generator = auth.spawn_regenerate_token(&cx.proxy);
 
         let source = PubsubSource {
             client,

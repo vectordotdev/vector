@@ -86,9 +86,9 @@ pub struct GcpCredentialsConfig {
     ///
     /// If unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked. If that
     /// is also unset, Vector will attempt to fetch credentials from the Compute Engine metadata
-    /// service if running on a GCE instance.
+    /// service if running on a GCE instance, using Vector's proxy settings if configured.
     ///
-    /// Token requests for these credentials do not use the component's `proxy` settings. To send them
+    /// Token requests for service account key files and `external_account` credentials ignore proxy settings in the configuration file. To send them
     /// through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
     ///
     /// [gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
@@ -108,6 +108,7 @@ impl GcpCredentialsConfig {
         &self,
         scope: Scope,
         api_key: Option<&SensitiveString>,
+        proxy_config: &ProxyConfig,
     ) -> crate::Result<GcpAuthenticator> {
         Ok(if self.skip_authentication {
             GcpAuthenticator::None
@@ -115,9 +116,9 @@ impl GcpCredentialsConfig {
             let gap = std::env::var(GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR).ok();
             let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
             match (creds_path, api_key) {
-                (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
+                (Some(path), _) => GcpAuthenticator::from_file(path, scope, proxy_config).await?,
                 (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key.inner())?,
-                (None, None) => GcpAuthenticator::new_implicit().await?,
+                (None, None) => GcpAuthenticator::new_implicit(proxy_config).await?,
             }
         })
     }
@@ -155,10 +156,10 @@ pub struct GcpAuthConfig {
     ///
     /// If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
     /// filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
-    /// running on. If this is not on a GCE instance, then you must define it with an API key or service account
+    /// running on, using Vector's proxy settings if configured. If this is not on a GCE instance, then you must define it with an API key or service account
     /// credentials JSON file.
     ///
-    /// Token requests for these credentials do not use the component's `proxy` settings. To send them
+    /// Token requests for service account key files and `external_account` credentials ignore proxy settings in the configuration file. To send them
     /// through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
     ///
     /// [gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
@@ -174,16 +175,20 @@ pub struct GcpAuthConfig {
 impl GcpAuthConfig {
     /// # Errors
     /// Returns an error if credentials or the API key are invalid, or token retrieval fails.
-    pub async fn build(&self, scope: Scope) -> crate::Result<GcpAuthenticator> {
+    pub async fn build(
+        &self,
+        scope: Scope,
+        proxy_config: &ProxyConfig,
+    ) -> crate::Result<GcpAuthenticator> {
         Ok(if self.skip_authentication {
             GcpAuthenticator::None
         } else {
             let gap = std::env::var(GOOGLE_APPLICATION_CREDENTIALS_ENV_VAR).ok();
             let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
             match (&creds_path, &self.api_key) {
-                (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
+                (Some(path), _) => GcpAuthenticator::from_file(path, scope, proxy_config).await?,
                 (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key.inner())?,
-                (None, None) => GcpAuthenticator::new_implicit().await?,
+                (None, None) => GcpAuthenticator::new_implicit(proxy_config).await?,
             }
         })
     }
@@ -225,7 +230,11 @@ struct FetchedToken {
 }
 
 impl GcpAuthenticator {
-    async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
+    async fn from_file(
+        path: &str,
+        scope: Scope,
+        proxy_config: &ProxyConfig,
+    ) -> crate::Result<Self> {
         let source = match external_account_json(path) {
             Some(json) => TokenSource::ExternalAccount(ExternalAccount::new(json, scope.url())?),
             None => TokenSource::ServiceAccount(
@@ -233,11 +242,11 @@ impl GcpAuthenticator {
                 scope,
             ),
         };
-        InnerCreds::authenticator(source).await
+        InnerCreds::authenticator(source, proxy_config).await
     }
 
-    async fn new_implicit() -> crate::Result<Self> {
-        InnerCreds::authenticator(TokenSource::Metadata).await
+    async fn new_implicit(proxy_config: &ProxyConfig) -> crate::Result<Self> {
+        InnerCreds::authenticator(TokenSource::Metadata, proxy_config).await
     }
 
     fn from_api_key(api_key: &str) -> crate::Result<Self> {
@@ -294,13 +303,13 @@ impl GcpAuthenticator {
         clippy::must_use_candidate,
         reason = "Refresh subscription is optional"
     )]
-    pub fn spawn_regenerate_token(&self) -> watch::Receiver<()> {
+    pub fn spawn_regenerate_token(&self, proxy_config: &ProxyConfig) -> watch::Receiver<()> {
         let (sender, receiver) = watch::channel(());
-        crate::spawn_in_current_span(self.clone().token_regenerator(sender));
+        crate::spawn_in_current_span(self.clone().token_regenerator(sender, proxy_config.clone()));
         receiver
     }
 
-    async fn token_regenerator(self, sender: watch::Sender<()>) {
+    async fn token_regenerator(self, sender: watch::Sender<()>, proxy_config: ProxyConfig) {
         match self {
             Self::Credentials(inner) => {
                 let mut deadline = inner.token.read().unwrap().refresh_in;
@@ -310,7 +319,7 @@ impl GcpAuthenticator {
                         "Sleeping before refreshing GCP authentication token.",
                     );
                     tokio::time::sleep(deadline).await;
-                    match inner.regenerate_token().await {
+                    match inner.regenerate_token(&proxy_config).await {
                         Ok(changed) => {
                             // Subscribers such as the Pub/Sub source reconnect on every
                             // notification, so only notify when the token actually changed.
@@ -346,8 +355,11 @@ impl GcpAuthenticator {
 
 impl InnerCreds {
     /// Fetches the first token up front so that invalid credentials fail the component build.
-    async fn authenticator(source: TokenSource) -> crate::Result<GcpAuthenticator> {
-        let token = RwLock::new(source.fetch().await?);
+    async fn authenticator(
+        source: TokenSource,
+        proxy_config: &ProxyConfig,
+    ) -> crate::Result<GcpAuthenticator> {
+        let token = RwLock::new(source.fetch(proxy_config).await?);
         Ok(GcpAuthenticator::Credentials(Arc::new(Self {
             source,
             token,
@@ -355,8 +367,8 @@ impl InnerCreds {
     }
 
     /// Returns whether the token changed.
-    async fn regenerate_token(&self) -> crate::Result<bool> {
-        let token = self.source.fetch().await?;
+    async fn regenerate_token(&self, proxy_config: &ProxyConfig) -> crate::Result<bool> {
+        let token = self.source.fetch(proxy_config).await?;
         let mut current = self.token.write().unwrap();
         let changed = current.header != token.header;
         *current = token;
@@ -369,10 +381,10 @@ impl InnerCreds {
 }
 
 impl TokenSource {
-    async fn fetch(&self) -> crate::Result<FetchedToken> {
+    async fn fetch(&self, proxy_config: &ProxyConfig) -> crate::Result<FetchedToken> {
         Ok(match self {
             Self::ServiceAccount(creds, scope) => fetch_token(creds, scope).await?.into(),
-            Self::Metadata => get_token_implicit().await?.into(),
+            Self::Metadata => get_token_implicit(proxy_config).await?.into(),
             Self::ExternalAccount(account) => account.fetch().await?,
         })
     }
@@ -477,15 +489,14 @@ async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token>
         .map_err(Into::into)
 }
 
-async fn get_token_implicit() -> Result<Token, GcpError> {
+async fn get_token_implicit(proxy_config: &ProxyConfig) -> Result<Token, GcpError> {
     debug!("Fetching implicit GCP authentication token.");
     let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
         .header("Metadata-Flavor", "Google")
         .body(empty_body())
         .unwrap();
 
-    let proxy = ProxyConfig::from_env();
-    let res = HttpClient::new(MaybeTlsSettings::Raw(()), &proxy)
+    let res = HttpClient::new(MaybeTlsSettings::Raw(()), proxy_config)
         .context(BuildHttpClientSnafu)?
         .send(req)
         .await
@@ -659,7 +670,10 @@ mod tests {
         };
 
         // The SDK still holds a valid cached token, so a refresh must not wake subscribers.
-        let changed = inner.regenerate_token().await.expect("refresh failed");
+        let changed = inner
+            .regenerate_token(&ProxyConfig::default())
+            .await
+            .expect("refresh failed");
 
         assert!(!changed);
         assert_eq!(authorization(&auth), "Bearer sts-token");
@@ -827,6 +841,6 @@ mod tests {
 
     async fn build_auth(yaml: &str) -> crate::Result<GcpAuthenticator> {
         let config: GcpAuthConfig = serde_yaml::from_str(yaml).expect("Invalid YAML");
-        config.build(Scope::Compute).await
+        config.build(Scope::Compute, &ProxyConfig::default()).await
     }
 }

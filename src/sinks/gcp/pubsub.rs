@@ -163,7 +163,7 @@ impl ValidatedSink for PubsubConfig {
         } = validated.clone();
 
         // We only need to load the credentials if we are not targeting an emulator.
-        let auth = self.auth.build(Scope::PubSub).await?;
+        let auth = self.auth.build(Scope::PubSub, cx.proxy()).await?;
 
         let serializer = self.encoding.build()?;
         let encoder = PubsubMessageEncoder {
@@ -177,7 +177,7 @@ impl ValidatedSink for PubsubConfig {
 
         let healthcheck =
             healthcheck(client.clone(), uri_base.as_uri().clone(), auth.clone()).boxed();
-        auth.spawn_regenerate_token();
+        auth.spawn_regenerate_token(cx.proxy());
 
         // The suffix is a Google API method that attaches directly to the topic path without a
         // separator.

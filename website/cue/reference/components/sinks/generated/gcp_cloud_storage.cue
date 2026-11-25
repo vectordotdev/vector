@@ -164,9 +164,9 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 
 			If unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked. If that
 			is also unset, Vector will attempt to fetch credentials from the Compute Engine metadata
-			service if running on a GCE instance.
+			service if running on a GCE instance, using Vector's proxy settings if configured.
 
-			Token requests for these credentials do not use the component's `proxy` settings. To send them
+			Token requests for service account key files and `external_account` credentials ignore proxy settings in the configuration file. To send them
 			through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
 
 			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually

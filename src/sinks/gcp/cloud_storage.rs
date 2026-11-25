@@ -320,7 +320,11 @@ impl ValidatedSink for GcsSinkConfig {
 
         let auth = self
             .auth
-            .build(Scope::DevStorageReadWrite, self.api_key.as_ref())
+            .build(
+                Scope::DevStorageReadWrite,
+                self.api_key.as_ref(),
+                cx.proxy(),
+            )
             .await?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
@@ -331,7 +335,7 @@ impl ValidatedSink for GcsSinkConfig {
             base_url.clone(),
             auth.clone(),
         );
-        auth.spawn_regenerate_token();
+        auth.spawn_regenerate_token(cx.proxy());
         let sink = self.build_sink(client, base_url.clone(), auth, &cx, validated)?;
         Ok((sink, healthcheck))
     }

@@ -350,13 +350,16 @@ impl ValidatedSink for ChronicleUnstructuredConfig {
             ..
         } = validated;
 
-        let creds = self.auth.build(Scope::MalachiteIngestion).await?;
+        let creds = self
+            .auth
+            .build(Scope::MalachiteIngestion, cx.proxy())
+            .await?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls.into(), cx.proxy())?;
 
         let healthcheck = build_healthcheck(client.clone(), healthcheck_endpoint, creds.clone())?;
-        creds.spawn_regenerate_token();
+        creds.spawn_regenerate_token(cx.proxy());
         let sink = self.build_sink(client, endpoint.clone(), creds, validated)?;
 
         Ok((sink, healthcheck))
