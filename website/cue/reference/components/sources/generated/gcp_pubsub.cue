@@ -59,7 +59,9 @@ generated: components: sources: gcp_pubsub: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
+			Path to a [service account][gcp_service_account_credentials] or
+			[Workload Identity Federation][gcp_workload_identity_federation] (`external_account`)
+			credentials JSON file.
 
 			Either an API key or a path to a service account credentials JSON file can be specified.
 
@@ -68,7 +70,11 @@ generated: components: sources: gcp_pubsub: configuration: {
 			running on. If this is not on a GCE instance, then you must define it with an API key or service account
 			credentials JSON file.
 
+			Token requests for these credentials do not use the component's `proxy` settings. To send them
+			through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
+
 			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
+			[gcp_workload_identity_federation]: https://cloud.google.com/iam/docs/workload-identity-federation
 			"""
 		required: false
 		type: string: {}
