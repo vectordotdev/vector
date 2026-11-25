@@ -266,7 +266,7 @@ where
     F: FnOnce(EventLogSubscription) -> (EventLogSubscription, R) + Send + 'static,
     R: Send + 'static,
 {
-    tokio::task::spawn_blocking(move || f(subscription))
+    vector_lib::cpu_time::spawn_blocking_timed(move || f(subscription))
         .await
         .map_err(|e| WindowsEventLogError::ConfigError {
             message: format!("Blocking subscription task panicked: {e}"),

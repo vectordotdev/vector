@@ -38,7 +38,7 @@ const CPU_BURN_MS: u64 = 1;
 
 /// CPU burned once by the sink healthcheck. Large enough to dwarf what the sink
 /// itself spends on `EVENT_COUNT` events.
-const HEALTHCHECK_CPU_BURN_MS: u32 = 100;
+const HEALTHCHECK_CPU_BURN_MS: u64 = 100;
 
 /// Which components of the test topology have `measure_cpu_usage` enabled.
 #[derive(Clone, Copy)]
@@ -99,6 +99,20 @@ fn assert_component_cpu_counter_positive(
     assert!(
         value > 0.0,
         "expected component_cpu_usage_ns_total > 0, got {value}"
+    );
+}
+
+fn assert_component_cpu_counter_at_least(
+    metrics: &[Metric],
+    id: &str,
+    has_tags: impl Fn(&Metric, &str) -> bool,
+    min: Duration,
+) {
+    let value = component_cpu_counter(metrics, id, has_tags);
+    let min_ns = min.as_secs_f64() * 1e9;
+    assert!(
+        value >= min_ns,
+        "expected component_cpu_usage_ns_total >= {min_ns}, got {value}"
     );
 }
 
@@ -310,16 +324,16 @@ async fn component_cpu_usage_includes_sink_healthcheck_tasks() {
         MEASURE_SINK,
         |s| s,
         |c| c,
-        |s| s.with_healthcheck_cpu_burn_ms(u64::from(HEALTHCHECK_CPU_BURN_MS)),
+        |s| s.with_healthcheck_cpu_burn_ms(HEALTHCHECK_CPU_BURN_MS),
     )
     .await;
 
     // The burn is measured on the same thread clock as the poll timer.
-    let min_ns = f64::from(HEALTHCHECK_CPU_BURN_MS) * 1e6;
-    let value = component_cpu_counter(&metrics, &format!("{id}_sink"), has_sink_tags);
-    assert!(
-        value >= min_ns,
-        "expected component_cpu_usage_ns_total >= {min_ns}, got {value}"
+    assert_component_cpu_counter_at_least(
+        &metrics,
+        &format!("{id}_sink"),
+        has_sink_tags,
+        Duration::from_millis(HEALTHCHECK_CPU_BURN_MS),
     );
 }
 
@@ -336,5 +350,12 @@ async fn component_cpu_usage_emitted_source() {
         |s| s,
     )
     .await;
-    assert_component_cpu_counter_positive(&metrics, &format!("{id}_source"), has_source_tags);
+    // Each sent event is received as its own batch, so the source burns once per event. The
+    // burns are measured on the same thread clock as the poll timer.
+    assert_component_cpu_counter_at_least(
+        &metrics,
+        &format!("{id}_source"),
+        has_source_tags,
+        Duration::from_millis(CPU_BURN_MS) * u32::try_from(EVENT_COUNT).unwrap(),
+    );
 }

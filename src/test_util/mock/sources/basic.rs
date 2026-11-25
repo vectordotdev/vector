@@ -24,7 +24,7 @@ use vector_lib::{
 
 use crate::{
     config::{SourceConfig, SourceContext},
-    test_util::mock::{TestComponentData, transforms::busy_spin},
+    test_util::mock::{TestComponentData, transforms::burn_thread_cpu},
 };
 
 /// Configuration for the `test_basic` source.
@@ -156,7 +156,7 @@ impl SourceConfig for BasicSourceConfig {
                         }
 
                         if let Some(cpu_burn) = cpu_burn {
-                            spawn_timed(async move { busy_spin(cpu_burn) })
+                            spawn_timed(async move { burn_thread_cpu(cpu_burn) })
                                 .await
                                 .expect("CPU burn task panicked");
                         }
