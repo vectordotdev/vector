@@ -186,8 +186,12 @@ impl vector_core::event::typed_trace::TraceConversionReporter for OtlpTraceRepor
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
+    use opentelemetry_proto::metrics::PROMETHEUS_STALE_NAN;
     use opentelemetry_proto::proto::collector::metrics::v1::ExportMetricsServiceRequest;
-    use vector_core::event::{Metric, MetricKind, MetricTags, MetricValue, metric::Bucket};
+    use vector_core::event::{
+        Metric, MetricKind, MetricTags, MetricValue,
+        metric::{Bucket, Quantile},
+    };
 
     // `into_event_iter` always wraps attributes in `Some(MetricTags)` (via `build_metric_tags`),
     // even when there are none, so a tag-less input compares unequal to its round-tripped output
@@ -365,6 +369,207 @@ mod tests {
                 .encode(Event::Metric(distribution_metric), &mut buffer)
                 .is_err()
         );
+    }
+
+    fn stale_metric(name: &str, kind: MetricKind, value: MetricValue) -> Metric {
+        with_empty_tags(
+            Metric::new(name, kind, value).with_timestamp(Some(Utc.timestamp_nanos(1_000_000_000))),
+        )
+    }
+
+    /// An Incremental NaN counter must round-trip back as a Counter (not a Gauge), and the
+    /// value must be bit-for-bit the Prometheus staleness marker.
+    #[test]
+    fn round_trip_stale_counter() {
+        let input = stale_metric(
+            "requests",
+            MetricKind::Incremental,
+            MetricValue::Counter {
+                value: PROMETHEUS_STALE_NAN,
+            },
+        );
+        let output = round_trip_metric(input);
+        match output.value() {
+            MetricValue::Counter { value } => {
+                assert_eq!(value.to_bits(), PROMETHEUS_STALE_NAN.to_bits());
+            }
+            other => panic!("expected a counter after round-trip, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn round_trip_stale_counter_absolute() {
+        let input = stale_metric(
+            "requests",
+            MetricKind::Absolute,
+            MetricValue::Counter {
+                value: PROMETHEUS_STALE_NAN,
+            },
+        );
+        let output = round_trip_metric(input);
+        match output.value() {
+            MetricValue::Counter { value } => {
+                assert_eq!(value.to_bits(), PROMETHEUS_STALE_NAN.to_bits());
+            }
+            other => panic!("expected a counter after round-trip, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn round_trip_stale_gauge() {
+        let input = stale_metric(
+            "cpu",
+            MetricKind::Absolute,
+            MetricValue::Gauge {
+                value: PROMETHEUS_STALE_NAN,
+            },
+        );
+        let output = round_trip_metric(input);
+        match output.value() {
+            MetricValue::Gauge { value } => {
+                assert_eq!(value.to_bits(), PROMETHEUS_STALE_NAN.to_bits());
+            }
+            other => panic!("expected a gauge after round-trip, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn round_trip_stale_histogram_without_observations() {
+        // count == 0, NaN sum: the whole point is stale. The +Inf bucket is explicit so the
+        // encoder does not treat the empty-bucket input as a bucket-count mismatch.
+        let input = stale_metric(
+            "latency",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![Bucket {
+                    upper_limit: f64::INFINITY,
+                    count: 0,
+                }],
+                count: 0,
+                sum: Some(PROMETHEUS_STALE_NAN),
+            },
+        );
+        let output = round_trip_metric(input);
+        match output.value() {
+            MetricValue::AggregatedHistogram { count, sum, .. } => {
+                assert_eq!(*count, 0);
+                assert_eq!(
+                    sum.expect("sum must be Some after round-trip").to_bits(),
+                    PROMETHEUS_STALE_NAN.to_bits()
+                );
+            }
+            other => panic!("expected an aggregated histogram, got {other:?}"),
+        }
+    }
+
+    /// A histogram with real observations and a NaN sum: the sum is dropped (omission carries
+    /// the staleness NaN), but the bucket data survives. The decoded sum is `None`.
+    #[test]
+    fn round_trip_histogram_with_nan_sum_and_observations_drops_the_sum() {
+        let input = stale_metric(
+            "latency",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 2,
+                    },
+                    Bucket {
+                        upper_limit: f64::INFINITY,
+                        count: 3,
+                    },
+                ],
+                count: 5,
+                sum: Some(PROMETHEUS_STALE_NAN),
+            },
+        );
+        let output = round_trip_metric(input);
+        match output.value() {
+            MetricValue::AggregatedHistogram { count, sum, .. } => {
+                assert_eq!(*count, 5);
+                // Lossy: NaN sum was carried by omission on the wire.
+                assert!(sum.is_none());
+            }
+            other => panic!("expected an aggregated histogram, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn round_trip_stale_summary() {
+        let input = stale_metric(
+            "latency",
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles: vec![
+                    Quantile {
+                        quantile: 0.5,
+                        value: PROMETHEUS_STALE_NAN,
+                    },
+                    Quantile {
+                        quantile: 0.99,
+                        value: PROMETHEUS_STALE_NAN,
+                    },
+                ],
+                count: 0,
+                sum: PROMETHEUS_STALE_NAN,
+            },
+        );
+        let output = round_trip_metric(input);
+        match output.value() {
+            MetricValue::AggregatedSummary {
+                quantiles,
+                count,
+                sum,
+            } => {
+                assert_eq!(*count, 0);
+                assert_eq!(sum.to_bits(), PROMETHEUS_STALE_NAN.to_bits());
+                for q in quantiles {
+                    assert_eq!(q.value.to_bits(), PROMETHEUS_STALE_NAN.to_bits());
+                }
+            }
+            other => panic!("expected an aggregated summary, got {other:?}"),
+        }
+    }
+
+    /// A summary where only one quantile value is NaN: the whole point widens to stale, so the
+    /// real sum and real quantile values are lost.
+    #[test]
+    fn round_trip_summary_with_a_nan_quantile_value_widens_to_the_point() {
+        let input = stale_metric(
+            "latency",
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles: vec![
+                    Quantile {
+                        quantile: 0.5,
+                        value: 10.0,
+                    },
+                    Quantile {
+                        quantile: 0.99,
+                        value: PROMETHEUS_STALE_NAN,
+                    },
+                ],
+                count: 100,
+                sum: 1000.0,
+            },
+        );
+        let output = round_trip_metric(input);
+        match output.value() {
+            MetricValue::AggregatedSummary {
+                quantiles,
+                count,
+                sum,
+            } => {
+                // The whole point widens to stale.
+                assert_eq!(*count, 100);
+                assert_eq!(sum.to_bits(), PROMETHEUS_STALE_NAN.to_bits());
+                for q in quantiles {
+                    assert_eq!(q.value.to_bits(), PROMETHEUS_STALE_NAN.to_bits());
+                }
+            }
+            other => panic!("expected an aggregated summary, got {other:?}"),
+        }
     }
 }
 

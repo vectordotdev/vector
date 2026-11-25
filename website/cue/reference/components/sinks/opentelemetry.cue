@@ -239,5 +239,23 @@ components: sinks: opentelemetry: {
 
 				"""
 		}
+		metric_staleness: {
+			title: "Metric staleness markers"
+			body: """
+				With `encoding.codec: otlp`, a `NaN` metric value encodes as a zero-valued OTLP data
+				point flagged `NO_RECORDED_VALUE`, the OTLP equivalent of a Prometheus "staleness
+				marker". This is what a `prometheus_remote_write` source produces when a series goes
+				stale, so such events are no longer dropped as malformed.
+
+				A `NaN` histogram sum is omitted (OTLP's `sum` is optional), and the point is flagged
+				only when the histogram has no observations. A `NaN` anywhere in a summary (its sum or
+				any quantile value) flags the whole point and zeroes every quantile value, since OTLP
+				cannot mark a single quantile as stale. A `NaN` histogram bucket bound or summary
+				quantile position is still rejected as malformed.
+
+				The `opentelemetry` source applies the reverse mapping when it decodes a flagged data
+				point.
+				"""
+		}
 	}
 }

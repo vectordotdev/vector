@@ -307,6 +307,22 @@ components: sources: opentelemetry: {
 				Summary is mapped to a Vector Aggregated Summary.
 				"""
 		}
+		metric_staleness: {
+			title: "OTLP staleness markers"
+			body: """
+				An OTLP data point flagged `NO_RECORDED_VALUE` (the equivalent of a Prometheus
+				"staleness marker") decodes to a `NaN` metric value using the exact bit pattern
+				that the Prometheus remote-write spec requires: `0x7ff0000000000002`. This lets
+				the decoded metric reach a downstream `prometheus_remote_write` sink as a valid
+				staleness marker instead of a fabricated zero.
+
+				For a `Sum` or `Gauge` data point, the flagged value itself goes stale. For a
+				`Histogram` or `ExponentialHistogram` data point, the `sum` field goes stale (and
+				is populated even when the point carried no sum at all). For a `Summary` data
+				point, the `sum` and every quantile value go stale, since OTLP has no way to mark
+				a single quantile as stale on its own.
+				"""
+		}
 	}
 
 	telemetry: metrics: {
