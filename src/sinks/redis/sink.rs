@@ -1,4 +1,5 @@
 use std::{future, sync::Arc, time::Duration};
+use vector_lib::internal_event::emit;
 
 use redis::{
     RedisResult,
@@ -67,7 +68,7 @@ pub(super) struct ConnectionState {
 }
 
 impl ConnectionState {
-    pub const fn new_no_generation(conn: ConnectionManager) -> Self {
+    const fn new_no_generation(conn: ConnectionManager) -> Self {
         Self {
             connection: conn,
             generation: None,
@@ -139,14 +140,14 @@ impl RedisConnection {
         Ok(Self::Sentinel {
             connection_send: conn_tx,
             connection_recv: conn_rx,
-            repair_task: Arc::new(crate::spawn_in_current_span(async move {
+            repair_task: Arc::new(vector_lib::cpu_time::spawn_timed(async move {
                 Self::repair_connection_manager_task(
                     sentinel,
                     service_name,
                     node_connection_info,
                     task_conn_tx,
                 )
-                .await
+                .await;
             })),
         })
     }
@@ -164,7 +165,7 @@ impl RedisConnection {
         loop {
             if !repairing {
                 // Wait until a repair is needed
-                if let Err(error) = conn_recv.wait_for(|state| state.needs_repair()).await {
+                if let Err(error) = conn_recv.wait_for(RepairState::needs_repair).await {
                     warn!("Connection state channel was dropped {error:?}.");
                     continue;
                 }
@@ -212,7 +213,7 @@ impl RedisConnection {
             Self::Sentinel {
                 connection_recv, ..
             } => {
-                match connection_recv.wait_for(|state| state.is_active()).await {
+                match connection_recv.wait_for(RepairState::is_active).await {
                     Ok(repair_state) => {
                         // SAFETY: we wait until we're in the active state before this runs
                         let state = repair_state
@@ -291,13 +292,13 @@ impl RedisSink {
 
         Ok(RedisSink {
             request,
-            batcher_settings,
-            transformer,
             encoder,
+            transformer,
             conn,
             data_type,
             key,
             score,
+            batcher_settings,
         })
     }
 
@@ -309,7 +310,7 @@ impl RedisSink {
             .key
             .render_string(&event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("key"),
                     drop_event: true,
@@ -322,7 +323,7 @@ impl RedisSink {
             .as_ref()
             .map(|template| {
                 template.render(&event).map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("score"),
                         drop_event: true,

@@ -82,7 +82,13 @@ components: sinks: datadog_logs: {
 				limit. Increase it when targeting a compatible endpoint that accepts larger payloads.
 
 				A batch that exceeds `max_payload_bytes` is split across multiple requests. A single event
-				that exceeds `max_payload_bytes` is dropped.
+				that still exceeds `max_payload_bytes` after optional truncation is dropped.
+
+				Set `truncate_oversized_logs` to opt in to reducing individual logs whose encoded JSON
+				exceeds `truncate_oversized_logs.max_log_bytes` (default 1,000,000). The message is
+				shortened to the largest size that fits and `...TRUNCATED...` is appended. Every reduced
+				log is tagged `truncated:single_line`. Logs whose non-message fields leave no room for
+				a truncated message, or have no string message to truncate, are dropped.
 				"""
 		}
 	}

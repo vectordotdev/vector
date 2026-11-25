@@ -1,6 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::emit;
 use vrl::value::Kind;
 
 use crate::{
@@ -176,11 +177,11 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
             .process
             .render_string(&event)
             .map_err(|error| {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("process"),
                     drop_event: false,
-                })
+                });
             })
             .ok()
             .unwrap_or_else(|| String::from("vector"));

@@ -3,6 +3,7 @@ public/
 resources/
 hugo_stats.json
 assets/jsconfig.json
+.hugo_build.lock
 
 # JavaScript, Sass, CSS, etc.
 node_modules/
@@ -23,3 +24,7 @@ yarn-error.log
 # Generated HTML reports for Lighthouse
 reports/lighthouse.html
 .hugo-classes
+
+# Playwright reports and failure artifacts
+playwright-report/
+test-results/

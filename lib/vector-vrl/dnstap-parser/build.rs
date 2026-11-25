@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 fn main() {
     println!("cargo:rerun-if-changed=proto/dnstap.proto");
     let mut prost_build = prost_build::Config::new();

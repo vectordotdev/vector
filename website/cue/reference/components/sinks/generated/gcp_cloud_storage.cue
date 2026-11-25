@@ -10,7 +10,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	acl: {
 		description: """
@@ -68,15 +68,10 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 		}
 	}
 	api_key: {
+		deprecated:         true
+		deprecated_message: "API keys are not supported by Google Cloud Storage; use `credentials_path` or default GCE credentials instead."
 		description: """
 			An [API key][gcp_api_key].
-
-			Either an API key or a path to a service account credentials JSON file can be specified.
-
-			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
-			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
-			running on. If this is not on a GCE instance, then you must define it with an API key or service account
-			credentials JSON file.
 
 			[gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
 			"""
@@ -163,16 +158,19 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
-
-			Either an API key or a path to a service account credentials JSON file can be specified.
-
-			If both are unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked for a filename. If no
-			filename is named, an attempt is made to fetch an instance service account for the compute instance the program is
-			running on. If this is not on a GCE instance, then you must define it with an API key or service account
+			Path to a [service account][gcp_service_account_credentials] or
+			[Workload Identity Federation][gcp_workload_identity_federation] (`external_account`)
 			credentials JSON file.
 
+			If unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked. If that
+			is also unset, Vector will attempt to fetch credentials from the Compute Engine metadata
+			service if running on a GCE instance.
+
+			Token requests for these credentials do not use the component's `proxy` settings. To send them
+			through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
+
 			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
+			[gcp_workload_identity_federation]: https://cloud.google.com/iam/docs/workload-identity-federation
 			"""
 		required: false
 		type: string: {}

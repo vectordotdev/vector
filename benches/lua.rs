@@ -7,7 +7,7 @@ use transforms::lua::v2::LuaConfig;
 use vector::{
     event::{Event, LogEvent},
     test_util::collect_ready,
-    transforms::{self, OutputBuffer, Transform},
+    transforms::{self, Transform},
 };
 use vrl::event_path;
 
@@ -53,14 +53,6 @@ fn bench_add_fields(c: &mut Criterion) {
         let (tx, rx) = futures::channel::mpsc::channel::<Event>(1);
 
         let mut rx: Pin<Box<dyn Stream<Item = Event> + Send>> = match transform {
-            Transform::Function(t) => {
-                let mut t = t.clone();
-                Box::pin(rx.flat_map(move |v| {
-                    let mut buf = OutputBuffer::with_capacity(1);
-                    t.transform(&mut buf, v);
-                    stream::iter(buf.into_events())
-                }))
-            }
             Transform::Synchronous(_t) => {
                 unreachable!("no sync transform used in these benches");
             }
@@ -79,13 +71,18 @@ fn bench_add_fields(c: &mut Criterion) {
                     transformed
                 },
                 BatchSize::SmallInput,
-            )
+            );
         });
     }
 
     group.finish();
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
+)]
 fn bench_field_filter(c: &mut Criterion) {
     let num_events = 10;
     let events = (0..num_events)
@@ -130,14 +127,6 @@ fn bench_field_filter(c: &mut Criterion) {
         let (tx, rx) = futures::channel::mpsc::channel::<Event>(num_events as usize);
 
         let mut rx: Pin<Box<dyn Stream<Item = Event> + Send>> = match transform {
-            Transform::Function(t) => {
-                let mut t = t.clone();
-                Box::pin(rx.flat_map(move |v| {
-                    let mut buf = OutputBuffer::with_capacity(1);
-                    t.transform(&mut buf, v);
-                    stream::iter(buf.into_events())
-                }))
-            }
             Transform::Synchronous(_t) => {
                 unreachable!("no sync transform used in these benches");
             }
@@ -160,7 +149,7 @@ fn bench_field_filter(c: &mut Criterion) {
                     num
                 },
                 BatchSize::SmallInput,
-            )
+            );
         });
     }
 

@@ -111,8 +111,8 @@ impl GenerateConfig for StatsdSinkConfig {
                 address.ip().to_string(),
                 address.port(),
             )),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -171,7 +171,9 @@ impl ValidatedSink for StatsdSinkConfig {
 
 #[cfg(test)]
 mod test {
-    use super::{Mode, SocketMode, StatsdSinkConfig, UdpConnectorConfig};
+    use super::{
+        AcknowledgementsConfig, BatchConfig, Mode, SocketMode, StatsdSinkConfig, UdpConnectorConfig,
+    };
     use crate::config::ValidatedSink;
 
     #[test]
@@ -181,11 +183,11 @@ mod test {
 
     #[test]
     fn unix_mode_deserializes_on_all_platforms() {
-        let config: StatsdSinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+        let config: StatsdSinkConfig = serde_yaml::from_str(indoc::indoc! {r"
             mode: unix
             path: /tmp/vector-statsd.sock
             unix_mode: Datagram
-        "#})
+        "})
         .unwrap();
 
         assert!(matches!(config.mode, Mode::Unix(_)));
@@ -199,8 +201,8 @@ mod test {
                 "127.0.0.1".to_string(),
                 8125,
             )),
-            batch: Default::default(),
-            acknowledgements: Default::default(),
+            batch: BatchConfig::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         config.validate().expect("validation should succeed");

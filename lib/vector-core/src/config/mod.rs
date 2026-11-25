@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc};
 
 use bitmask_enum::bitmask;
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
 
 mod global_options;
@@ -501,7 +500,7 @@ impl LogNamespace {
             log,
             log_schema().source_type_key(),
             path!("source_type"),
-            Bytes::from_static(source_name.as_bytes()),
+            Value::from_static_str(source_name),
         );
         self.insert_vector_metadata(
             log,

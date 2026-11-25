@@ -36,6 +36,7 @@ pub mod dot_graph;
 mod enrichment_table;
 pub mod format;
 mod graph;
+mod graph_builder;
 pub mod loading;
 pub mod provider;
 pub mod schema;
@@ -88,6 +89,7 @@ pub struct ComponentConfig {
 }
 
 impl ComponentConfig {
+    #[must_use]
     pub fn new(
         config_paths: Vec<PathBuf>,
         component_key: ComponentKey,
@@ -105,6 +107,7 @@ impl ComponentConfig {
         }
     }
 
+    #[must_use]
     pub fn contains(
         &self,
         config_paths: &HashSet<PathBuf>,
@@ -123,6 +126,8 @@ pub enum ConfigPath {
 }
 
 impl<'a> From<&'a ConfigPath> for &'a PathBuf {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::match_same_arms, reason = "Preserve branch-specific context")]
     fn from(config_path: &'a ConfigPath) -> &'a PathBuf {
         match config_path {
             ConfigPath::File(path, _) => path,
@@ -132,6 +137,12 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
 }
 
 impl ConfigPath {
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::match_wildcard_for_single_variants,
+        reason = "Preserve existing control flow"
+    )]
     pub const fn as_dir(&self) -> Option<&PathBuf> {
         match self {
             Self::Dir(path) => Some(path),
@@ -157,10 +168,12 @@ pub struct Config {
 }
 
 impl Config {
+    #[must_use]
     pub fn builder() -> builder::ConfigBuilder {
-        Default::default()
+        ConfigBuilder::default()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.sources.is_empty()
     }
@@ -169,6 +182,7 @@ impl Config {
         self.sources.iter()
     }
 
+    #[must_use]
     pub fn source(&self, id: &ComponentKey) -> Option<&SourceOuter> {
         self.sources.get(id)
     }
@@ -177,6 +191,7 @@ impl Config {
         self.transforms.iter()
     }
 
+    #[must_use]
     pub fn transform(&self, id: &ComponentKey) -> Option<&TransformOuter<OutputId>> {
         self.transforms.get(id)
     }
@@ -185,6 +200,7 @@ impl Config {
         self.sinks.iter()
     }
 
+    #[must_use]
     pub fn sink(&self, id: &ComponentKey) -> Option<&SinkOuter<OutputId>> {
         self.sinks.get(id)
     }
@@ -195,6 +211,7 @@ impl Config {
         self.enrichment_tables.iter()
     }
 
+    #[must_use]
     pub fn enrichment_table(&self, id: &ComponentKey) -> Option<&EnrichmentTableOuter<OutputId>> {
         self.enrichment_tables.get(id)
     }
@@ -223,10 +240,19 @@ impl Config {
             .and_then(|component| component.inputs())
     }
 
+    /// Enables sink acknowledgements on every source upstream of an enrichment table or a sink
+    /// that has acknowledgements enabled, following inputs through transforms.
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error. Sources that cannot acknowledge are logged as a
+    /// warning instead.
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
+        let table_sinks = enrichment_table_sinks(&self.enrichment_tables).collect::<Vec<_>>();
         let inputs: Vec<_> = self
             .sinks
             .iter()
+            .chain(table_sinks.iter().map(|(key, sink)| (key, sink)))
             .filter(|(_, sink)| {
                 sink.inner
                     .acknowledgements()
@@ -267,14 +293,15 @@ impl Config {
         }
     }
 
+    #[must_use]
     pub fn transform_keys_with_external_files(&self) -> HashSet<ComponentKey> {
         self.transforms
             .iter()
             .filter_map(|(name, transform_outer)| {
-                if !transform_outer.inner.files_to_watch().is_empty() {
-                    Some(name.clone())
-                } else {
+                if transform_outer.inner.files_to_watch().is_empty() {
                     None
+                } else {
+                    Some(name.clone())
                 }
             })
             .collect()
@@ -339,10 +366,12 @@ pub enum Protocol {
 }
 
 impl Resource {
+    #[must_use]
     pub const fn tcp(addr: SocketAddr) -> Self {
         Self::Port(addr, Protocol::Tcp)
     }
 
+    #[must_use]
     pub const fn udp(addr: SocketAddr) -> Self {
         Self::Port(addr, Protocol::Udp)
     }
@@ -374,7 +403,7 @@ impl Resource {
         // so we have to check for all Port resources if they share the same
         // port.
         for (key, address0, protocol0) in unspecified {
-            for (resource, components) in resource_map.iter_mut() {
+            for (resource, components) in &mut resource_map {
                 if let Resource::Port(address, protocol) = resource {
                     // IP addresses can either be v4 or v6.
                     // Therefore we check if the ip version matches, the port matches and if the protocol (TCP/UDP) matches
@@ -466,13 +495,13 @@ impl TestDefinition<String> {
                 for from in extract_from {
                     if no_outputs_from.contains(&from) {
                         errors.push(format!(
-                            r#"Invalid extract_from target in test '{name}': '{from}' listed in no_outputs_from"#
+                            r"Invalid extract_from target in test '{name}': '{from}' listed in no_outputs_from"
                         ));
                     } else if let Some(output_id) = output_map.get(&from) {
                         outputs.push(output_id.clone());
                     } else {
                         errors.push(format!(
-                            r#"Invalid extract_from target in test '{name}': '{from}' does not exist"#
+                            r"Invalid extract_from target in test '{name}': '{from}' does not exist"
                         ));
                     }
                 }
@@ -495,7 +524,7 @@ impl TestDefinition<String> {
                     Some(output_id.clone())
                 } else {
                     errors.push(format!(
-                        r#"Invalid no_outputs_from target in test '{name}': '{o}' does not exist"#
+                        r"Invalid no_outputs_from target in test '{name}': '{o}' does not exist"
                     ));
                     None
                 }
@@ -560,6 +589,8 @@ impl TestDefinition<OutputId> {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(clippy::doc_markdown, reason = "Documentation formatting deferred")]
 pub struct TestInput {
     /// The name of the transform to insert the input event to.
     pub insert_at: ComponentKey,
@@ -834,7 +865,7 @@ mod tests {
                 "Transform \"sample2\" has no consumers",
                 "Source \"in2\" has no consumers",
             ]
-        )
+        );
     }
 
     #[tokio::test]
@@ -880,7 +911,7 @@ mod tests {
         assert_eq!(
             errors,
             vec!["Cyclic dependency detected in the chain [ four -> two -> three -> four ]"]
-        )
+        );
     }
 
     #[test]
@@ -901,7 +932,7 @@ mod tests {
         assert_eq!(
             Some(PathBuf::from("/var/lib/vector")),
             config.global.data_dir
-        )
+        );
     }
 
     #[test]
@@ -1404,6 +1435,11 @@ mod resource_config_tests {
     #[ignore]
     #[allow(clippy::print_stdout)]
     #[allow(clippy::print_stderr)]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::ignore_without_reason,
+        reason = "Ignored test needs documentation"
+    )]
     fn generate_component_config_schema() {
         use indexmap::IndexMap;
         use vector_lib::{config::ComponentKey, configurable::configurable_component};
@@ -1436,5 +1472,92 @@ mod resource_config_tests {
             }
             Err(e) => eprintln!("error while generating schema: {e:?}"),
         }
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "sources-http_server",
+    feature = "enrichment-tables-memory",
+    feature = "sinks-file"
+))]
+mod config_tests {
+    use crate::config::{ConfigBuilder, Format, format};
+    use indoc::indoc;
+    use vector_common::config::ComponentKey;
+
+    #[test]
+    fn propagate_acknowledgements() {
+        let config_builder: ConfigBuilder = format::deserialize(
+            indoc! {r"
+                acknowledgements:
+                  enabled: true
+                sources:
+                  incoming_0:
+                    type: http_server
+                    address: 127.0.0.1:8080
+                    decoding:
+                      codec: json
+                  incoming_1:
+                    type: http_server
+                    address: 127.0.0.1:8081
+                    decoding:
+                      codec: json
+                  incoming_2:
+                    type: http_server
+                    address: 127.0.0.1:8082
+                    decoding:
+                      codec: json
+                enrichment_tables:
+                  cache:
+                    type: memory
+                    inputs: [incoming_0]
+                sinks:
+                  outgoing_0:
+                    type: file
+                    inputs: [incoming_1]
+                    encoding:
+                      codec: text
+                    path: /path/to/out1
+                    acknowledgements: true
+                  outgoing_1:
+                    type: file
+                    inputs: [incoming_2]
+                    encoding:
+                      codec: text
+                    path: /path/to/out2
+                    acknowledgements: false
+            "},
+            Format::Yaml,
+        )
+        .unwrap();
+        let mut config = config_builder.build().unwrap();
+        config
+            .sources
+            .iter()
+            .all(|(_, source)| !source.sink_acknowledgements);
+
+        config.propagate_acknowledgements().unwrap();
+        assert!(
+            config
+                .sources
+                .get(&ComponentKey::from("incoming_0"))
+                .unwrap()
+                .sink_acknowledgements
+        );
+        assert!(
+            config
+                .sources
+                .get(&ComponentKey::from("incoming_1"))
+                .unwrap()
+                .sink_acknowledgements
+        );
+        assert!(
+            !config
+                .sources
+                .get(&ComponentKey::from("incoming_2"))
+                .unwrap()
+                .sink_acknowledgements
+        );
     }
 }

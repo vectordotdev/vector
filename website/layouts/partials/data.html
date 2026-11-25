@@ -137,6 +137,11 @@
                 <div class="mt-4">
                   {{ template "config-object" (dict "name" $name "config" $v "level" 4) }}
                 </div>
+
+                {{/* Map/object fields carry their examples on the object type itself */}}
+                {{ with $v.examples }}
+                  {{ template "config-examples" (dict "examples" . "syntax" $v.syntax) }}
+                {{ end }}
               {{ else if eq $k "array" }}
                 {{/* Array */}}
                 {{ with $v.items }}
@@ -938,7 +943,7 @@
     <div class="flex flex-col divide-y dark:divide-gray-700">
       {{ range . }}
         {{ $input := dict "message" .input.log.message | jsonify (dict "indent" "  ") }}
-        {{ $vrlSourceCode := highlight .source "toml" "" }}
+        {{ $vrlSourceCode := partial "vrl-code.html" (dict "source" .source) }}
         {{ $output := .output | jsonify (dict "indent" "  ") }}
         {{ $outputCode := highlight $output "json" "" }}
         <div class="py-3 px-5">
@@ -1146,7 +1151,7 @@
                         <div>
                           <span class="tracking-tighter font-semibold text-sm"> VRL program </span>
 
-                          {{ highlight . "coffee" "" }}
+                          {{ partial "vrl-code.html" (dict "source" .) }}
                         </div>
                       {{ end }}
 
@@ -1192,7 +1197,7 @@
 
             <div class="mt-2 border rounded p-4 dark:border-gray-700">
               <div>
-                {{ highlight .source "coffee" "" }}
+                {{ partial "vrl-code.html" (dict "source" .source) }}
               </div>
 
               {{ with .definitions }}
@@ -1304,7 +1309,7 @@
                   <span> Source </span>
 
                   <div class="mt-1">
-                    {{ highlight .source "coffee" "" }}
+                    {{ partial "vrl-code.html" (dict "source" .source) }}
                   </div>
                 </div>
 
@@ -1379,7 +1384,7 @@
 
               <div class="mt-2 flex flex-col space-y-2">
                 {{ range . }}
-                  {{ highlight . "text" "" }}
+                  {{ partial "vrl-code.html" (dict "source" .) }}
                 {{ end }}
               </div>
             </div>
@@ -1413,7 +1418,7 @@
 
               <div class="mt-2 flex flex-col space-y-2 text-sm">
                 {{ range . }}
-                  {{ highlight . "coffee" "" }}
+                  {{ partial "vrl-code.html" (dict "source" .) }}
                 {{ end }}
               </div>
             </div>
@@ -1748,8 +1753,8 @@
 {{ define "config-examples" }}
   {{/* Fields whose value is source code (per their declared `syntax`) render their examples as a
        highlighted code block so multi-line programs keep their newlines; jsonify would escape them
-       to a literal \n. Every other syntax renders inline as JSON. Map: syntax -> Chroma lexer. */}}
-  {{ $codeLexers := dict "vrl_program" "coffee" "lua" "lua" "yaml" "yaml" "toml" "toml" }}
+       to a literal \n. Every other syntax renders inline as JSON. Map: syntax -> language. */}}
+  {{ $codeLexers := dict "vrl_program" "vrl" "lua" "lua" "yaml" "yaml" "toml" "toml" }}
   <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
     <span class="flex justify-between items-center">
       <span class="text-sm"> Examples </span>
@@ -1761,7 +1766,9 @@
       {{ $lexer := "" }}
       {{ with $.syntax }}{{ $lexer = index $codeLexers . }}{{ end }}
       {{ range .examples }}
-        {{ if $lexer }}
+        {{ if eq $lexer "vrl" }}
+          {{ partial "vrl-code.html" (dict "source" .) }}
+        {{ else if $lexer }}
           {{ highlight . $lexer "" }}
         {{ else }}
           {{ $json := . | jsonify (dict "indent" "  ") }}
@@ -1847,7 +1854,7 @@
         <span class="font-light"> Source </span>
 
         <div class="text-sm">
-          {{ template "code" .ctx.source }}
+          {{ partial "vrl-code.html" (dict "source" .ctx.source) }}
         </div>
       </div>
 

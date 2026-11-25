@@ -1,6 +1,6 @@
 [package]
 name = "vector-vrl-web-playground"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 repository = "https://github.com/vectordotdev/vector"
 description = "A playground for experimenting with VRL"
@@ -20,7 +20,7 @@ default = ["vrl/stdlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-vrl.workspace = true
+vrl = { workspace = true, features = ["docs"] }
 serde.workspace = true
 serde_json.workspace = true
 web-sys = { version = "0.3", features = ["Window", "Performance"] }

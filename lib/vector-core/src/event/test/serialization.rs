@@ -7,6 +7,10 @@ use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
+use vector_core_proto_013::{
+    event_array_decodes as previous_array_decodes,
+    event_wrapper_decodes as previous_wrapper_decodes,
+};
 use vrl::event_path;
 
 use crate::event::ser::{
@@ -69,6 +73,77 @@ fn back_and_forth_through_bytes() {
         .quickcheck(inner as fn(EventArray) -> TestResult);
 }
 
+mod histogram_sum {
+    use crate::event::metric::{Bucket, MetricValue};
+    use crate::event::proto;
+    use similar_asserts::assert_eq;
+
+    fn histogram(sum: Option<f64>) -> MetricValue {
+        MetricValue::AggregatedHistogram {
+            buckets: vec![Bucket {
+                upper_limit: 1.0,
+                count: 3,
+            }],
+            count: 3,
+            sum,
+        }
+    }
+
+    fn decode(value: proto::MetricValue) -> MetricValue {
+        MetricValue::try_from(value).expect("histogram should decode")
+    }
+
+    #[test]
+    fn both_survive_a_round_trip() {
+        for sum in [Some(12.5), Some(0.0), None] {
+            let decoded = decode(proto::MetricValue::from(histogram(sum)));
+            assert_eq!(decoded, histogram(sum), "round-trip lost the sum {sum:?}");
+        }
+    }
+
+    /// Payloads that do not set `sum_missing` carry a reported sum -- including a zero, which proto3
+    /// implicit presence does not even write to the wire. Versions 1 and 2 cannot set it at all.
+    #[test]
+    #[allow(deprecated)] // These variants are deliberately decoded for backwards compatibility.
+    fn unmarked_payloads_decode_as_a_reported_sum() {
+        let v3 = proto::MetricValue::AggregatedHistogram3(proto::AggregatedHistogram3 {
+            buckets: vec![proto::HistogramBucket3 {
+                upper_limit: 1.0,
+                count: 3,
+            }],
+            count: 3,
+            sum: 0.0,
+            sum_missing: false,
+        });
+        assert_eq!(decode(v3), histogram(Some(0.0)));
+
+        let v2 = proto::MetricValue::AggregatedHistogram2(proto::AggregatedHistogram2 {
+            buckets: vec![proto::HistogramBucket {
+                upper_limit: 1.0,
+                count: 3,
+            }],
+            count: 3,
+            sum: 0.0,
+        });
+        assert_eq!(decode(v2), histogram(Some(0.0)));
+
+        let v1 = proto::MetricValue::AggregatedHistogram1(proto::AggregatedHistogram1 {
+            buckets: vec![1.0],
+            counts: vec![3],
+            count: 3,
+            sum: 0.0,
+        });
+        assert_eq!(decode(v1), histogram(Some(0.0)));
+    }
+
+    /// `PartialEq` has to keep these apart, or none of the above proves anything.
+    #[test]
+    fn an_unreported_sum_differs_from_zero() {
+        assert_ne!(histogram(None), histogram(Some(0.0)));
+        assert_eq!(histogram(None), histogram(None));
+    }
+}
+
 #[test]
 fn disk_buffer_preserves_trace_layout_metadata() {
     let mut trace = TraceEvent::default();
@@ -107,6 +182,28 @@ fn disk_buffer_preserves_unrecognized_trace_layout() {
         traces[0].metadata().trace_layout(),
         Some(TraceLayout::Unrecognized(99))
     );
+}
+
+#[test]
+fn disk_buffer_preserves_datadog_metric_unit() {
+    let mut metric = Metric::new(
+        "test",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 1.0 },
+    );
+    metric
+        .metadata_mut()
+        .set_datadog_metric_unit("byte".to_owned());
+    let expected = EventArray::from(Event::Metric(metric));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Metrics(metrics) = actual else {
+        panic!("expected a metrics array");
+    };
+    assert_eq!(metrics[0].metadata().datadog_metric_unit(), Some("byte"));
 }
 
 #[test]
@@ -150,7 +247,9 @@ fn type_serialization() {
 // Nesting validation tests
 // ---------------------------------------------------------------------------
 //
-// Prost enforces a decode recursion limit of 100 (no limit on encode). Each nesting
+// Older receivers using Prost 0.13 enforce a decode recursion limit of 100 (no limit
+// on encode). A test-only decoder retains that behavior independently of SDKs enabling
+// `prost/no-recursion-limit` for the production Prost version. Each nesting
 // level consumes a path-dependent number of prost recursion frames:
 //
 //   - `Value::Object` level: Value + ValueMap + map_entry = 3 frames
@@ -288,6 +387,7 @@ fn max_nesting_budget_is_safe_for_all_paths() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
+        assert!(previous_array_decodes(&buf));
         assert!(
             proto::EventArray::decode(buf.freeze()).is_ok(),
             "EventArray decode FAILED for {name} at the common Value budget.",
@@ -298,6 +398,7 @@ fn max_nesting_budget_is_safe_for_all_paths() {
         let wrapper = proto::EventWrapper::from(event);
         let mut buf = BytesMut::with_capacity(65536);
         wrapper.encode(&mut buf).unwrap();
+        assert!(previous_wrapper_decodes(&buf));
         assert!(
             proto::EventWrapper::decode(buf.freeze()).is_ok(),
             "EventWrapper decode FAILED for {name} at the common Value budget.",
@@ -310,7 +411,7 @@ fn max_nesting_budget_is_safe_for_all_paths() {
             let proto_array = proto::EventArray::from(array);
             let mut buf = BytesMut::with_capacity(65536);
             proto_array.encode(&mut buf).unwrap();
-            proto::EventArray::decode(buf.freeze()).is_err()
+            !previous_array_decodes(&buf)
         });
     assert!(
         any_fails,
@@ -361,7 +462,7 @@ fn per_path_boundaries() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
 
     let roundtrip_metadata = |value: Value| -> bool {
@@ -371,7 +472,7 @@ fn per_path_boundaries() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
 
     // `Log.fields` accepts 33 object levels (cost 99), one more than the common limit.
@@ -430,7 +531,7 @@ fn value_budget_matches_tightest_wire_path() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
 
     assert!(
@@ -549,7 +650,7 @@ fn nesting_gate_rejects_timestamp_leaf_at_max_object_depth() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
     let roundtrip_metadata = |value: Value| -> bool {
         let mut event = LogEvent::from("flat");
@@ -558,7 +659,7 @@ fn nesting_gate_rejects_timestamp_leaf_at_max_object_depth() {
         let proto_array = proto::EventArray::from(array);
         let mut buf = BytesMut::with_capacity(65536);
         proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
+        previous_array_decodes(&buf)
     };
 
     // `Log.fields` can carry 33 object levels (cost 99), but a Timestamp leaf raises

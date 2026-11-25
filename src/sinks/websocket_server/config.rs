@@ -122,9 +122,9 @@ impl Default for WebSocketListenerSinkConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             encoding: JsonSerializerConfig::default().into(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: AcknowledgementsConfig::default(),
             message_buffering: None,
-            subprotocol: Default::default(),
+            subprotocol: SubProtocolConfig::default(),
             auth: None,
             internal_metrics: InternalMetricsConfig::default(),
         }
@@ -175,10 +175,10 @@ impl ValidatedSink for WebSocketListenerSinkConfig {
         // TLS settings may read certificate files from disk, so they are
         // resolved at build time rather than during pure validation.
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
-        let ws_sink = WebSocketListenerSink::from_validated(self.clone(), validated, tls, cx)?;
+        let ws_sink = WebSocketListenerSink::from_validated(self.clone(), validated, tls, &cx)?;
 
         Ok((
-            VectorSink::from_event_streamsink(ws_sink),
+            VectorSink::from_detailed_event_streamsink(ws_sink),
             Box::pin(async move { Ok(()) }),
         ))
     }

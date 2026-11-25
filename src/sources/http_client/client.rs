@@ -5,8 +5,11 @@ use std::{collections::HashMap, time::Duration};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
-use futures_util::FutureExt;
-use http::{Uri, response::Parts};
+use http::{
+    Uri,
+    response::Parts,
+    uri::{Authority, Scheme},
+};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_util::codec::Decoder as _;
@@ -24,13 +27,14 @@ use vector_lib::{
 use vrl::{
     compiler::{CompileConfig, Function, Program, runtime::Runtime},
     prelude::TypeState,
+    value::Value,
 };
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     format_vrl_diagnostics,
-    http::{Auth, ParamType, ParameterValue, QueryParameterValue, QueryParameters},
+    http::{Auth, HttpClient, ParamType, ParameterValue, QueryParameterValue, QueryParameters},
     serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
@@ -257,17 +261,21 @@ pub struct Query {
 }
 
 impl Query {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a query parameter VRL expression cannot be compiled.
     pub fn new(params: &HashMap<String, QueryParameterValue>) -> Result<Self, sources::BuildError> {
         let functions = vector_vrl_functions::all();
 
         let mut compiled: HashMap<String, CompiledQueryParameterValue> = HashMap::new();
 
-        for (k, v) in params.iter() {
+        for (k, v) in params {
             let compiled_param = Self::compile_param(v, &functions)?;
             compiled.insert(k.clone(), compiled_param);
         }
 
-        let has_vrl = compiled.values().any(|v| v.has_vrl());
+        let has_vrl = compiled.values().any(CompiledQueryParameterValue::has_vrl);
 
         Ok(Query {
             original: params.clone(),
@@ -372,12 +380,16 @@ impl SourceConfig for HttpClientConfig {
             headers,
             content_type,
             auth: self.auth.clone(),
-            tls,
-            proxy: cx.proxy.clone(),
+            client: HttpClient::new(tls.into(), &cx.proxy)?,
             shutdown: cx.shutdown,
         };
 
-        Ok(call(inputs, context, cx.out, self.method).boxed())
+        Ok(crate::sources::source_with_error(call(
+            inputs,
+            context,
+            cx.out,
+            self.method,
+        )))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -402,6 +414,7 @@ impl SourceConfig for HttpClientConfig {
 }
 
 impl HttpClientConfig {
+    #[must_use]
     pub fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
         let decoding = self.decoding.clone();
         let framing = self.framing.clone();
@@ -539,15 +552,11 @@ impl http_client::HttpClientContext for HttpClientContext {
 
         // Build base URI and add query parameters
         let base_uri = Uri::builder()
-            .scheme(
-                url.scheme()
-                    .cloned()
-                    .unwrap_or_else(|| http::uri::Scheme::try_from("http").unwrap()),
-            )
+            .scheme(url.scheme().cloned().unwrap_or(Scheme::HTTP))
             .authority(
                 url.authority()
                     .cloned()
-                    .unwrap_or_else(|| http::uri::Authority::try_from("localhost").unwrap()),
+                    .unwrap_or_else(|| Authority::from_static("localhost")),
             )
             .path_and_query(url.path().to_string())
             .build()
@@ -556,7 +565,7 @@ impl http_client::HttpClientContext for HttpClientContext {
         Some(build_url(&base_uri, &processed_query?))
     }
 
-    /// Enriches events with source_type, timestamp
+    /// Enriches events with `source_type`, timestamp
     fn enrich_events(&mut self, events: &mut Vec<Event>) {
         let now = Utc::now();
 
@@ -579,7 +588,7 @@ impl http_client::HttpClientContext for HttpClientContext {
                 }
                 Event::Trace(trace) => {
                     trace.maybe_insert(log_schema().source_type_key_target_path(), || {
-                        Bytes::from(HttpClientConfig::NAME).into()
+                        Value::from_static_str(HttpClientConfig::NAME)
                     });
                 }
             }

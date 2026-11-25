@@ -12,7 +12,11 @@ use bytes::{Buf, BufMut};
 use clap::{Arg, Command};
 use hdrhistogram::Histogram;
 use rand::RngExt;
-use tokio::{select, sync::oneshot, task, time};
+use tokio::{
+    select,
+    sync::oneshot::{self, error::RecvError},
+    task, time,
+};
 use tracing::{Span, debug, info};
 use tracing_subscriber::EnvFilter;
 use vector_buffers::{
@@ -39,14 +43,16 @@ pub struct VariableMessage {
 }
 
 impl VariableMessage {
+    #[must_use]
     pub fn new(id: u64, payload: Vec<u8>) -> Self {
         VariableMessage {
             id,
             payload,
-            finalizers: Default::default(),
+            finalizers: EventFinalizers::default(),
         }
     }
 
+    #[must_use]
     pub fn id(&self) -> u64 {
         self.id
     }
@@ -197,7 +203,7 @@ impl Configuration {
 
         let buffer_type = matches
             .get_one::<String>("buffer_type")
-            .map(|s| s.to_string())
+            .cloned()
             .expect("default value for buffer_type should always be present");
         let read_total_records = matches
             .get_one::<String>("read_total_records")
@@ -299,6 +305,16 @@ where
         .expect("build should not fail")
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "Preserve the benchmark latency and throughput measurement conversions. https://github.com/vectordotdev/vector/issues/23659"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "Splitting the benchmark driver is deferred to keep this lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 #[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() {
     tracing_subscriber::fmt()
@@ -325,8 +341,8 @@ async fn main() {
     let write_position = Arc::new(AtomicUsize::new(0));
     let read_position = Arc::new(AtomicUsize::new(0));
 
-    let writer_position = Arc::clone(&write_position);
-    let reader_position = Arc::clone(&read_position);
+    let writer_progress = Arc::clone(&write_position);
+    let reader_progress = Arc::clone(&read_position);
 
     let start = Instant::now();
     info!(
@@ -386,7 +402,7 @@ async fn main() {
             let elapsed = write_start.elapsed().as_nanos() as u64;
             tx_histo.record(elapsed).expect("should not fail");
 
-            writer_position.fetch_add(records_written, Ordering::Relaxed);
+            writer_progress.fetch_add(records_written, Ordering::Relaxed);
         }
 
         writer.flush().await.expect("flush shouldn't fail");
@@ -407,20 +423,19 @@ async fn main() {
         for _ in 0..read_total_records {
             let read_start = Instant::now();
 
-            match reader.next().await {
-                Some(mut record) => record
+            if let Some(mut record) = reader.next().await {
+                record
                     .take_finalizers()
-                    .update_status(EventStatus::Delivered),
-                None => {
-                    info!("[buffer-perf] reader hit end of buffer, closing...");
-                    break;
-                }
+                    .update_status(EventStatus::Delivered);
+            } else {
+                info!("[buffer-perf] reader hit end of buffer, closing...");
+                break;
             }
 
             let elapsed = read_start.elapsed().as_nanos() as u64;
             rx_histo.record(elapsed).expect("should not fail");
 
-            reader_position.fetch_add(1, Ordering::Relaxed);
+            reader_progress.fetch_add(1, Ordering::Relaxed);
         }
         let total_rx_dur = rx_start.elapsed();
 
@@ -443,14 +458,14 @@ async fn main() {
                     writer_result = Some(result);
                     info!("[buffer-perf] {:?}s: writer finished", start.elapsed().as_secs());
                 },
-                Err(_) => panic!("[buffer-perf] writer task failed unexpectedly!"),
+                Err(RecvError { .. }) => panic!("[buffer-perf] writer task failed unexpectedly!"),
             },
             result = &mut reader_rx, if reader_result.is_none() => match result {
                 Ok(result) => {
                     reader_result = Some(result);
                     info!("[buffer-perf] {:?}s: reader finished", start.elapsed().as_secs());
                 },
-                Err(_) => panic!("[buffer-perf] reader task failed unexpectedly!"),
+                Err(RecvError { .. }) => panic!("[buffer-perf] reader task failed unexpectedly!"),
             },
             _ = progress_interval.tick(), if writer_result.is_none() || reader_result.is_none() => {
                 let elapsed = start.elapsed();

@@ -14,6 +14,8 @@ mod tests;
 
 pub use builder::Builder;
 pub use errors::SendError;
+/// Result of sending a source's events downstream.
+pub type SendResult = Result<(), SendError>;
 use output::{Output, OutputMetrics};
 pub use sender::{SourceSender, SourceSenderItem};
 

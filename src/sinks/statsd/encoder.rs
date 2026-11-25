@@ -2,6 +2,7 @@ use std::{
     fmt::Display,
     io::{self, Write},
 };
+use vector_lib::internal_event::emit;
 
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
@@ -9,17 +10,17 @@ use vector_lib::event::{Metric, MetricKind, MetricTags, MetricValue, StatisticKi
 
 use crate::{
     internal_events::StatsdInvalidMetricError,
-    sinks::util::{buffer::metrics::compress_distribution, encode_namespace},
+    sinks::util::{buffer::metrics::compress_distribution, encode_metric_tag, encode_namespace},
 };
 
 /// Error type for errors that can never happen, but for use with `Encoder`.
 ///
-/// For the StatsD encoder, the encoding operation is infallible. However, as `Encoder<T>` requires
+/// For the `StatsD` encoder, the encoding operation is infallible. However, as `Encoder<T>` requires
 /// that the associated error type can be created by `From<io::Error>`, we can't simply use
 /// `Infallible`. This type exists to bridge that gap, acting as a marker type for "we emit no
 /// errors" while supporting the trait bounds on `Encoder<T>::Error`.
 #[derive(Debug)]
-pub struct InfallibleIo;
+pub(super) struct InfallibleIo;
 
 impl From<io::Error> for InfallibleIo {
     fn from(_: io::Error) -> Self {
@@ -34,7 +35,7 @@ pub(super) struct StatsdEncoder {
 
 impl StatsdEncoder {
     /// Creates a new `StatsdEncoder` with the given default namespace, if any.
-    pub const fn new(default_namespace: Option<String>) -> Self {
+    pub(super) const fn new(default_namespace: Option<String>) -> Self {
         Self { default_namespace }
     }
 }
@@ -51,21 +52,19 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
             MetricValue::Counter { value } => {
                 encode_and_write_single_event(buf, &name, tags.as_deref(), value, "c", None);
             }
-            MetricValue::Gauge { value } => {
-                match metric.kind() {
-                    MetricKind::Incremental => encode_and_write_single_event(
-                        buf,
-                        &name,
-                        tags.as_deref(),
-                        format!("{value:+}"),
-                        "g",
-                        None,
-                    ),
-                    MetricKind::Absolute => {
-                        encode_and_write_single_event(buf, &name, tags.as_deref(), value, "g", None)
-                    }
-                };
-            }
+            MetricValue::Gauge { value } => match metric.kind() {
+                MetricKind::Incremental => encode_and_write_single_event(
+                    buf,
+                    &name,
+                    tags.as_deref(),
+                    format!("{value:+}"),
+                    "g",
+                    None,
+                ),
+                MetricKind::Absolute => {
+                    encode_and_write_single_event(buf, &name, tags.as_deref(), value, "g", None);
+                }
+            },
             MetricValue::Distribution { samples, statistic } => {
                 let metric_type = match statistic {
                     StatisticKind::Histogram => "h",
@@ -97,14 +96,14 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
                 }
             }
             _ => {
-                emit!(StatsdInvalidMetricError {
+                emit(StatsdInvalidMetricError {
                     value: metric.value(),
                     kind: metric.kind(),
                 });
 
                 return Ok(());
             }
-        };
+        }
 
         Ok(())
     }
@@ -114,16 +113,16 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
 // event, since the tags with multiple values may not have been grouped together.
 // This is not an issue, but noting as it may be an observed behavior.
 fn encode_tags(tags: &MetricTags) -> String {
-    let parts: Vec<_> = tags
-        .iter_all()
-        .map(|(name, tag_value)| match tag_value {
-            Some(value) => format!("{name}:{value}"),
-            None => name.to_owned(),
-        })
-        .collect();
-
-    // `parts` is already sorted by key because of BTreeMap
-    parts.join(",")
+    let mut output = String::new();
+    let mut first = true;
+    for (name, tag_value) in tags.iter_all() {
+        if !first {
+            output.push(',');
+        }
+        first = false;
+        encode_metric_tag(&mut output, name, tag_value);
+    }
+    output
 }
 
 fn encode_and_write_single_event<V: Display>(
@@ -142,11 +141,11 @@ fn encode_and_write_single_event<V: Display>(
         && sample_rate != 1
     {
         write!(&mut writer, "|@{}", 1.0 / f64::from(sample_rate)).unwrap();
-    };
+    }
 
     if let Some(t) = metric_tags {
         write!(&mut writer, "|#{t}").unwrap();
-    };
+    }
 
     writeln!(&mut writer).unwrap();
 }
@@ -203,13 +202,13 @@ mod tests {
     fn test_encode_tags() {
         let actual = encode_tags(&tags());
         let mut actual = actual.split(',').collect::<Vec<_>>();
-        actual.sort();
+        actual.sort_unstable();
 
         let mut expected =
             "bare_tag,normal_tag:value,multi_value:true,multi_value:false,multi_value"
                 .split(',')
                 .collect::<Vec<_>>();
-        expected.sort();
+        expected.sort_unstable();
 
         assert_eq!(actual, expected);
     }

@@ -14,7 +14,7 @@ use vector_lib::{
 use super::WebHdfsConfig;
 use crate::{
     config::{SinkConfig, SinkContext, ValidatedSink},
-    sinks::util::{BatchConfig, Compression, HttpEndpoint},
+    sinks::util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
@@ -30,7 +30,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
         .expect("config build must with success");
     let result = health_check.await;
 
-    assert!(result.is_err())
+    assert!(result.is_err());
 }
 
 #[tokio::test]
@@ -41,7 +41,7 @@ async fn hdfs_healthchecks_valid_node_node() {
         .expect("config build must with success");
     let result = health_check.await;
 
-    assert!(result.is_ok())
+    assert!(result.is_ok());
 }
 
 #[tokio::test]
@@ -120,7 +120,8 @@ fn config(endpoint: &str, batch_size: usize) -> WebHdfsConfig {
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
         compression: Compression::None,
         batch,
-        acknowledgements: Default::default(),
-        confinement: Default::default(),
+        request: TowerRequestConfig::default(),
+        acknowledgements: crate::config::AcknowledgementsConfig::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     }
 }

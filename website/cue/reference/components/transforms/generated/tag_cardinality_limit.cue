@@ -13,7 +13,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 		type: uint: default: 5120
 	}
 	internal_metrics: {
-		description: "Configuration of internal metrics for the TagCardinalityLimit transform."
+		description: "Configuration of internal metrics for the `TagCardinalityLimit` transform."
 		required:    false
 		type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::InternalMetricsConfig"]
 	}
@@ -93,7 +93,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					type: uint: default: 5120
 				}
 				internal_metrics: {
-					description: "Configuration of internal metrics for the TagCardinalityLimit transform."
+					description: "Configuration of internal metrics for the `TagCardinalityLimit` transform."
 					required:    false
 					type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::InternalMetricsConfig"]
 				}

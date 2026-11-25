@@ -44,6 +44,7 @@ pub struct NewlineDelimitedDecoderOptions {
 
 impl NewlineDelimitedDecoderOptions {
     /// Creates a `NewlineDelimitedDecoderOptions` with a maximum frame length limit.
+    #[must_use]
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self {
             max_length: Some(max_length),
@@ -54,11 +55,13 @@ impl NewlineDelimitedDecoderOptions {
 
 impl NewlineDelimitedDecoderConfig {
     /// Creates a new `NewlineDelimitedDecoderConfig`.
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        NewlineDelimitedDecoderConfig::default()
     }
 
     /// Creates a `NewlineDelimitedDecoder` with a maximum frame length limit.
+    #[must_use]
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self {
             newline_delimited: { NewlineDelimitedDecoderOptions::new_with_max_length(max_length) },
@@ -66,6 +69,7 @@ impl NewlineDelimitedDecoderConfig {
     }
 
     /// Build the `NewlineDelimitedDecoder` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> NewlineDelimitedDecoder {
         let oversized_action = self.newline_delimited.oversized_action;
         if let Some(max_length) = self.newline_delimited.max_length {
@@ -83,6 +87,7 @@ pub struct NewlineDelimitedDecoder(CharacterDelimitedDecoder);
 
 impl NewlineDelimitedDecoder {
     /// Creates a new `NewlineDelimitedDecoder`.
+    #[must_use]
     pub const fn new() -> Self {
         Self(CharacterDelimitedDecoder::new(b'\n'))
     }
@@ -90,6 +95,7 @@ impl NewlineDelimitedDecoder {
     /// Creates a `NewlineDelimitedDecoder` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
+    #[must_use]
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self(CharacterDelimitedDecoder::new_with_max_length(
             b'\n', max_length,
@@ -97,6 +103,7 @@ impl NewlineDelimitedDecoder {
     }
 
     /// Sets the behavior when a line exceeds `max_length`.
+    #[must_use]
     pub const fn with_oversized_action(mut self, action: OversizedAction) -> Self {
         self.0.oversized_action = action;
         self

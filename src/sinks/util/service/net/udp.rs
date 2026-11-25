@@ -4,7 +4,10 @@ use snafu::ResultExt;
 use tokio::net::UdpSocket;
 use vector_lib::configurable::configurable_component;
 
-use super::{ConnectorType, HostAndPort, NetError, NetworkConnector, net_error::*};
+use super::{
+    ConnectorType, HostAndPort, NetError, NetworkConnector,
+    net_error::{FailedToBind, FailedToConnect, FailedToResolve},
+};
 use crate::{dns, net};
 
 /// UDP configuration.
@@ -22,6 +25,7 @@ pub struct UdpConnectorConfig {
 }
 
 impl UdpConnectorConfig {
+    #[must_use]
     pub const fn from_address(host: String, port: u16) -> Self {
         Self {
             address: HostAndPort { host, port },
@@ -30,6 +34,7 @@ impl UdpConnectorConfig {
     }
 
     /// Creates a [`NetworkConnector`] from this UDP connector configuration.
+    #[must_use]
     pub fn as_connector(&self) -> NetworkConnector {
         NetworkConnector {
             inner: ConnectorType::Udp(UdpConnector {

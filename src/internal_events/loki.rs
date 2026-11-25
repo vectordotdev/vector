@@ -1,10 +1,10 @@
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, error_stage, error_type,
+    ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, emit, error_stage, error_type,
 };
 use vector_lib::{NamedInternalEvent, counter};
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LokiEventUnlabeledError;
+pub(crate) struct LokiEventUnlabeledError;
 
 impl InternalEvent for LokiEventUnlabeledError {
     fn emit(self) {
@@ -26,7 +26,7 @@ impl InternalEvent for LokiEventUnlabeledError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LokiOutOfOrderEventDroppedError {
+pub(crate) struct LokiOutOfOrderEventDroppedError {
     pub count: usize,
 }
 
@@ -41,7 +41,7 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
             stage = error_stage::PROCESSING,
         );
 
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
+        emit(ComponentEventsDropped::<INTENTIONAL> {
             count: self.count,
             reason,
         });
@@ -57,7 +57,7 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LokiOutOfOrderEventRewritten {
+pub(crate) struct LokiOutOfOrderEventRewritten {
     pub count: usize,
 }
 
@@ -73,7 +73,7 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct LokiTimestampNonParsableEventsDropped;
+pub(crate) struct LokiTimestampNonParsableEventsDropped;
 
 impl InternalEvent for LokiTimestampNonParsableEventsDropped {
     fn emit(self) {
@@ -86,7 +86,7 @@ impl InternalEvent for LokiTimestampNonParsableEventsDropped {
             stage = error_stage::PROCESSING,
         );
 
-        emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
 
         counter!(
             CounterName::ComponentErrorsTotal,

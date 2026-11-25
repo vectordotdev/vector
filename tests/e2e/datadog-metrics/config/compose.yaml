@@ -22,6 +22,8 @@ services:
     environment:
       - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
       - DD_HOSTNAME=datadog-agent
+      # Newer Agents default to v3 only for Datadog URLs; exercise it with fakeintake too.
+      - DD_USE_V3_API_SERIES_ENABLED=true
     volumes:
       # The Agent config file
       - ../data/agent.yaml:/etc/datadog-agent/datadog.yaml

@@ -41,6 +41,11 @@ impl<T> UnixOnly<T> {
     /// Pass the closure with `#[cfg(unix)]` so Unix-only APIs in its body are not
     /// compiled on other targets. Context is accepted on every target and is
     /// dropped, together with the configuration, if Unix is unavailable.
+    ///
+    /// # Errors
+    ///
+    /// On Unix, returns the error produced by `operation`. On other platforms, always returns
+    /// an unsupported-platform error.
     pub fn on_unix<C, R>(
         self,
         context: C,

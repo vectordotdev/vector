@@ -24,8 +24,8 @@ use vector_config::{
 };
 
 use super::schema_validation::{
-    encoded_value_validates_against_schema, json_schema_safe_f64, json_schema_safe_i64,
-    json_schema_safe_u64,
+    assert_schema_allows, encoded_value_validates_against_schema, json_schema_safe_f64,
+    json_schema_safe_i64, json_schema_safe_u64,
 };
 
 /// A templated string.
@@ -290,24 +290,23 @@ impl TryFrom<String> for SocketListenAddr {
 
     fn try_from(input: String) -> Result<Self, Self::Error> {
         // first attempt to parse the string into a SocketAddr directly
-        match input.parse::<SocketAddr>() {
-            Ok(socket_addr) => Ok(socket_addr.into()),
-
+        if let Ok(socket_addr) = input.parse::<SocketAddr>() {
+            Ok(socket_addr.into())
+        } else {
             // then attempt to parse a systemd file descriptor
-            Err(_) => {
-                let fd: usize = match input.as_str() {
-                    "systemd" => Ok(0),
-                    s => s
-                        .strip_prefix("systemd#")
-                        .ok_or_else(|| "unable to parse".to_string())?
-                        .parse::<usize>()
-                        .map_err(|_| "failed to parse usize".to_string())?
-                        .checked_sub(1)
-                        .ok_or_else(|| "systemd indices start at 1".to_string()),
-                }?;
 
-                Ok(fd.into())
-            }
+            let fd: usize = match input.as_str() {
+                "systemd" => Ok(0),
+                s => s
+                    .strip_prefix("systemd#")
+                    .ok_or_else(|| "unable to parse".to_string())?
+                    .parse::<usize>()
+                    .map_err(|_| "failed to parse usize".to_string())?
+                    .checked_sub(1)
+                    .ok_or_else(|| "systemd indices start at 1".to_string()),
+            }?;
+
+            Ok(fd.into())
         }
     }
 }
@@ -933,6 +932,35 @@ fn required_one_of_generates_one_of_constraint() {
             ]
         })
     );
+}
+
+/// A `required_one_of` group with a member that also accepts an alias.
+#[configurable_component]
+#[derive(Clone, Debug)]
+struct RequiredOneOfWithAliasConfig {
+    /// First option.
+    #[configurable(required_one_of = "group")]
+    #[serde(alias = "src")]
+    source: Option<String>,
+
+    /// Second option.
+    #[configurable(required_one_of = "group")]
+    file: Option<String>,
+}
+
+#[test]
+fn required_one_of_accepts_aliases() {
+    let schema = generate_test_schema::<RequiredOneOfWithAliasConfig>();
+    let required: Vec<_> = schema["allOf"][1]["oneOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|branch| branch["required"][0].as_str().unwrap())
+        .collect();
+    assert_eq!(required, ["source", "src", "file"]);
+
+    // A config that sets the member through its alias satisfies the constraint.
+    assert_schema_allows::<RequiredOneOfWithAliasConfig>(json!({ "src": "a" }));
 }
 
 proptest! {

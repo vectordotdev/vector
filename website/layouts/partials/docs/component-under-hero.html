@@ -9,7 +9,7 @@
 {{ $output := $config.output }}
 
 {{ $singularType := strings.TrimSuffix "s" $type }}
-{{ $issuesUrl := printf "https://github.com/vectordotdev/vector/issues?q=sort%%3Aupdated-desc+is%%3Aissue+is%%3Aopen+label%%3A%%22%s%%3A+%s%%22" $singularType $tag }}
+{{ $issuesUrl := printf "https://github.com/vectordotdev/vector/issues?q=sort%%3Aupdated-desc+is%%3Aissue+is%%3Aopen+label%%3A%%22%s%%3A%s%%22" $singularType $tag }}
 
 <div class="block space-y-1">
   {{ if eq $classes.development "beta" }}

@@ -27,6 +27,11 @@ impl fmt::Display for Param {
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::too_many_lines,
+    reason = "Keep the existing control flow intact during the lint rollout."
+)]
 fn dedupe(c: &mut Criterion) {
     let mut group: BenchmarkGroup<WallTime> =
         c.benchmark_group("vector::transforms::dedupe::Dedupe");
@@ -135,10 +140,10 @@ fn dedupe(c: &mut Criterion) {
                 },
                 |(dedupe, input)| {
                     let output = dedupe.transform_events(input);
-                    consume(output)
+                    consume(output);
                 },
                 BatchSize::SmallInput,
-            )
+            );
         });
     }
 }
@@ -147,7 +152,7 @@ criterion_group!(
     name = benches;
     config = Criterion::default()
         .warm_up_time(Duration::from_secs(5))
-        .measurement_time(Duration::from_secs(120))
+        .measurement_time(Duration::from_mins(2))
         // degree of noise to ignore in measurements, here 1%
         .noise_threshold(0.01)
         // likelihood of noise registering as difference, here 5%

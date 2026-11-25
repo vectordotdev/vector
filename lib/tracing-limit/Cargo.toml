@@ -1,6 +1,6 @@
 [package]
 name = "tracing-limit"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
@@ -12,7 +12,7 @@ workspace = true
 [dependencies]
 tracing-core = { version = "0.1", default-features = false }
 tracing-subscriber = { workspace = true, features = ["registry", "std"] }
-dashmap = { version = "6.1.0", default-features = false }
+dashmap.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

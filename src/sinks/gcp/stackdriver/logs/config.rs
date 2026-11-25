@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 
-use http::StatusCode;
-use http_1::Request;
+use http::Request;
 use snafu::Snafu;
+use vector_http::full_body;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
@@ -20,15 +20,14 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::client_v1::{HttpClient, full_body},
+    http::HttpClient,
     schema,
     sinks::{
         gcs_common::config::healthcheck_status,
         prelude::*,
         util::{
             BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
-            http::RetryStrategy,
-            http_v1::{HttpService, http_response_retry_logic},
+            http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -42,7 +41,7 @@ enum HealthcheckError {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct StackdriverTowerRequestConfigDefaults;
+pub(super) struct StackdriverTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for StackdriverTowerRequestConfigDefaults {
     const RATE_LIMIT_NUM: u64 = 1_000;
@@ -177,7 +176,7 @@ pub(super) enum StackdriverLogName {
 #[derive(Clone, Debug, Default)]
 pub(super) struct StackdriverLabelConfig {
     /// The value of this field is used to retrieve the associated labels from the `jsonPayload`
-    /// and extract their values to set as LogEntry labels.
+    /// and extract their values to set as `LogEntry` labels.
     #[configurable(metadata(docs::examples = "logging.googleapis.com/labels"))]
     #[serde(default = "default_labels_key")]
     pub(super) labels_key: Option<String>,
@@ -201,6 +200,11 @@ fn labels_examples() -> HashMap<String, String> {
     example
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Serde requires the optional field type."
+)]
 pub(super) fn default_labels_key() -> Option<String> {
     Some("logging.googleapis.com/labels".to_string())
 }
@@ -351,7 +355,7 @@ impl ValidatedSink for StackdriverConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValidatedStackdriverLogs {
+pub(super) struct ValidatedStackdriverLogs {
     encoder: StackdriverLogsEncoder,
     batch_settings: BatcherSettings,
 }
@@ -365,19 +369,17 @@ async fn healthcheck(
     let events = serde_json::json!({ "entries": entries });
 
     let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
-    let mut request = Request::post(endpoint.into_v1())
+    let mut request = Request::post(endpoint.into_uri())
         .header("Content-Type", "application/json")
         .body(body)
         .unwrap();
 
-    auth.apply_v1(&mut request);
+    auth.apply(&mut request);
     let request = request.map(full_body);
 
     let response = client.send(request).await?;
 
-    let status = StatusCode::from_u16(response.status().as_u16())
-        .expect("HTTP status codes are valid u16 values");
-    healthcheck_status(status, HealthcheckError::NotFound.into())
+    healthcheck_status(response.status(), HealthcheckError::NotFound.into())
 }
 
 #[cfg(test)]

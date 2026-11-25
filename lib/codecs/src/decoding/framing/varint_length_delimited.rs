@@ -21,10 +21,8 @@ pub enum VarintFramingError {
 impl StreamDecodingError for VarintFramingError {
     fn can_continue(&self) -> bool {
         match self {
-            // Varint overflow and frame too large are not recoverable
-            Self::VarintOverflow | Self::FrameTooLarge { .. } => false,
-            // Trailing data at EOF is not recoverable
-            Self::TrailingData => false,
+            // Overflow, oversized frames, and trailing data at EOF are not recoverable.
+            Self::VarintOverflow | Self::FrameTooLarge { .. } | Self::TrailingData => false,
         }
     }
 }
@@ -50,6 +48,7 @@ const fn default_max_frame_length() -> usize {
 
 impl VarintLengthDelimitedDecoderConfig {
     /// Build the `VarintLengthDelimitedDecoder` from this configuration.
+    #[must_use]
     pub fn build(&self) -> VarintLengthDelimitedDecoder {
         VarintLengthDelimitedDecoder::new(self.max_frame_length)
     }
@@ -64,17 +63,18 @@ pub struct VarintLengthDelimitedDecoder {
 
 impl VarintLengthDelimitedDecoder {
     /// Creates a new `VarintLengthDelimitedDecoder`.
+    #[must_use]
     pub fn new(max_frame_length: usize) -> Self {
         Self { max_frame_length }
     }
 
     /// Decode a varint from the start of the buffer without consuming it.
-    fn decode_varint(&self, buf: &BytesMut) -> Result<Option<(u64, usize)>, BoxedFramingError> {
+    fn decode_varint(buf: &BytesMut) -> Result<Option<(u64, usize)>, BoxedFramingError> {
         let mut value: u64 = 0;
         let mut shift: u8 = 0;
 
         for (index, byte) in buf.iter().enumerate() {
-            let byte_value = (*byte & 0x7F) as u64;
+            let byte_value = u64::from(*byte & 0x7F);
             value |= byte_value << shift;
 
             if *byte & 0x80 == 0 {
@@ -105,7 +105,7 @@ impl Decoder for VarintLengthDelimitedDecoder {
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // First, peek at the varint length prefix.
-        let (length, prefix_length) = match self.decode_varint(src)? {
+        let (length, prefix_length) = match Self::decode_varint(src)? {
             Some((length, prefix_length)) => {
                 (usize::try_from(length).unwrap_or(usize::MAX), prefix_length)
             }
@@ -141,10 +141,10 @@ impl Decoder for VarintLengthDelimitedDecoder {
                 Some(frame) => Ok(Some(frame)),
                 None => {
                     // If we have data but couldn't decode it, it's trailing data
-                    if !src.is_empty() {
-                        Err(VarintFramingError::TrailingData.into())
-                    } else {
+                    if src.is_empty() {
                         Ok(None)
+                    } else {
+                        Err(VarintFramingError::TrailingData.into())
                     }
                 }
             }
@@ -198,6 +198,15 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion and wire-format behavior."
+    )]
+    #[allow(
+        clippy::similar_names,
+        reason = "Related fixture values retain names that describe their types or encodings."
+    )]
     fn decode_frames_split_across_read_buffer() {
         const FRAME_LENGTH: usize = 87;
         const FRAME_COUNT: usize = 200;

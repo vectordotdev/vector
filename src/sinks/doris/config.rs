@@ -234,7 +234,7 @@ impl ValidatedSink for DorisConfig {
         let commons = DorisCommon::parse_many(self)?;
         let common = &commons[0];
 
-        let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
+        let client = HttpClient::new(common.tls_settings.clone().into(), &cx.proxy)?;
 
         let services_futures = commons
             .iter()
@@ -278,10 +278,10 @@ impl ValidatedSink for DorisConfig {
             .collect::<Vec<_>>();
 
         let service = request_settings.distributed_service(
-            DorisRetryLogic {},
+            &DorisRetryLogic {},
             services,
-            health_config,
-            DorisHealthLogic,
+            &health_config,
+            &DorisHealthLogic,
             1, // Buffer bound is hardcoded to 1 for sinks
         );
 

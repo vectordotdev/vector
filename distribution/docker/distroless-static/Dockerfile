@@ -1,4 +1,4 @@
-FROM docker.io/alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS builder
+FROM docker.io/alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS builder
 
 WORKDIR /vector
 
@@ -9,7 +9,7 @@ RUN mkdir -p /var/lib/vector
 
 # distroless doesn't use static tags
 # hadolint ignore=DL3007
-FROM gcr.io/distroless/static:latest@sha256:58133991db06659feaabe0f4e97a35cebf15ef4ea08f8a4c6d2ee5f75e4aa6a0
+FROM gcr.io/distroless/static:latest@sha256:1a64f46364620465ef9e9a8f5413757dfdf22695e050bbfd7303eeaf17a59383
 
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md
 LABEL org.opencontainers.image.url="https://vector.dev"

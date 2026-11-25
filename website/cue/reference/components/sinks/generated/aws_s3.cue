@@ -10,7 +10,7 @@ generated: components: sinks: aws_s3: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	acl: {
 		description: """
@@ -235,8 +235,7 @@ generated: components: sinks: aws_s3: configuration: {
 
 			Directly comparable to the `Content-Type` HTTP header.
 
-			If not specified, the compression scheme used dictates this value.
-			When `compression` is set to `none`, the value `text/x-log` is used.
+			Defaults to `text/x-log`, or `application/vnd.apache.parquet` when Parquet batch encoding is enabled.
 			"""
 		required: false
 		type: string: examples: ["application/gzip"]
