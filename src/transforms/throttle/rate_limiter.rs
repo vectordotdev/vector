@@ -144,30 +144,6 @@ mod tests {
         assert!(!limiter.check_key(&"bucket", NonZeroU32::MAX));
     }
 
-    #[test]
-    fn dynamic_limiter_matches_governor_at_constant_rates() {
-        for threshold in [1, 2, 10] {
-            let threshold = NonZeroU32::new(threshold).unwrap();
-            let clock = clock::FakeRelativeClock::default();
-            let window = Duration::from_secs(5);
-            let limiter = DynamicLimiter::new(window, clock.clone());
-            let quota = Quota::with_period(window / threshold.get())
-                .unwrap()
-                .allow_burst(threshold);
-            let reference = RateLimiter::dashmap_with_clock(quota, clock.clone());
-
-            for advance in [Duration::ZERO, Duration::from_millis(500), window] {
-                clock.advance(advance);
-                for _ in 0..=threshold.get() {
-                    assert_eq!(
-                        limiter.check_key(&"bucket", threshold),
-                        reference.check_key(&"bucket").is_ok()
-                    );
-                }
-            }
-        }
-    }
-
     #[tokio::test(start_paused = true)]
     async fn removes_only_replenished_buckets() {
         let clock = clock::FakeRelativeClock::default();

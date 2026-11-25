@@ -3,7 +3,7 @@ transforms:
     type: throttle
     inputs:
       - my-source-or-transform-id
-    key_field: "{{ service }}"
+    key_field: "{{ message }}"
     measure_cpu_usage: false
     threshold: 100
     threshold_field: rate_limit

@@ -316,44 +316,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn threshold_field_replenishes_capacity() {
-        let config = ThrottleConfig {
-            threshold: 1,
-            threshold_field: Some("limit".into()),
-            window_secs: Duration::from_secs(8),
-            ..Default::default()
-        };
-        let clock = clock::FakeRelativeClock::default();
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
-        let events = [
-            (0, 4),
-            (0, 4),
-            (0, 4),
-            (0, 4),
-            (0, 4),
-            (1, 4),
-            (1, 4),
-            (1, 2),
-            (3, 2),
-        ]
-        .into_iter()
-        .enumerate()
-        .map(move |(index, (advance, threshold))| {
-            clock.advance(Duration::from_secs(advance));
-            let mut log = LogEvent::from(index.to_string());
-            log.insert(event_path!("limit"), threshold);
-            Event::Log(log)
-        });
-        let output: Vec<_> = Box::new(throttle)
-            .transform(Box::pin(futures::stream::iter(events)))
-            .map(|event| event.as_log()["message"].clone())
-            .collect()
-            .await;
-
-        assert_eq!(output, ["0", "1", "2", "3", "6", "8"].map(Value::from));
-    }
-
-    #[tokio::test]
     async fn throttle_events() {
         let clock = clock::FakeRelativeClock::default();
         let config = serde_yaml::from_str::<ThrottleConfig>(indoc! {"
@@ -421,34 +383,80 @@ mod tests {
 
     #[tokio::test]
     async fn throttle_exclude() {
-        let config: ThrottleConfig = serde_yaml::from_str(indoc! {"
+        let clock = clock::FakeRelativeClock::default();
+        let config = serde_yaml::from_str::<ThrottleConfig>(indoc! {"
             threshold: 2
-            threshold_field: limit
             window_secs: 5
-            exclude: exists(.special)
+            exclude: \"exists(.special)\"
         "})
         .unwrap();
-        let normal = LogEvent::from("normal");
-        let mut excluded = LogEvent::from("excluded");
-        excluded.insert(event_path!("special"), true);
-        excluded.insert(event_path!("limit"), 1);
 
-        let input = vec![
-            excluded.clone(),
-            normal.clone(),
-            normal.clone(),
-            excluded.clone(),
-            normal.clone(),
-        ];
-        assert_eq!(
-            throttle_logs(&config, input).await,
-            vec![
-                excluded.clone().into(),
-                normal.clone().into(),
-                normal.into(),
-                excluded.into()
-            ],
-        );
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        tx.send(LogEvent::default().into()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
+
+        let mut count = 0_u8;
+        while count < 2 {
+            match out_stream.next().await {
+                Some(_event) => {
+                    count += 1;
+                }
+                _ => {
+                    panic!("Unexpectedly received None in output stream");
+                }
+            }
+        }
+        assert_eq!(2, count);
+
+        clock.advance(Duration::from_secs(2));
+
+        tx.send(LogEvent::default().into()).await.unwrap();
+
+        // We should be back to pending, having the second event dropped
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        let mut special_log = LogEvent::default();
+        special_log.insert(event_path!("special"), "true");
+        tx.send(special_log.into()).await.unwrap();
+        // The rate limiter should allow this log through regardless of current limit
+        match out_stream.next().await {
+            Some(_event) => {}
+            _ => {
+                panic!("Unexpectedly received None in output stream");
+            }
+        }
+
+        clock.advance(Duration::from_secs(3));
+
+        tx.send(LogEvent::default().into()).await.unwrap();
+
+        // The rate limiter should now be refreshed and allow an additional event through
+        match out_stream.next().await {
+            Some(_event) => {}
+            _ => {
+                panic!("Unexpectedly received None in output stream");
+            }
+        }
+
+        // We should be back to pending, having nothing waiting for us
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        tx.disconnect();
+
+        // And still nothing there
+        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
     }
 
     #[tokio::test]

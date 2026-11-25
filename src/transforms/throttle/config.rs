@@ -51,33 +51,31 @@ pub struct ThrottleInternalMetricsConfig {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ThrottleConfig {
-    /// The default number of events allowed per bucket per `window_secs`.
+    /// The default number of events allowed for a given bucket per configured `window_secs`.
     ///
-    /// A positive threshold is required even when `threshold_field` is set. It applies to
-    /// events whose threshold field is missing or invalid.
+    /// Each unique key has its own `threshold`.
     pub threshold: u32,
 
-    /// The literal path to the event or metadata field that supplies the threshold for each event.
+    /// The path to the event or metadata field that overrides `threshold`, such as `rate_limit` or `%rate_limit`.
     ///
-    /// Use `rate_limit` for an event field or `%rate_limit` for a metadata field. The value
-    /// must be an integer from 1 to 4,294,967,295 or a string that parses as one. Missing
-    /// fields and invalid values, including floats, use the configured `threshold`.
-    /// Events in the same bucket share capacity even when their thresholds differ.
+    /// The value must be an integer from 1 to 4,294,967,295 or a string that parses as one.
+    /// Missing or invalid values use the required positive `threshold`.
     #[configurable(metadata(docs::examples = "rate_limit"))]
     pub threshold_field: Option<ConfigTargetPath>,
 
-    /// The time in seconds for a bucket to replenish its full capacity.
+    /// The time window in which the configured `threshold` is applied, in seconds.
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[configurable(metadata(docs::human_name = "Time Window"))]
     pub window_secs: Duration,
 
-    /// A template whose rendered value groups events into independently rate-limited buckets.
+    /// The value to group events into separate buckets to be rate limited independently.
     ///
-    /// Events use a shared default bucket when the template is omitted or cannot be rendered.
-    #[configurable(metadata(docs::examples = "{{ service }}", docs::examples = "{{ hostname }}",))]
+    /// If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
+    /// limited separately.
+    #[configurable(metadata(docs::examples = "{{ message }}", docs::examples = "{{ hostname }}",))]
     pub key_field: Option<UnconfinedTemplate>,
 
-    /// A condition that lets matching events pass without consuming bucket capacity.
+    /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
 
     #[serde(default)]
