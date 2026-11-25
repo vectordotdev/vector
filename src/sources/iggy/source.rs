@@ -282,10 +282,44 @@ fn seek_started(seek: Option<PollingStrategy>, offset: u64) -> bool {
     })
 }
 
+/// Everything the source keeps for one partition it owns. A reassignment or a
+/// lost history invalidates all of it together, so it lives in one place rather
+/// than one map per concern.
+struct PartitionSlot {
+    state: PartitionState,
+    finalizer: OrderedFinalizer<u64>,
+    /// The last SDK generation seen for the partition. A generation change is a
+    /// new assignment unless a seek issued here opened it.
+    generation: Option<u64>,
+    /// The strategy of the last seek issued for this partition, consumed by the
+    /// first message of the generation that seek started.
+    own_seek: Option<PollingStrategy>,
+    /// When the last settled-only commit ran. Pacing is per partition so a
+    /// commit on another partition cannot suppress this one.
+    last_settled_commit: Option<Instant>,
+}
+
+impl PartitionSlot {
+    /// A slot plus the acknowledgement stream its finalizer feeds.
+    fn new() -> (Self, BoxStream<'static, (BatchStatus, u64)>) {
+        let (finalizer, stream) = OrderedFinalizer::<u64>::new(None);
+        (
+            Self {
+                state: PartitionState::default(),
+                finalizer,
+                generation: None,
+                own_seek: None,
+                last_settled_commit: None,
+            },
+            stream,
+        )
+    }
+}
+
 /// Whether the acknowledgement backlog reached the cap that pauses polling.
-fn at_capacity(partitions: &HashMap<u32, PartitionState>) -> bool {
-    partitions
-        .values()
+fn at_capacity<'a>(states: impl IntoIterator<Item = &'a PartitionState>) -> bool {
+    states
+        .into_iter()
         .map(|state| state.in_flight)
         .sum::<usize>()
         >= MAX_IN_FLIGHT
@@ -300,19 +334,35 @@ fn stopped_partition(error: &ReadError) -> Option<u32> {
 }
 
 /// Forget the acknowledgement state tied to a partition: a reassignment or a
-/// lost history invalidates all of it. The generation map keeps the current
-/// generation so the next message is not treated as another change.
+/// lost history invalidates all of it. The generation stays so the next message
+/// is not treated as another change, and the finalizer is replaced so late
+/// acknowledgements of the old history are dropped.
 fn reset_partition(
     partition_id: u32,
-    partitions: &mut HashMap<u32, PartitionState>,
-    finalizers: &mut HashMap<u32, OrderedFinalizer<u64>>,
+    slots: &mut HashMap<u32, PartitionSlot>,
     ack_streams: &mut StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>>,
-    last_settled_commits: &mut HashMap<u32, Instant>,
 ) {
-    partitions.remove(&partition_id);
-    finalizers.remove(&partition_id);
     ack_streams.remove(&partition_id);
-    last_settled_commits.remove(&partition_id);
+    if let Some(slot) = slots.get_mut(&partition_id) {
+        slot.state = PartitionState::default();
+        slot.own_seek = None;
+        slot.last_settled_commit = None;
+        let (finalizer, _) = OrderedFinalizer::<u64>::new(None);
+        slot.finalizer = finalizer;
+    }
+}
+
+/// The slot for `partition_id`, creating its acknowledgement stream on demand.
+fn slot_entry<'a>(
+    slots: &'a mut HashMap<u32, PartitionSlot>,
+    ack_streams: &mut StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>>,
+    partition_id: u32,
+) -> &'a mut PartitionSlot {
+    slots.entry(partition_id).or_insert_with(|| {
+        let (slot, stream) = PartitionSlot::new();
+        ack_streams.insert(partition_id, stream);
+        slot
+    })
 }
 
 /// Queue a seek. A replay or skip never replaces a pending history reset: the
@@ -379,14 +429,10 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
 /// concurrently so a slow partition cannot stall the commit tick. A delivered
 /// message's checkpoint commits under the partition history that delivered it,
 /// so the SDK drops a store that a rebalance or a recreated partition made
-/// stale; a skipped offset has no checkpoint and is stored raw. A
-/// `NotResolvedConsumer` or `ConsumerGroupPartitionNotOwned` error prunes the
-/// partition's state after a rebalance, since its checkpoint can never be
-/// stored again; other errors restore the pending offset so a later tick or
-/// the shutdown commit retries it.
+/// stale; a skipped offset has no checkpoint and is stored raw.
 #[allow(
     clippy::too_many_arguments,
-    reason = "One call keeps the commit, ack, and auth state together"
+    reason = "One call keeps the commit and auth state together"
 )]
 async fn commit_offsets(
     consumer: &IggyConsumer,
@@ -394,14 +440,13 @@ async fn commit_offsets(
     url: &str,
     stream: &str,
     topic: &str,
-    partitions: &mut HashMap<u32, PartitionState>,
-    finalizers: &mut HashMap<u32, OrderedFinalizer<u64>>,
+    slots: &mut HashMap<u32, PartitionSlot>,
     ack_streams: &mut StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>>,
 ) {
-    let pending: Vec<(u32, u64, Option<Checkpoint>)> = partitions
+    let pending: Vec<(u32, u64, Option<Checkpoint>)> = slots
         .iter_mut()
-        .filter_map(|(&partition_id, state)| {
-            state
+        .filter_map(|(&partition_id, slot)| {
+            slot.state
                 .take_pending()
                 .map(|(offset, checkpoint)| (partition_id, offset, checkpoint))
         })
@@ -428,8 +473,8 @@ async fn commit_offsets(
     for (partition_id, offset, result) in results {
         match result {
             Ok(()) => {
-                if let Some(state) = partitions.get_mut(&partition_id) {
-                    state.committed_through(offset);
+                if let Some(slot) = slots.get_mut(&partition_id) {
+                    slot.state.committed_through(offset);
                 }
                 emit(IggyOffsetCommitted {
                     stream,
@@ -441,17 +486,15 @@ async fn commit_offsets(
             Err(
                 IggyError::NotResolvedConsumer(_) | IggyError::ConsumerGroupPartitionNotOwned(..),
             ) => {
-                partitions.remove(&partition_id);
-                finalizers.remove(&partition_id);
-                ack_streams.remove(&partition_id);
+                reset_partition(partition_id, slots, ack_streams);
                 debug!(
                     message = "Partition no longer assigned to this consumer; dropping per-partition acknowledgement state.",
                     stream, topic, partition_id,
                 );
             }
             Err(error) => {
-                if let Some(state) = partitions.get_mut(&partition_id) {
-                    state.pending = Some(offset);
+                if let Some(slot) = slots.get_mut(&partition_id) {
+                    slot.state.pending = Some(offset);
                 }
                 let unauthenticated = is_unauthenticated(&error);
                 emit(IggyOffsetUpdateError { error });
@@ -481,8 +524,7 @@ struct MessageMetadata<'a> {
 }
 
 struct AckTracker<'a> {
-    partitions: &'a mut HashMap<u32, PartitionState>,
-    finalizers: &'a mut HashMap<u32, OrderedFinalizer<u64>>,
+    slots: &'a mut HashMap<u32, PartitionSlot>,
     ack_streams: &'a mut StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>>,
 }
 
@@ -494,16 +536,9 @@ impl AckTracker<'_> {
         checkpoint: Checkpoint,
         receiver: BatchStatusReceiver,
     ) {
-        let finalizer = self.finalizers.entry(partition_id).or_insert_with(|| {
-            let (finalizer, stream) = OrderedFinalizer::<u64>::new(None);
-            self.ack_streams.insert(partition_id, stream);
-            finalizer
-        });
-        self.partitions
-            .entry(partition_id)
-            .or_default()
-            .mark_in_flight(offset, checkpoint);
-        finalizer.add(offset, receiver);
+        let slot = slot_entry(&mut *self.slots, &mut *self.ack_streams, partition_id);
+        slot.state.mark_in_flight(offset, checkpoint);
+        slot.finalizer.add(offset, receiver);
     }
 }
 
@@ -723,14 +758,8 @@ pub(crate) async fn run_iggy_source(
     // Each partition gets its own ordered finalizer so a stalled batch on
     // one partition does not block another's commits. Ordering within a
     // partition is what the fence logic depends on.
-    let mut partitions: HashMap<u32, PartitionState> = HashMap::new();
-    let mut finalizers: HashMap<u32, OrderedFinalizer<u64>> = HashMap::new();
+    let mut slots: HashMap<u32, PartitionSlot> = HashMap::new();
     let mut ack_streams: StreamMap<u32, BoxStream<'static, (BatchStatus, u64)>> = StreamMap::new();
-    let mut generations: HashMap<u32, u64> = HashMap::new();
-    // A seek starts a new SDK generation, so a replay seek looks like a
-    // reassignment. The strategy of each seek issued here is kept so its
-    // generation can be told apart from an assignment's.
-    let mut own_seeks: HashMap<u32, PollingStrategy> = HashMap::new();
 
     // The SDK polls from the server-stored consumer offset, so it must track
     // the consumed position or every poll refetches the same window. Commit
@@ -739,7 +768,6 @@ pub(crate) async fn run_iggy_source(
     // another partition cannot suppress it. The timer is a shutdown backstop.
     let commit_after = u64::from((config.batch_length / 2).max(1));
     let settled_commit_gap = Duration::from_millis(config.poll_interval_ms.max(1));
-    let mut last_settled_commits: HashMap<u32, Instant> = HashMap::new();
     let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs.max(1)));
     commit_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
@@ -789,15 +817,10 @@ pub(crate) async fn run_iggy_source(
                         // The recovered partition belongs to a new history:
                         // offsets, fences, and finalizers of the old one
                         // cannot be committed and must not block it.
-                        reset_partition(
-                            partition_id,
-                            &mut partitions,
-                            &mut finalizers,
-                            &mut ack_streams,
-                            &mut last_settled_commits,
-                        );
+                        reset_partition(partition_id, &mut slots, &mut ack_streams);
                     } else {
-                        own_seeks.insert(partition_id, strategy);
+                        slot_entry(&mut slots, &mut ack_streams, partition_id).own_seek =
+                            Some(strategy);
                     }
                 }
                 Err(error) => {
@@ -835,25 +858,26 @@ pub(crate) async fn run_iggy_source(
                 if !ack_streams.is_empty() =>
             {
                 let mut retry = RetryOutcome::Idle;
-                let should_commit = match partitions.get_mut(&partition_id) {
-                    Some(state) => {
-                        record_ack(state, partition_id, status, offset);
+                let should_commit = match slots.get_mut(&partition_id) {
+                    Some(slot) => {
+                        record_ack(&mut slot.state, partition_id, status, offset);
                         if !matches!(status, BatchStatus::Delivered) {
                             // Only the fenced message spends the replay budget;
                             // a rejection queued behind the fence waits for its
                             // turn instead of exhausting the lower offset's
                             // attempts before it was ever replayed.
-                            if state.fence() == Some(offset) {
-                                retry = state.retry();
+                            if slot.state.fence() == Some(offset) {
+                                retry = slot.state.retry();
                             }
                             None
-                        } else if state.lag() >= commit_after {
+                        } else if slot.state.lag() >= commit_after {
                             Some(false)
                         } else {
-                            let paced = last_settled_commits
-                                .get(&partition_id)
+                            let paced = slot
+                                .last_settled_commit
                                 .is_none_or(|t| t.elapsed() >= settled_commit_gap);
-                            (state.lag() > 0 && state.is_settled() && paced).then_some(true)
+                            (slot.state.lag() > 0 && slot.state.is_settled() && paced)
+                                .then_some(true)
                         }
                     }
                     None => None,
@@ -881,9 +905,9 @@ pub(crate) async fn run_iggy_source(
                         // A rejection above the skipped offset has no
                         // acknowledgement left to trigger its replay, so start
                         // it here or it would fence the partition forever.
-                        if let Some(next) = partitions
+                        if let Some(next) = slots
                             .get(&partition_id)
-                            .and_then(PartitionState::fence)
+                            .and_then(|slot| slot.state.fence())
                         {
                             queue_seek(
                                 &mut pending_seeks,
@@ -897,8 +921,10 @@ pub(crate) async fn run_iggy_source(
                     RetryOutcome::Idle => {}
                 }
                 if let Some(settled) = should_commit {
-                    if settled {
-                        last_settled_commits.insert(partition_id, Instant::now());
+                    if settled
+                        && let Some(slot) = slots.get_mut(&partition_id)
+                    {
+                        slot.last_settled_commit = Some(Instant::now());
                     }
                     commit_offsets(
                         &consumer,
@@ -906,8 +932,7 @@ pub(crate) async fn run_iggy_source(
                         &config.url,
                         stream,
                         topic,
-                        &mut partitions,
-                        &mut finalizers,
+                        &mut slots,
                         &mut ack_streams,
                     )
                     .await;
@@ -921,8 +946,7 @@ pub(crate) async fn run_iggy_source(
                     &config.url,
                     stream,
                     topic,
-                    &mut partitions,
-                    &mut finalizers,
+                    &mut slots,
                     &mut ack_streams,
                 )
                 .await;
@@ -940,7 +964,7 @@ pub(crate) async fn run_iggy_source(
                 break;
             }
 
-            next = consumer.next(), if !at_capacity(&partitions) => {
+            next = consumer.next(), if !at_capacity(slots.values().map(|slot| &slot.state)) => {
                 match next {
                     Some(Ok(received)) => {
                         read_backoff.reset();
@@ -956,24 +980,24 @@ pub(crate) async fn run_iggy_source(
                         {
                             let partition_id = received.partition_id;
                             let offset = received.message.header.offset;
-                            let previous = generations.insert(partition_id, generation);
-                            if previous != Some(generation)
-                                && !seek_started(own_seeks.remove(&partition_id), offset)
-                            {
-                                reset_partition(
-                                    partition_id,
-                                    &mut partitions,
-                                    &mut finalizers,
-                                    &mut ack_streams,
-                                    &mut last_settled_commits,
-                                );
+                            let slot = slot_entry(&mut slots, &mut ack_streams, partition_id);
+                            let previous = slot.generation.replace(generation);
+                            let own_seek = slot.own_seek.take();
+                            if previous != Some(generation) && !seek_started(own_seek, offset) {
+                                reset_partition(partition_id, &mut slots, &mut ack_streams);
+                                // The generation that triggered the reset is
+                                // the one the replacement serves; recreating
+                                // the slot without it resets again on the next
+                                // message and drops that message's finalizer,
+                                // committing past an unacknowledged record.
+                                slot_entry(&mut slots, &mut ack_streams, partition_id)
+                                    .generation = Some(generation);
                             }
                         }
 
                         let checkpoint = received.checkpoint();
                         let mut tracker = AckTracker {
-                            partitions: &mut partitions,
-                            finalizers: &mut finalizers,
+                            slots: &mut slots,
                             ack_streams: &mut ack_streams,
                         };
                         if process_received_message(
@@ -1032,13 +1056,13 @@ pub(crate) async fn run_iggy_source(
                                 partition_id,
                                 offset = ?failed_offset,
                             );
-                            let state = partitions.entry(partition_id).or_default();
+                            let slot = slot_entry(&mut slots, &mut ack_streams, partition_id);
                             let failed = failed_offset.or_else(|| {
                                 (strategy.kind == PollingKind::Offset)
                                     .then_some(strategy.value)
                                     .and_then(|next| next.checked_sub(1))
                             });
-                            match state.fence_entry() {
+                            match slot.state.fence_entry() {
                                 // Replay a lower rejection first so its event
                                 // is not skipped with the unreadable record;
                                 // the read error repeats until the fence clears.
@@ -1055,7 +1079,7 @@ pub(crate) async fn run_iggy_source(
                                 }
                                 _ => {
                                     if let Some(failed) = failed {
-                                        state.skip_through(failed);
+                                        slot.state.skip_through(failed);
                                     }
                                     queue_seek(
                                         &mut pending_seeks,
@@ -1113,7 +1137,10 @@ pub(crate) async fn run_iggy_source(
         // restart. Clearing the finalizers closes each per-partition sender;
         // their streams end once pending entries finalize. Clear rather than
         // drop so the final commit still sees the partitions.
-        finalizers.clear();
+        for slot in slots.values_mut() {
+            let (finalizer, _) = OrderedFinalizer::<u64>::new(None);
+            slot.finalizer = finalizer;
+        }
         let drain_deadline = sleep(Duration::from_secs(config.drain_timeout_secs));
         tokio::pin!(drain_deadline);
         while !ack_streams.is_empty() {
@@ -1122,8 +1149,8 @@ pub(crate) async fn run_iggy_source(
 
                 next = ack_streams.next() => match next {
                     Some((partition_id, (status, offset))) => {
-                        if let Some(state) = partitions.get_mut(&partition_id) {
-                            record_ack(state, partition_id, status, offset);
+                        if let Some(slot) = slots.get_mut(&partition_id) {
+                            record_ack(&mut slot.state, partition_id, status, offset);
                         }
                     }
                     // Breaking here avoids waiting out the drain deadline;
@@ -1149,8 +1176,7 @@ pub(crate) async fn run_iggy_source(
             &config.url,
             stream,
             topic,
-            &mut partitions,
-            &mut finalizers,
+            &mut slots,
             &mut ack_streams,
         )
         .await;
@@ -1321,14 +1347,14 @@ mod tests {
     #[test]
     fn capacity_counts_outstanding_acknowledgements() {
         let mut partitions = HashMap::new();
-        assert!(!at_capacity(&partitions));
+        assert!(!at_capacity(partitions.values()));
 
         let mut state = PartitionState::default();
         for offset in 0..MAX_IN_FLIGHT as u64 {
             state.mark_offset_in_flight(offset);
         }
         partitions.insert(0, state);
-        assert!(at_capacity(&partitions));
+        assert!(at_capacity(partitions.values()));
     }
 
     #[test]
