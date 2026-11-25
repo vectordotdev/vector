@@ -409,6 +409,22 @@ impl PartitionSlots {
         }
         self.ack_streams.remove(&partition_id);
     }
+
+    /// Adopt the SDK generation that delivered `offset`. A generation change is
+    /// a new assignment unless a seek issued here opened it, so the slot is
+    /// replaced; either way the replacement starts on the generation that
+    /// triggered the reset, because a slot left without it resets again on the
+    /// next message and drops that message's finalizer, committing past an
+    /// unacknowledged record.
+    fn adopt_generation(&mut self, partition_id: u32, offset: u64, generation: u64) {
+        let slot = self.entry(partition_id);
+        let previous = slot.generation.replace(generation);
+        let own_seek = slot.own_seek.take();
+        if previous != Some(generation) && !seek_started(own_seek, offset) {
+            self.reset(partition_id);
+            self.entry(partition_id).generation = Some(generation);
+        }
+    }
 }
 
 /// Queue a seek. A replay or skip never replaces a pending history reset: the
@@ -1097,20 +1113,11 @@ pub(crate) async fn run_iggy_source(
                         if let Some(generation) =
                             received.checkpoint().stamp().map(|stamp| stamp.generation)
                         {
-                            let partition_id = received.partition_id;
-                            let offset = received.message.header.offset;
-                            let slot = partitions.entry(partition_id);
-                            let previous = slot.generation.replace(generation);
-                            let own_seek = slot.own_seek.take();
-                            if previous != Some(generation) && !seek_started(own_seek, offset) {
-                                partitions.reset(partition_id);
-                                // The generation that triggered the reset is
-                                // the one the replacement serves; recreating
-                                // the slot without it resets again on the next
-                                // message and drops that message's finalizer,
-                                // committing past an unacknowledged record.
-                                partitions.entry(partition_id).generation = Some(generation);
-                            }
+                            partitions.adopt_generation(
+                                received.partition_id,
+                                received.message.header.offset,
+                                generation,
+                            );
                         }
 
                         let checkpoint = received.checkpoint();
@@ -1552,6 +1559,39 @@ mod tests {
         // so a late acknowledgement cannot land on a closed finalizer.
         assert_eq!(partitions.entry(0).state.checkpoints.len(), 0);
         assert_eq!(partitions.ack_streams.len(), 1);
+    }
+
+    #[test]
+    fn a_reset_adopts_the_generation_that_triggered_it() {
+        let mut partitions = PartitionSlots::default();
+        partitions.adopt_generation(0, 1, 3);
+
+        // A generation change without a seek this source issued is a new
+        // assignment, so the slot and its acknowledgement stream are replaced.
+        let first = partitions.get(0).expect("slot exists").id.clone();
+        partitions.adopt_generation(0, 2, 4);
+        let replacement = partitions.get(0).expect("slot exists").id.clone();
+        assert!(!first.same(&replacement));
+        assert!(first.retired());
+
+        // The replacement serves the generation that triggered the reset, so
+        // the next message keeps its finalizer instead of resetting again.
+        partitions.adopt_generation(0, 3, 4);
+        assert!(replacement.same(&partitions.get(0).expect("slot exists").id));
+    }
+
+    #[test]
+    fn a_seek_opened_generation_keeps_the_slot() {
+        let mut partitions = PartitionSlots::default();
+        partitions.adopt_generation(0, 1, 3);
+        let id = partitions.get(0).expect("slot exists").id.clone();
+
+        // A replay seek resumes at its target, so the generation it opens
+        // keeps the fence and the replay budget it was issued to protect.
+        partitions.entry(0).own_seek = Some(PollingStrategy::offset(7));
+        partitions.adopt_generation(0, 7, 4);
+
+        assert!(id.same(&partitions.get(0).expect("slot exists").id));
     }
 
     #[test]
