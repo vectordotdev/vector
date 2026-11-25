@@ -173,7 +173,6 @@ pub struct DatadogMetricsConfig {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 3600.0))]
-    #[configurable(metadata(docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
     #[serde(default)]
