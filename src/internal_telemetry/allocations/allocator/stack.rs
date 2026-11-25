@@ -48,3 +48,42 @@ impl<const N: usize> GroupStack<N> {
         self.current_top -= 1;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    use super::*;
+
+    #[test]
+    fn stack_restores_groups_and_enforces_bounds() {
+        let root = AllocationGroupId::ROOT;
+        let first = AllocationGroupId::from_raw(2);
+        let second = AllocationGroupId::from_raw(3);
+        let mut stack = GroupStack::<3>::new();
+        assert_eq!(stack.current(), root);
+        stack.push(first);
+        stack.push(second);
+        assert_eq!(stack.current(), second);
+        stack.pop();
+        assert_eq!(stack.current(), first);
+        stack.push(second);
+        assert_eq!(stack.current(), second);
+        stack.pop();
+        stack.pop();
+        assert_eq!(stack.current(), root);
+
+        let underflow = catch_unwind(AssertUnwindSafe(|| stack.pop())).unwrap_err();
+        assert_eq!(
+            underflow.downcast_ref::<&str>().copied(),
+            Some("tried to pop current allocation group from the stack but the stack is empty")
+        );
+        stack.push(first);
+        stack.push(second);
+        let overflow = catch_unwind(AssertUnwindSafe(|| stack.push(first))).unwrap_err();
+        assert_eq!(
+            overflow.downcast_ref::<String>().unwrap(),
+            "tried to push new allocation group to the current stack, but hit the limit of 3 entries"
+        );
+    }
+}

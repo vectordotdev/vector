@@ -243,6 +243,16 @@ mod test {
                 Ok(()),
             ),
             (
+                Event::Metric(Metric::new(
+                    "zork",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )),
+                r".counter.value == 1.0 && .gauge.value == null",
+                Ok(()),
+                Ok(()),
+            ),
+            (
                 log_event![],
                 r#""i_return_a_string""#,
                 Err("VRL conditions must return a boolean.".into()),
@@ -267,7 +277,7 @@ mod test {
 
             if let Ok(cond) = config.build(&Default::default(), &MetricsStorage::default()) {
                 assert_eq!(
-                    cond.check_with_context(event.clone()).0,
+                    cond.check_with_context(event).0,
                     check.map_err(std::string::ToString::to_string)
                 );
             }
