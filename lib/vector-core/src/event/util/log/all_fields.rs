@@ -1,14 +1,15 @@
-use std::{fmt::Write as _, iter, slice, sync::LazyLock};
+use std::{fmt::Write as _, iter, slice};
 
-use regex::Regex;
 use serde::{Serialize, Serializer};
 use vrl::path::PathPrefix;
 
 use crate::event::{KeyString, ObjectMap, Value};
 use vrl::value::ObjectMapIter;
 
-static IS_VALID_PATH_SEGMENT: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
+/// Equivalent to `^[a-zA-Z0-9_]+$`.
+fn is_valid_path_segment(key: &str) -> bool {
+    !key.is_empty() && key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
@@ -144,7 +145,7 @@ impl<'a> FieldsIter<'a> {
             match path_iter.next() {
                 None => break res.into(),
                 Some(PathComponent::Key(key)) => {
-                    if self.quote_invalid_fields && !IS_VALID_PATH_SEGMENT.is_match(key) {
+                    if self.quote_invalid_fields && !is_valid_path_segment(key) {
                         write!(res, "\"{key}\"").expect("write to String never fails");
                     } else {
                         res.push_str(key);
@@ -266,6 +267,26 @@ mod test {
                 .cmp(b.strip_prefix('"').unwrap_or(b))
         });
 
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn keys_quoted_at_charset_edges() {
+        let fields = fields_from_json(json!({
+            "": 1,
+            "_0": 2,
+            "é": 3,
+        }));
+        let expected: Vec<_> = vec![
+            ("\"\"", &Value::Integer(1)),
+            ("_0", &Value::Integer(2)),
+            ("\"é\"", &Value::Integer(3)),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
+
+        let collected: Vec<_> = all_fields(&fields).collect();
         assert_eq!(collected, expected);
     }
 
