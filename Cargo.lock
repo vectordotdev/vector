@@ -13262,6 +13262,7 @@ dependencies = [
  "criterion",
  "csv",
  "cuckoo-clock",
+ "dashmap",
  "databend-client",
  "databricks-zerobus-ingest-sdk",
  "datadog-agent-metrics-v3",

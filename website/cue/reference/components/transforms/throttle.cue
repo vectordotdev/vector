@@ -84,9 +84,8 @@ components: transforms: throttle: {
 		rate_limiting: {
 			title: "Rate Limiting"
 			body:  """
-				The `throttle` transform will spread load across the configured `window_secs`, ensuring that each bucket's
-				throughput averages out to the `threshold` per `window_secs`. It utilizes a [Generic Cell Rate Algorithm](\(urls.gcra)) to
-				rate limit the event stream.
+				The `throttle` transform uses the [Generic Cell Rate Algorithm](\(urls.gcra)) to limit
+				the rate of each bucket independently. Each bucket starts full and replenishes continuously.
 				"""
 			sub_sections: [
 				{
@@ -99,22 +98,48 @@ components: transforms: throttle: {
 				{
 					title: "Quotas"
 					body: """
-						Rate limiters use "cells" to determine if there is sufficient capacity for an event to successfully
-						pass through a rate limiter. Each event passing through the transform consumes an available cell,
-						if there is no available cell the event will be rate limited.
+						With a fixed threshold, a full bucket admits a burst of `threshold` events. It then regains
+						capacity for one event every `window_secs / threshold` seconds. For example, a threshold of
+						10 over a 60-second window allows 10 events immediately, then one more every 6 seconds.
+						"""
+				},
+				{
+					title: "Dynamic thresholds"
+					body: """
+						An upstream transform can set a service's limit on each log. In this example, the
+						`api` service gets 200 events per second. Each service without a limit gets the
+						configured fallback of 20 events per second.
 
-						A rate limiter is created with a maximum number of cells equal to the `threshold`, and cells replenish
-						at a rate of `window_secs` divided by `threshold`. For example, a `window_secs` of 60 with a `threshold` of 10
-						replenishes a cell every 6 seconds and allows a burst of up to 10 events.
+						```yaml
+						transforms:
+						  enriched_logs:
+						    type: remap
+						    inputs: [logs]
+						    source: |
+						      if .service == "api" {
+						        %rate_limit = 200
+						      }
+
+						  service_throttle:
+						    type: throttle
+						    inputs: [enriched_logs]
+						    key_field: "{{ service }}"
+						    threshold: 20
+						    threshold_field: "%rate_limit"
+						    window_secs: 1
+						```
+
+						Each admitted event uses a fraction of its bucket equal to one divided by that event's
+						threshold. For example, an event with a threshold of 2 uses half a full bucket. Two
+						events with a threshold of 4 can then pass immediately in the same bucket.
 						"""
 				},
 				{
 					title: "Rate Limited Events"
 					body: """
-						The rate limiter will allow up to `threshold` number of events through and drop any further events
-						for that particular bucket when the rate limiter is at capacity. Any event passed when the rate
-						limiter is at capacity will be discarded and tracked by an `events_discarded_total` metric tagged
-						by the bucket's `key`.
+						When a bucket has too little capacity for an event, Vector drops the event and increments
+						`component_discarded_events_total`. Enable `internal_metrics.emit_events_discarded_per_key`
+						to also track drops by bucket in `events_discarded_total` with the `key` tag.
 						"""
 				},
 			]

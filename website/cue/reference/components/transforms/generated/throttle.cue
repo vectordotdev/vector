@@ -2,7 +2,7 @@ package metadata
 
 generated: components: transforms: throttle: configuration: {
 	exclude: {
-		description: "A logical condition used to exclude events from sampling."
+		description: "A condition that lets matching events pass without consuming bucket capacity."
 		required:    false
 		type: condition: {}
 	}
@@ -43,28 +43,40 @@ generated: components: transforms: throttle: configuration: {
 	}
 	key_field: {
 		description: """
-			The value to group events into separate buckets to be rate limited independently.
+			A template whose rendered value groups events into independently rate-limited buckets.
 
-			If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
-			limited separately.
+			Events use a shared default bucket when the template is omitted or cannot be rendered.
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ message }}", "{{ hostname }}"]
+			examples: ["{{ service }}", "{{ hostname }}"]
 			syntax: "template"
 		}
 	}
 	threshold: {
 		description: """
-			The number of events allowed for a given bucket per configured `window_secs`.
+			The default number of events allowed per bucket per `window_secs`.
 
-			Each unique key has its own `threshold`.
+			A positive threshold is required even when `threshold_field` is set. It applies to
+			events whose threshold field is missing or invalid.
 			"""
 		required: true
 		type: uint: {}
 	}
+	threshold_field: {
+		description: """
+			The literal path to the event or metadata field that supplies the threshold for each event.
+
+			Use `rate_limit` for an event field or `%rate_limit` for a metadata field. The value
+			must be an integer from 1 to 4,294,967,295 or a string that parses as one. Missing
+			fields and invalid values, including floats, use the configured `threshold`.
+			Events in the same bucket share capacity even when their thresholds differ.
+			"""
+		required: false
+		type: string: examples: ["rate_limit"]
+	}
 	window_secs: {
-		description: "The time window in which the configured `threshold` is applied, in seconds."
+		description: "The time in seconds for a bucket to replenish its full capacity."
 		required:    true
 		type: float: unit: "seconds"
 	}
