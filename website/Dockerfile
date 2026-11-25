@@ -1,8 +1,8 @@
-FROM debian:bookworm-slim
+# Node.js and Yarn are supplied by the pinned image.
+FROM node:24-bookworm-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530
 
 ARG HUGO_VERSION=0.154.5
 ARG CUE_VERSION=0.17.1
-ARG NODE_VERSION=24
 
 ENV PATH="/root/.cargo/bin:/root/.local/bin:${PATH}"
 
@@ -20,12 +20,6 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
     curl -fsSL https://github.com/cue-lang/cue/releases/download/v${CUE_VERSION}/cue_v${CUE_VERSION}_linux_${ARCH}.tar.gz \
     | tar -xz -C /usr/local/bin cue
-
-# Node.js + Yarn
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g yarn \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/website
 
