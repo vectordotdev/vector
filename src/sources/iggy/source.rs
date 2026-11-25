@@ -44,22 +44,20 @@ use crate::{
     sources::iggy::config::IggySourceConfig,
 };
 
-/// How many times a permanently rejected offset is replayed before the source
-/// gives up and commits past it, so a single undeliverable message cannot
-/// stall a partition for the lifetime of its assignment. Transient failures
-/// (`BatchStatus::Errored`) are never skipped: dropping them would break the
-/// source's at-least-once guarantee.
+/// Replays of a permanently rejected offset before the source commits past it,
+/// so one undeliverable message cannot stall its assignment for its lifetime.
+/// Transient failures are never skipped: dropping them breaks at-least-once.
 const MAX_REDELIVERY_ATTEMPTS: u32 = 3;
 
-/// Polled messages allowed to wait for a final acknowledgement before the
-/// source stops polling. An ordered finalizer yields acknowledgements in order,
-/// so one stalled acknowledgement holds every later one on that partition; an
-/// unbounded read would grow that queue for as long as the stall lasts.
+/// Polled messages allowed to wait for a final acknowledgement. The ordered
+/// finalizer yields acknowledgements in order, so one stalled acknowledgement
+/// holds every later one on that partition, and an unbounded read would grow
+/// that queue for the whole stall.
 ///
-/// The cap covers every assigned partition: the SDK polls the consumer group
-/// through one multiplexed stream and offers no per-partition pause, so a
-/// stalled partition eventually pauses them all. It bounds memory rather
-/// than pacing one partition.
+/// The cap spans every assigned partition because the SDK polls the group
+/// through one multiplexed stream with no per-partition pause: a stalled
+/// partition eventually pauses them all. It bounds memory, not one partition's
+/// pace.
 const MAX_IN_FLIGHT: usize = 10_000;
 
 /// Per-partition acknowledgement bookkeeping. The "fence" is the lowest
@@ -75,11 +73,11 @@ struct PartitionState {
     committed: Option<u64>,
     max_delivered: Option<u64>,
     /// Lowest offsets whose final acknowledgement was not `Delivered`, with
-    /// `true` when the failure was transient. `pending` never advances past
-    /// the minimum, but every rejection stays: replaying the fence can deliver
-    /// it while a higher rejection is still undelivered, and clearing the
-    /// whole fence would let a commit skip that one. Transient failures are
-    /// replayed indefinitely; permanent ones are skipped after
+    /// `true` when the failure was transient. `pending` never advances past the
+    /// minimum, but every rejection stays: replaying the fence can deliver it
+    /// while a higher rejection is still undelivered, and clearing the whole
+    /// fence would let a commit skip that one. Transient failures replay
+    /// indefinitely; permanent ones are skipped after
     /// `MAX_REDELIVERY_ATTEMPTS`.
     rejected: BTreeMap<u64, bool>,
     /// Offsets the broker could not decode or decrypt and a seek moved past;
@@ -164,9 +162,9 @@ impl PartitionState {
     /// false for a permanent `Rejected`. Returns `true` if the fence moved.
     fn record_rejection(&mut self, offset: u64, transient: bool) -> bool {
         if self.skipped.remove(&offset) {
-            // Undecodable and already moved past: replaying fails the same
-            // way forever. Lower offsets stay actionable so their failure
-            // still holds the checkpoint.
+            // Undecodable and already moved past: replaying fails the same way
+            // forever. Lower offsets stay actionable and still hold the
+            // checkpoint.
             self.recompute_pending();
             return false;
         }
@@ -334,7 +332,6 @@ struct PartitionSlot {
 }
 
 impl PartitionSlot {
-    /// A slot plus the acknowledgement stream its finalizer feeds.
     fn new() -> (Self, BoxStream<'static, (BatchStatus, u64)>) {
         let (finalizer, stream) = OrderedFinalizer::<u64>::new(None);
         (
@@ -1464,7 +1461,6 @@ mod tests {
         s.record_rejection(5, false);
         assert_eq!(s.pending, Some(4));
 
-        // The replay of offset 5 is delivered.
         assert!(s.record_delivered(5));
         assert_eq!(s.pending, Some(10));
     }
