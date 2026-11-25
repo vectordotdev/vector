@@ -788,13 +788,25 @@ services:
     environment:
       - VECTOR_LOG=${VECTOR_LOG:-info}
     depends_on:
+      vector-receiver:
+        condition: service_started
+    volumes:
+      - "../data/vector-${CONFIG_PIPELINE}.yaml:/etc/vector/vector.yaml:ro"
+      - vector_buffer:/var/lib/vector
+  # Idle in direct mode; keeping it present gives both environments the same lifecycle.
+  vector-receiver:
+    image: "${CONFIG_VECTOR_IMAGE}"
+    command: ["vector", "--config", "/etc/vector/vector.yaml"]
+    environment:
+      - VECTOR_LOG=${VECTOR_LOG:-info}
+    depends_on:
       prepare-output:
         condition: service_completed_successfully
       otel-collector-sink:
         condition: service_healthy
     volumes:
-      - "../data/vector.yaml:/etc/vector/vector.yaml:ro"
-  # Run by vdev's lifecycle after Vector stops; profiles keep `up` from starting it.
+      - "../data/vector-receiver.yaml:/etc/vector/vector.yaml:ro"
+  # Run by vdev's lifecycle after both Vectors stop; profiles keep `up` from starting it.
   drain-check:
     # Reuse the demo's pinned Python runtime without starting Locust.
     image: ghcr.io/open-telemetry/demo:3.1.0-load-generator
@@ -811,6 +823,7 @@ services:
     image: alpine:3.20
     command: ["sleep", "infinity"]
 volumes:
+  vector_buffer:
   opentelemetry_traces_multiservice_evidence:
     external: true
 networks:
