@@ -101,23 +101,13 @@ components: sources: kubernetes_logs: {
 					examples: ["coredns"]
 				}
 			}
-			"kubernetes.container_cpu_request_millicores": {
-				description: "CPU request of the container that produced the log, in millicores."
-				required:    false
-				type: uint: examples: [500, 1000]
-			}
-			"kubernetes.container_memory_request_bytes": {
-				description: "Memory request of the container that produced the log, in bytes."
-				required:    false
-				type: uint: examples: [268435456, 1073741824]
-			}
 			"kubernetes.pod_cpu_request_millicores": {
-				description: "Effective Pod CPU request in millicores."
+				description: "Effective Pod CPU request in millicores, including overhead. If `spec.resources.requests.cpu` is unset, Vector calculates the request from the Pod's app and init containers."
 				required:    false
 				type: uint: examples: [600, 2000]
 			}
 			"kubernetes.pod_memory_request_bytes": {
-				description: "Effective Pod memory request in bytes."
+				description: "Effective Pod memory request in bytes, including overhead. If `spec.resources.requests.memory` is unset, Vector calculates the request from the Pod's app and init containers."
 				required:    false
 				type: uint: examples: [301989888, 1073741824]
 			}
@@ -280,16 +270,9 @@ components: sources: kubernetes_logs: {
 		enrichment: {
 			title: "Enrichment"
 			body:  """
-					Vector adds [Kubernetes metadata](\(urls.vector_kubernetes_logs_source)#output-types) to each log.
-
-					Vector uses `spec.resources.requests.cpu` and `spec.resources.requests.memory` when set.
-					For each missing value, it sums the container requests for each init stage and for normal
-					operation, then takes the largest sum. A restartable init container counts in its own stage
-					and all later stages. Vector adds Pod overhead in either case.
-
-					Vector rounds CPU up to whole millicores and memory up to whole bytes before summing.
-					It omits a field if all values are missing, a contributing quantity is invalid, or the
-					result exceeds `2^63 - 1`.
+					Vector will enrich data with Kubernetes context. A comprehensive
+					list of fields can be found in the
+					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output-types).
 					"""
 		}
 

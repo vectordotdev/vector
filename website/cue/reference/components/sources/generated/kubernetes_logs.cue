@@ -305,21 +305,9 @@ generated: components: sources: kubernetes_logs: configuration: {
 		type: bool: default: true
 	}
 	pod_annotation_fields: {
-		description: """
-			Field paths for Pod and container metadata in legacy logs.
-
-			With log namespacing enabled, Vector writes available metadata under `%kubernetes_logs`.
-			"""
-		required: false
+		description: "Configuration for how the events are enriched with Pod metadata."
+		required:    false
 		type: object: options: {
-			container_cpu_request_millicores: {
-				description: "Set this path to include the container's CPU request (millicores) in legacy logs."
-				required:    false
-				type: string: {
-					default: ""
-					examples: ["kubernetes.container_cpu_request_millicores"]
-				}
-			}
 			container_id: {
 				description: """
 					Event field for the Container's ID.
@@ -356,14 +344,6 @@ generated: components: sources: kubernetes_logs: configuration: {
 					examples: [".k8s.container_image_id", "k8s.container_image_id", ""]
 				}
 			}
-			container_memory_request_bytes: {
-				description: "Set this path to include the container's memory request (bytes) in legacy logs."
-				required:    false
-				type: string: {
-					default: ""
-					examples: ["kubernetes.container_memory_request_bytes"]
-				}
-			}
 			container_name: {
 				description: """
 					Event field for the Container's name.
@@ -389,8 +369,11 @@ generated: components: sources: kubernetes_logs: configuration: {
 				}
 			}
 			pod_cpu_request_millicores: {
-				description: "Set this path to include the Pod's effective CPU request (millicores) in legacy logs."
-				required:    false
+				description: """
+					Set this path to include the Pod's effective CPU request (millicores) in legacy logs.
+					With log namespacing, the request is available in `%kubernetes_logs`.
+					"""
+				required: false
 				type: string: {
 					default: ""
 					examples: ["kubernetes.pod_cpu_request_millicores"]
@@ -433,8 +416,11 @@ generated: components: sources: kubernetes_logs: configuration: {
 				}
 			}
 			pod_memory_request_bytes: {
-				description: "Set this path to include the Pod's effective memory request (bytes) in legacy logs."
-				required:    false
+				description: """
+					Set this path to include the Pod's effective memory request (bytes) in legacy logs.
+					With log namespacing, the request is available in `%kubernetes_logs`.
+					"""
+				required: false
 				type: string: {
 					default: ""
 					examples: ["kubernetes.pod_memory_request_bytes"]
