@@ -107,10 +107,7 @@ pub trait RequestBuilder<Input> {
         // of clash-y with `Self::Metadata`.
         let mut compressor = Compressor::from(self.compression());
         let is_compressed = compressor.is_compressed();
-        let (_, json_size) = self
-            .encoder()
-            .encode_input(events, &mut compressor)
-            .map_err(|error| PreparationError::Permanent(error.into()))?;
+        let (_, json_size) = encode_to_writer(self.encoder(), events, &mut compressor)?;
 
         let payload = compressor
             .finish()
@@ -134,6 +131,49 @@ pub trait RequestBuilder<Input> {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request;
+}
+
+fn encode_to_writer<T, E: From<io::Error>>(
+    encoder: &impl Encoder<T>,
+    events: T,
+    writer: &mut dyn io::Write,
+) -> Result<(usize, GroupedCountByteSize), PreparationError<E>> {
+    encoder
+        .encode_input(events, &mut EncodeWriter(writer))
+        .map_err(|error| match error.downcast::<OutputWriteError>() {
+            Ok(error) => PreparationError::Transient(error.source.into()),
+            Err(error) => PreparationError::Permanent(error.into()),
+        })
+}
+
+/// Tags writer errors so they can be distinguished from serialization errors.
+struct EncodeWriter<'a>(&'a mut dyn io::Write);
+
+#[derive(Debug, snafu::Snafu)]
+#[snafu(display("{source}"))]
+struct OutputWriteError {
+    source: io::Error,
+}
+
+impl OutputWriteError {
+    fn wrap(source: io::Error) -> io::Error {
+        io::Error::new(source.kind(), Self { source })
+    }
+}
+
+impl io::Write for EncodeWriter<'_> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        #[allow(clippy::disallowed_methods)] // Forward short writes to the caller.
+        self.0.write(buf).map_err(OutputWriteError::wrap)
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.0.write_all(buf).map_err(OutputWriteError::wrap)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush().map_err(OutputWriteError::wrap)
+    }
 }
 
 /// One output of incremental encoding, with the finalizers for exactly those events.
@@ -173,4 +213,81 @@ pub trait IncrementalRequestBuilder<Input> {
         finalizers: EventFinalizers,
         payload: Self::Payload,
     ) -> Self::Request;
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use serde::Serialize;
+    use vector_lib::{
+        config::telemetry,
+        event::{BatchNotifier, BatchStatus, EventFinalizer},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn encoding_distinguishes_serialization_and_writer_failures() {
+        struct JsonEncoder;
+
+        impl<T: Serialize> Encoder<T> for JsonEncoder {
+            fn encode_input(
+                &self,
+                input: T,
+                writer: &mut dyn io::Write,
+            ) -> io::Result<(usize, GroupedCountByteSize)> {
+                serde_json::to_writer(writer, &input)?;
+                Ok((0, telemetry().create_request_count_byte_size()))
+            }
+        }
+
+        #[derive(Default)]
+        struct FailingWriter {
+            bytes_written: usize,
+        }
+
+        impl io::Write for FailingWriter {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                if buf.is_empty() {
+                    return Ok(0);
+                }
+                if self.bytes_written != 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "compressor write failed",
+                    ));
+                }
+                self.bytes_written = 1;
+                Ok(1)
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut writer = FailingWriter::default();
+        let write_failure =
+            encode_to_writer::<_, io::Error>(&JsonEncoder, 123, &mut writer).unwrap_err();
+        assert_eq!(writer.bytes_written, 1);
+
+        let invalid_json = BTreeMap::from([((1, 2), 3)]);
+        let serialize_failure =
+            encode_to_writer::<_, io::Error>(&JsonEncoder, invalid_json, &mut io::sink())
+                .unwrap_err();
+
+        for (failure, expected) in [
+            (write_failure, BatchStatus::Errored),
+            (serialize_failure, BatchStatus::Rejected),
+        ] {
+            let (notifier, status) = BatchNotifier::new_with_receiver();
+            let finalizers = EventFinalizers::new(EventFinalizer::new(notifier));
+            let error = failure.record_failure(&finalizers);
+            drop(finalizers);
+
+            assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+            assert_eq!(status.await, expected);
+        }
+    }
 }
