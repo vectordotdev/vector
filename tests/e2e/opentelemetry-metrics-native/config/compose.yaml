@@ -2,7 +2,7 @@ name: opentelemetry-vector-native-e2e
 services:
   otel-collector-source:
     container_name: otel-collector-source-native
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
+    image: &collector_image otel/opentelemetry-collector-contrib:0.159.0@sha256:1f2c54a30e713fac6b3ae77a1ec84010c2007e29ced8ec666214fc2f6739c1cc
     init: true
     volumes:
       - type: bind
@@ -83,7 +83,7 @@ services:
       context: ../../../..
       dockerfile: ./tests/e2e/opentelemetry-common/collector.Dockerfile
       args:
-        CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
+        COLLECTOR_IMAGE: *collector_image
     init: true
     user: "0:0" # test only, override special user with root
     # Wipe stale output before starting: the file exporter appends and the
