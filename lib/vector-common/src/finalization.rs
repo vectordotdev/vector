@@ -478,15 +478,17 @@ impl<T: MergeFinalizable> GroupedFinalizable for T {
 
 impl<T: Finalizable> Finalizable for Option<T> {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        self.as_mut()
-            .map(Finalizable::take_finalizers)
-            .unwrap_or_default()
+        match self {
+            Some(item) => item.take_finalizers(),
+            None => EventFinalizers::default(),
+        }
     }
 
     fn take_finalizer_groups(&mut self) -> EventFinalizerGroups {
-        self.as_mut()
-            .map(Finalizable::take_finalizer_groups)
-            .unwrap_or_default()
+        match self {
+            Some(item) => item.take_finalizer_groups(),
+            None => EventFinalizerGroups::default(),
+        }
     }
 }
 
