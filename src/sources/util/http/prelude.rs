@@ -35,6 +35,15 @@ use crate::{
 };
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
+    /// Build an optional CORS policy before starting the HTTP listener.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the CORS configuration is invalid.
+    fn cors(&self, _method: HttpMethod) -> crate::Result<Option<warp::cors::Cors>> {
+        Ok(None)
+    }
+
     // This function can be defined to enrich events with additional HTTP
     // metadata. This function should be used rather than internal enrichment so
     // that accurate byte count metrics can be emitted.
@@ -150,6 +159,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             return Err(TlsError::ReloaderWithoutTls.into());
         }
         let protocol = tls.http_protocol_name();
+        let cors = self.cors(method)?;
         let auth_matcher = auth
             .map(|a| a.build(&cx.enrichment_tables, &cx.metrics_storage))
             .transpose()?;
@@ -293,6 +303,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 remote_addr,
                             )
                         }))
+                        .option_layer(cors.clone().map(super::cors::CorsLayer))
                         .map_request(move |mut request: http::Request<_>| {
                             request.extensions_mut().insert(PeerAddr::new(remote_addr));
 

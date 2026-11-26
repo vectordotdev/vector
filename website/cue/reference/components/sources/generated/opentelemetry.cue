@@ -111,6 +111,16 @@ generated: components: sources: opentelemetry: configuration: {
 					required: true
 					type: string: examples: ["0.0.0.0:4318", "localhost:4318"]
 				}
+				cors: {
+					description: """
+						Cross-origin resource sharing (CORS) configuration.
+
+						Omit this block to disable CORS. Preflight requests do not generate events.
+						CORS is not authentication; use authentication and TLS to protect the endpoint.
+						"""
+					required: false
+					type:     _schemaDefinitions["core::option::Option<vector::sources::util::http::cors::CorsConfig>"]
+				}
 				headers: {
 					description: """
 						A list of HTTP headers to include in the event.

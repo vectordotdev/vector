@@ -74,11 +74,13 @@ pub(crate) fn middleware_error_response(error: MiddlewareError) -> Response {
     warp::reply::with_status(response, status).into_response()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_http_server(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
     tls_reloader: Option<TlsAcceptorReloader>,
     filters: BoxedFilter<(Response,)>,
+    cors: Option<warp::cors::Cors>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
     request_control: RequestControlLayer<
@@ -110,6 +112,10 @@ pub(crate) async fn run_http_server(
                         conn.peer_addr(),
                     )
                 }))
+                .option_layer(
+                    cors.clone()
+                        .map(crate::sources::util::http::cors::CorsLayer),
+                )
                 .service(admitted.clone())
         },
     )
@@ -503,5 +509,63 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
             reply,
             StatusCode::INTERNAL_SERVER_ERROR,
         ))
+    }
+}
+
+#[cfg(test)]
+mod cors_tests {
+    use crate::sources::{
+        opentelemetry::request_control::RequestControl,
+        util::http::cors::{CorsConfig, CorsLayer},
+    };
+    use http::{Method, Request, header};
+    use std::convert::Infallible;
+    use tower::{Layer, ServiceExt, service_fn};
+    use warp::Reply;
+
+    #[tokio::test]
+    async fn cors_preflights_bypass_exhausted_otlp_admission() {
+        let origin = "https://app.example.com";
+        let config = CorsConfig {
+            allowed_origins: vec![origin.into()],
+            allowed_headers: vec![],
+            max_age_secs: None,
+        };
+        let inner = service_fn(|_: Request<()>| async {
+            Ok::<_, Infallible>(warp::reply().into_response())
+        });
+        // No permits models a source whose ingestion slots are all occupied.
+        let admission =
+            RequestControl::new(Some(0), None).http_layer(super::middleware_error_response);
+        let service = CorsLayer(config.build(Method::POST).unwrap()).layer(admission.layer(inner));
+        let response = service
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::OPTIONS)
+                    .header(header::ORIGIN, origin)
+                    .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                    .body(())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+
+        let response = service
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .header(header::ORIGIN, origin)
+                    .body(())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), http::StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            response.headers()[header::ACCESS_CONTROL_ALLOW_ORIGIN],
+            origin
+        );
     }
 }

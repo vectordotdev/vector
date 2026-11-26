@@ -1591,6 +1591,7 @@ fn get_source_config_with_headers(
             keepalive: GrpcKeepaliveConfig::default(),
         },
         http: HttpConfig {
+            cors: None,
             address: http_addr,
             tls: Option::default(),
             keepalive: KeepaliveConfig::default(),
@@ -2040,6 +2041,7 @@ async fn build_otlp_test_env_with(
             keepalive: GrpcKeepaliveConfig::default(),
         },
         http: HttpConfig {
+            cors: None,
             address: http_addr,
             tls: Option::default(),
             keepalive: KeepaliveConfig::default(),
@@ -2148,6 +2150,7 @@ async fn http_logs_preserve_otlp_emits_metric() {
             keepalive: GrpcKeepaliveConfig::default(),
         },
         http: HttpConfig {
+            cors: None,
             address: http_addr,
             tls: Option::default(),
             keepalive: KeepaliveConfig::default(),
@@ -2390,6 +2393,7 @@ mod otlp_decoding_config_tests {
                 keepalive: GrpcKeepaliveConfig::default(),
             },
             http: HttpConfig {
+                cors: None,
                 address: "0.0.0.0:4318".parse().unwrap(),
                 tls: None,
                 keepalive: KeepaliveConfig::default(),
@@ -2440,6 +2444,7 @@ mod otlp_decoding_config_tests {
                 keepalive: GrpcKeepaliveConfig::default(),
             },
             http: HttpConfig {
+                cors: None,
                 address: "0.0.0.0:4318".parse().unwrap(),
                 tls: None,
                 keepalive: KeepaliveConfig::default(),
@@ -2487,6 +2492,7 @@ mod otlp_decoding_config_tests {
                 keepalive: GrpcKeepaliveConfig::default(),
             },
             http: HttpConfig {
+                cors: None,
                 address: "0.0.0.0:4318".parse().unwrap(),
                 tls: None,
                 keepalive: KeepaliveConfig::default(),
