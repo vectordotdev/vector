@@ -37,7 +37,7 @@ test = []
 tokenize = []
 
 [dependencies]
-async-compression.workspace = true
+async-compression = { workspace = true, features = ["zstd"] }
 flate2.workspace = true
 zstd.workspace = true
 async-stream = "0.3.6"
