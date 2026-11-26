@@ -50,8 +50,7 @@ cfg_if::cfg_if! {
             checkpoint::Checkpointer,
             error::WindowsEventLogError,
             parser::EventLogParser,
-            subscription::{EventLogSubscription, WaitResult},
-            xml_parser::WindowsEvent,
+            subscription::{EventLogSubscription, SubscribedEvent, WaitResult},
         };
     }
 }
@@ -171,7 +170,7 @@ impl Finalizer {
 /// logic. Returns `true` if the downstream pipeline closed and the caller
 /// should break out of the main event loop.
 async fn process_event_batch(
-    events: Vec<WindowsEvent>,
+    events: Vec<SubscribedEvent>,
     parser: &EventLogParser,
     log_namespace: LogNamespace,
     acknowledgements: bool,
@@ -191,9 +190,14 @@ async fn process_event_batch(
     let mut total_byte_size = 0usize;
     let mut channels_in_batch = std::collections::HashSet::new();
 
-    for event in events {
+    for SubscribedEvent {
+        event,
+        subscription_channel,
+    } in events
+    {
+        // Forwarded events can retain a different channel in their XML.
+        channels_in_batch.insert(subscription_channel);
         let channel = event.channel.clone();
-        channels_in_batch.insert(channel.clone());
         let event_id = event.event_id;
         match parser.parse_event(event) {
             Ok(mut log_event) => {
