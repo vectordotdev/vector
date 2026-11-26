@@ -1,6 +1,6 @@
 //! [`Glob`] based paths provider implementation.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use file_source_common::internal_events::FileSourceInternalEvents;
 pub use glob::MatchOptions;
@@ -29,6 +29,19 @@ pub trait PathsProvider {
 
     /// Provides a set of paths.
     fn paths(&self) -> Self::IntoIter;
+
+    /// Optionally orders rotations within one logical file sequence.
+    fn file_ordering(&self, _path: &Path) -> Option<FileOrdering> {
+        None
+    }
+}
+
+/// Files in one sequence are read in order while other sequences share read time.
+pub struct FileOrdering {
+    /// Stable identity shared by the current file and its rotations.
+    pub group: PathBuf,
+    /// Rotation sequence, ordered ascending. `None` identifies the current file.
+    pub rotation: Option<String>,
 }
 
 /// A glob-based path provider.

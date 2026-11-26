@@ -4573,6 +4573,7 @@ dependencies = [
  "futures-util",
  "glob",
  "indexmap 2.14.2",
+ "libc",
  "quickcheck",
  "tempfile",
  "tokio",
