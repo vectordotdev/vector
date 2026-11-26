@@ -5,12 +5,12 @@
 //!
 //! [remote_write]: https://prometheus.io/docs/concepts/remote_write_spec/
 
+#[cfg(test)]
 use vector_lib::event::Metric;
 
-use crate::sinks::{
-    prelude::*,
-    util::buffer::metrics::{MetricNormalize, MetricSet},
-};
+#[cfg(test)]
+use crate::sinks::prelude::*;
+use crate::sinks::util::Compression;
 
 mod config;
 mod request_builder;
@@ -38,11 +38,5 @@ struct PartitionKey {
     tenant_id: Option<String>,
 }
 
-#[derive(Default)]
-pub struct PrometheusMetricNormalize;
-
-impl MetricNormalize for PrometheusMetricNormalize {
-    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        state.make_absolute(metric)
-    }
-}
+mod normalize;
+pub use self::normalize::PrometheusMetricNormalize;

@@ -181,9 +181,17 @@ where
         let service = self.service;
         let expire_metrics_secs = self.expire_metrics_secs;
 
-        input
-            .filter_map(|event| future::ready(event.try_into_metric()))
-            .normalized_with_ttl::<PrometheusMetricNormalize>(expire_metrics_secs)
+        let metrics = input.filter_map(|event| future::ready(event.try_into_metric()));
+        let normalizer = PrometheusMetricNormalize::new(self.buckets.clone());
+        let metrics = match expire_metrics_secs
+            .and_then(|secs| std::time::Duration::try_from_secs_f64(secs).ok())
+            .filter(|ttl| !ttl.is_zero())
+        {
+            Some(ttl) => crate::sinks::util::Normalizer::new_with_ttl(metrics, normalizer, ttl),
+            None => crate::sinks::util::Normalizer::new(metrics, normalizer),
+        };
+
+        metrics
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })
