@@ -10,6 +10,10 @@ pub(super) struct IggyRequest {
     pub(super) payloads: Vec<Bytes>,
     finalizers: EventFinalizers,
     pub(super) metadata: RequestMetadata,
+    /// Payloads the broker has confirmed or that are proven delivered. The
+    /// retry layer clones the request, so the cursor is shared and a resend
+    /// skips the chunks the SDK already committed.
+    pub(super) sent: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl Finalizable for IggyRequest {
@@ -108,5 +112,6 @@ pub(super) fn request_builder(
         payloads: result.into_payload(),
         finalizers,
         metadata,
+        sent: std::sync::Arc::default(),
     })
 }
