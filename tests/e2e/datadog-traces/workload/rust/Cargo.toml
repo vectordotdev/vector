@@ -1,0 +1,17 @@
+[package]
+name = "inventory"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Standalone: not part of Vector's workspace.
+[workspace]
+
+[dependencies]
+datadog-opentelemetry = "=0.6.0"
+opentelemetry = { version = "=0.33.0", features = ["trace"] }
+opentelemetry-http = "=0.33.0"
+http-body-util = "=0.1.5"
+hyper = { version = "=1.12.0", features = ["server", "http1"] }
+hyper-util = { version = "=0.1.21", features = ["tokio"] }
+tokio = { version = "=1.54.1", features = ["rt-multi-thread", "macros", "net", "signal"] }

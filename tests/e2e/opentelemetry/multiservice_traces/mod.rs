@@ -234,12 +234,6 @@ fn read_capture(directory: &Path, name: &str) -> Result<ExportTraceServiceReques
 }
 
 fn validate_captures(directory: &Path, transport: &str) -> Result<(), String> {
-    if !directory.join("capture-complete").exists() {
-        return Err(
-            "Captures were not finalized; run cargo vdev e2e run opentelemetry-traces-multiservice"
-                .into(),
-        );
-    }
     let input = read_capture(directory, "input.jsonl")?;
     let input_coverage = Coverage::new(&input);
     fs::write(
@@ -341,7 +335,7 @@ mod tests {
     }
 
     #[test]
-    fn finalized_captures_can_be_validated_repeatedly() {
+    fn captures_can_be_validated_repeatedly() {
         let directory = tempfile::tempdir().unwrap();
         let resources: Vec<_> = REQUIRED_SERVICES.iter().enumerate().map(|(index, name)| {
             serde_json::json!({
@@ -358,8 +352,6 @@ mod tests {
         for name in ["input.jsonl", "output.jsonl"] {
             fs::write(directory.path().join(name), &capture).unwrap();
         }
-        assert!(validate_captures(directory.path(), "HTTP").is_err());
-        fs::write(directory.path().join("capture-complete"), "").unwrap();
         assert!(validate_captures(directory.path(), "HTTP").is_ok());
         assert!(validate_captures(directory.path(), "HTTP").is_ok());
         fs::write(directory.path().join("drain-timeout"), "").unwrap();

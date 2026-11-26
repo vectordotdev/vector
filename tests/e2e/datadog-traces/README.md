@@ -11,7 +11,7 @@ OTLP.
 
 ```mermaid
 flowchart TB
-    app["Checkout app<br/><br/>3 services, 3 native tracers<br/>Python, Node, Go<br/>6 checkouts, ~114 spans / run<br/>errors, links, events"] --> agent["Datadog Agent<br/>7.84.6"]
+    app["Checkout app<br/><br/>3 services, 3 native tracers<br/>Python, Node, Rust<br/>6 checkouts, ~114 spans / run<br/>errors, links, events"] --> agent["Datadog Agent<br/>7.84.6"]
     agent -->|"apm_dd_url"| input
     agent -->|"additional_endpoints"| vector
     subgraph vector["Vector"]
@@ -41,7 +41,7 @@ flowchart TB
 ```
 
 - [Workload](workload): three small services instrumented with pinned native tracers
-  (ddtrace 4.16.0, dd-trace-js 6.21.0, dd-trace-go 2.11.2). The client sends six
+  (ddtrace 4.16.0, dd-trace-js 6.21.0, dd-trace-rs `datadog-opentelemetry` 0.6.0). The client sends six
   checkouts and exits.
 - [Agent config](data/agent.yaml): the Agent sends the same payload body to both
   endpoints, so `fakeintake-agent` records exactly what Vector received.
@@ -54,11 +54,12 @@ flowchart TB
 
 Compose starts the tracers only after the Agent answers `/info`, and the client only
 after the frontend and both downstream services accept connections. When the client
-exits, [finalize.py](data/finalize.py) stops the services in order. Each tracer flushes
-on stop, then the Agent flushes to both endpoints, then Vector drains its sink. Any
-unclean exit fails the run, and so does Vector logging a graceful-shutdown timeout,
-because it exits 0 in that case. Rust then reads the still-running fakeintakes, so `vdev
-e2e test` can be rerun against the same captures.
+exits, vdev runs the `lifecycle` steps in [test.yaml](config/test.yaml): it stops the
+services in order. Each tracer flushes on stop, then the Agent flushes to both
+endpoints, then Vector drains its sink. Any unclean exit fails the run, and so does
+Vector logging a graceful-shutdown timeout, because it exits 0 in that case. Rust then
+reads the still-running fakeintakes, so `vdev e2e test` can be rerun against the same
+captures.
 
 ## Validations
 
@@ -109,11 +110,9 @@ The merge queue runs it automatically when the paths in
 - Span-level only: Agent envelope, tracer payload and chunk fields are not compared yet.
   The current relay rewrites some of them, such as tracer payload `env` and merged tags.
 - Indexed payloads: Agent 7.84+ sends them by default and Vector drops them, so the
-  Agent sets `disable-convert-traces`. dd-trace-go v2 sends `/v1.0/traces`, which the
-  Agent always forwards as indexed payloads, so the Go service is pinned to protocol
-  0.4.
+  Agent sets `disable-convert-traces`.
 - Native span events come only from Python: Agent 7.84.6 rejects native span events from
   dd-trace-js 6.21.0.
 - APM stats are not compared.
-- Only top-level Python and Node dependencies are pinned, so transitive versions can
+- Only direct Python, Node and Rust dependencies are pinned, so transitive versions can
   change between image builds.

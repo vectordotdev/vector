@@ -794,32 +794,22 @@ services:
         condition: service_healthy
     volumes:
       - "../data/vector.yaml:/etc/vector/vector.yaml:ro"
-  finalize-captures:
+  # Run by vdev's lifecycle after Vector stops; profiles keep `up` from starting it.
+  drain-check:
     # Reuse the demo's pinned Python runtime without starting Locust.
     image: ghcr.io/open-telemetry/demo:3.1.0-load-generator
-    entrypoint: ["python", "/usr/src/app/finalize.py"]
+    profiles: [lifecycle]
+    entrypoint: ["python", "/usr/src/app/drain_check.py"]
     environment:
       - CONFIG_INGRESS_EXPORTER=${CONFIG_INGRESS_EXPORTER}
-      - VECTOR_NETWORK=${VECTOR_NETWORK}
-    depends_on:
-      load-generator:
-        condition: service_completed_successfully
     volumes:
-      - "../data/finalize.py:/usr/src/app/finalize.py:ro"
-      - "${DOCKER_SOCKET}:/var/run/docker.sock"
+      - "../data/drain_check.py:/usr/src/app/drain_check.py:ro"
       - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
-  # Wait for finalized captures and stay running so vdev does not restart the workload.
+  # Stays running after the lifecycle stops every other service, so vdev still sees the
+  # environment as up and `vdev e2e test` can be rerun against the captures.
   demo-ready:
     image: alpine:3.20
-    command:
-      - sh
-      - "-c"
-      - test -f /output/opentelemetry-traces-multiservice/${CONFIG_INGRESS_EXPORTER}/capture-complete && exec sleep infinity
-    depends_on:
-      finalize-captures:
-        condition: service_completed_successfully
-    volumes:
-      - opentelemetry_traces_multiservice_evidence:/output/opentelemetry-traces-multiservice
+    command: ["sleep", "infinity"]
 volumes:
   opentelemetry_traces_multiservice_evidence:
     external: true

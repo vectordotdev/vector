@@ -30,6 +30,23 @@ cargo vdev e2e stop NAME [ENVIRONMENT]
 
 If no environment is named for the `test` and `stop` subcommands, all active environments are used.
 
+## Lifecycle steps
+
+A test whose validation needs complete captures can declare `lifecycle.before_validation` in its
+`test.yaml`. vdev runs the steps in order once per `start`, after `compose up`, and `test` refuses
+to run against an environment whose lifecycle did not complete. Each step is a single-key map:
+
+- `wait_for_success: {service, timeout_secs}`: wait for a one-shot service to exit 0.
+- `sleep_secs: N`: pause, for consumers with no observable completion signal.
+- `stop: {services | labels, timeout_secs, require_success, reject_log_messages}`: stop a group
+  of containers together, then fail on a non-zero exit, an OOM kill (unless
+  `require_success: false`), or any of the rejected log messages.
+- `run: {service, timeout_secs}`: run a compose service, usually kept out of `up` with
+  `profiles`, to a successful exit.
+
+See [datadog-traces](datadog-traces/config/test.yaml) and
+[opentelemetry-traces-multiservice](opentelemetry-traces-multiservice/config/test.yaml).
+
 ## E2E vs Integration Tests
 
 The end-to-end (E2E) tests are black box tests that spin up a full Vector instance as one of the
