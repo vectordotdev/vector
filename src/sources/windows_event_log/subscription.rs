@@ -1375,7 +1375,8 @@ mod tests {
         let tolerance = chrono::Duration::seconds(5);
         let earliest_allowed = subscription_start_time - tolerance;
 
-        for event in &events {
+        for subscribed_event in &events {
+            let event = &subscribed_event.event;
             assert!(
                 event.time_created >= earliest_allowed,
                 "Event timestamp {} is before subscription start time {subscription_start_time} (minus tolerance). \
