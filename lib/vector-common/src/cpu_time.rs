@@ -43,6 +43,7 @@ use std::{
 use futures::future::Either;
 use metrics::Counter;
 use pin_project::pin_project;
+use tracing::Instrument;
 
 thread_local! {
     static CURRENT_COUNTER: RefCell<Option<Counter>> = const { RefCell::new(None) };
@@ -439,6 +440,35 @@ where
     F::Output: Send + 'static,
 {
     tokio::spawn(inherit_cpu_timer(future))
+}
+
+/// Extension trait that spawns a future into a [`JoinSet`] the way [`spawn_timed`] spawns a
+/// standalone task: in the current tracing span, charging its CPU time to the [current
+/// counter](current_counter), if any.
+///
+/// ```ignore
+/// let mut tasks = JoinSet::new();
+/// tasks.spawn_timed(async move { /* work */ });
+/// ```
+///
+/// Use this instead of [`spawn_timed`] when the tasks must be owned by a [`JoinSet`], e.g. so
+/// that dropping the set aborts them, or to join them and observe their panics.
+pub trait SpawnTimedExt<T> {
+    /// Spawns `future` into this set, attaching the current tracing span and charging its CPU
+    /// time to the [current counter](current_counter), if any. Returns the task's
+    /// [`AbortHandle`](tokio::task::AbortHandle), like [`JoinSet::spawn`].
+    fn spawn_timed<F>(&mut self, future: F) -> tokio::task::AbortHandle
+    where
+        F: Future<Output = T> + Send + 'static;
+}
+
+impl<T: Send + 'static> SpawnTimedExt<T> for tokio::task::JoinSet<T> {
+    fn spawn_timed<F>(&mut self, future: F) -> tokio::task::AbortHandle
+    where
+        F: Future<Output = T> + Send + 'static,
+    {
+        self.spawn(inherit_cpu_timer(future).in_current_span())
+    }
 }
 
 /// Registers the `component_cpu_usage_ns_total` counter for the calling
