@@ -29,6 +29,7 @@ sinks:
   - nats
   - new_relic_logs
   - new_relic
+  - opsimate
   - papertrail
   - postgres
   - prometheus_exporter
