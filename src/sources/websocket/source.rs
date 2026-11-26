@@ -427,7 +427,7 @@ impl WebSocketSource {
                         event
                             .value()
                             .get(&replay_config.message_id_path)
-                            .filter(|value| matches!(value, Value::Bytes(_) | Value::String(_))
+                            .filter(|value| matches!(value, Value::Bytes(_) | Value::String(_)))
                             .or_else(|| {
                                 event
                                     .get_message()
