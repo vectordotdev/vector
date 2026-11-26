@@ -139,7 +139,6 @@ mod statsd_sink;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
 mod tcp;
-mod template;
 #[cfg(feature = "transforms-throttle")]
 mod throttle;
 mod udp;
@@ -310,5 +309,6 @@ pub(crate) use self::windows::*;
 pub(crate) use self::windows_event_log::*;
 pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
-    heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
+    heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, udp::*,
 };
+pub use vector_lib::template::internal_event::TemplateRenderingError;

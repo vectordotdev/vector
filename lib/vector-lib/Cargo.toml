@@ -23,6 +23,7 @@ vector-core = { path = "../vector-core", default-features = false }
 vector-lookup = { path = "../vector-lookup", features = ["test"] }
 vector-stream = { path = "../vector-stream" }
 vector-tap = { path = "../vector-tap" }
+vector-template = { path = "../vector-template" }
 vector-top = { path = "../vector-top", optional = true }
 vrl.workspace = true
 

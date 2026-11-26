@@ -1,0 +1,32 @@
+[package]
+name = "vector-template"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+bytes.workspace = true
+chrono.workspace = true
+derivative.workspace = true
+derive_more.workspace = true
+http = { version = "1.0", default-features = false, features = ["std"] }
+lookup = { package = "vector-lookup", path = "../vector-lookup" }
+metrics.workspace = true
+regex.workspace = true
+serde.workspace = true
+snafu.workspace = true
+tracing.workspace = true
+vector-common = { path = "../vector-common" }
+vector-config = { path = "../vector-config" }
+vector-core = { path = "../vector-core" }
+
+[dev-dependencies]
+chrono-tz.workspace = true
+rstest = { version = "0.26.1" }
+serde_json.workspace = true
+vector-core = { path = "../vector-core", features = ["test"] }
+vrl.workspace = true
