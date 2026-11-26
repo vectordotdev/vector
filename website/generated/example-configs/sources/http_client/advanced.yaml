@@ -21,5 +21,7 @@ sources:
       start_time:
         type: vrl
         value: now()
+    redirects:
+      follow: true
     scrape_interval_secs: 15
     scrape_timeout_secs: 5.0
