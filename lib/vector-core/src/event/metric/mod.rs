@@ -301,9 +301,11 @@ impl Metric {
         }
     }
 
-    /// Creates a new metric from components specific to a metric emitted by `metrics`.
+    /// Creates a new absolute metric in the `vector` namespace from a `metrics` key, using its
+    /// name and labels as the metric's name and tags.
     #[allow(clippy::cast_precision_loss)]
-    pub(crate) fn from_metric_kv(
+    #[must_use]
+    pub fn from_metric_kv(
         key: &metrics::Key,
         value: MetricValue,
         timestamp: DateTime<Utc>,

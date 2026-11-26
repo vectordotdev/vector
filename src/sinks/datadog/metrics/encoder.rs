@@ -803,7 +803,7 @@ fn source_type_to_service(source_type: &str) -> Option<u32> {
         "aws_ecs_metrics" => Some(209),
         "eventstoredb_metrics" => Some(210),
         "host_metrics" => Some(211),
-        "internal_metrics" => Some(212),
+        "internal_metrics" => Some(DatadogMetricOriginMetadata::SERVICE_INTERNAL_METRICS),
         "mongodb_metrics" => Some(111),
         "nginx_metrics" => Some(117),
         "open_telemetry" => Some(213),
