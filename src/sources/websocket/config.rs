@@ -236,8 +236,8 @@ impl SourceConfig for WebSocketConfig {
                 .any(|(name, _)| name == LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME)
         {
             return Err(format!(
-                "Found forbidden query param '{}' found in connection URI. This query param is used for replay option."
-            , LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME).into());
+                "Found forbidden query param '{LAST_RECEIVED_MESSAGE_ID_QUERY_PARAM_NAME}' found in connection URI. This query param is used for replay option."
+            ).into());
         }
         let headers = WebSocketConnector::parse_headers(&self.common.headers)?;
         let connector =
