@@ -657,30 +657,36 @@ fn resolve_top_level_config_fields(
         anyhow::bail!("ConfigBuilder allOf schemas are empty");
     }
 
-    let mut all_properties: IndexMap<String, Value> = IndexMap::new();
+    let mut all_properties: IndexMap<&String, (&Value, &Value)> = IndexMap::new();
     for subschema in all_of {
         if let Some(props) = subschema.get("properties").and_then(Value::as_object) {
             for (k, v) in props {
-                all_properties.insert(k.clone(), v.clone());
+                all_properties.insert(k, (subschema, v));
             }
         }
     }
 
     let mut resolved_fields = serde_json::Map::new();
-    for (field_name, field_schema) in all_properties {
-        if super::schema::get_schema_metadata(&field_schema, "docs::hidden").is_some() {
+    for (field_name, (parent_schema, field_schema)) in all_properties {
+        if super::schema::get_schema_metadata(field_schema, "docs::hidden").is_some() {
             debug!("Skipping '{field_name}' (marked as docs::hidden)");
             continue;
         }
 
-        let mut resolved = context.resolve_schema(&field_schema)?;
+        let mut resolved = context.resolve_schema(field_schema)?;
         if !resolved.is_object() {
             continue;
         }
+        context.apply_object_property_fields(
+            parent_schema,
+            field_schema,
+            field_name,
+            &mut resolved,
+        );
 
         let group = TOP_LEVEL_FIELD_GROUPS
             .iter()
-            .find(|(name, _)| *name == field_name)
+            .find(|(name, _)| name == field_name)
             .map_or("global_options", |(_, g)| *g);
 
         resolved
@@ -688,7 +694,7 @@ fn resolve_top_level_config_fields(
             .unwrap()
             .insert("group".to_string(), Value::String(group.to_string()));
 
-        resolved_fields.insert(field_name, resolved);
+        resolved_fields.insert(field_name.clone(), resolved);
     }
     Ok(resolved_fields)
 }

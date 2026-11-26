@@ -113,7 +113,7 @@ With Docker available, run both transports:
 cargo vdev e2e run opentelemetry-traces-multiservice --always-show-logs
 ```
 
-To run one transport, add `-e 0.159.0-otlphttp` (HTTP) or `-e 0.159.0-otlp` (gRPC).
+To run one transport, add `-e otlphttp` (HTTP) or `-e otlp` (gRPC).
 
 In CI, a Vector-team member can submit a PR review starting with
 `/ci-run-e2e-opentelemetry-traces-multiservice` to test the reviewed commit, or

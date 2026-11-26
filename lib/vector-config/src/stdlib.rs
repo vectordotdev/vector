@@ -242,12 +242,6 @@ where
     K: ConfigurableString + Ord + ToValue + 'static,
     V: Configurable + ToValue + 'static,
 {
-    fn is_optional() -> bool {
-        // A map with required fields would be... an object.  So if you want that, make a struct
-        // instead, not a map.
-        true
-    }
-
     fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
@@ -321,12 +315,6 @@ where
     K: ConfigurableString + ToValue + Hash + Eq + 'static,
     V: Configurable + ToValue + 'static,
 {
-    fn is_optional() -> bool {
-        // A map with required fields would be... an object.  So if you want that, make a struct
-        // instead, not a map.
-        true
-    }
-
     fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }

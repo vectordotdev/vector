@@ -56,6 +56,12 @@ jobs:
 
       - run: bash scripts/environment/prepare.sh --modules=rustup,datadog-ci
 
+      # Only the aws environment pulls from public.ecr.aws.
+      - uses: ./.github/actions/ecr-public-login
+        if: inputs.test_name == 'aws'
+        with:
+          role-to-assume: ${{ vars.ECR_PUBLIC_PULL_ROLE_ARN }}
+
       # Preserve the retry policy used by integration test.
       - run: cargo vdev --verbose integration run "$TEST_NAME" --retries 0
         env:

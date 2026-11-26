@@ -78,7 +78,6 @@ pub struct GlobalOptions {
     /// Setting this to "relaxed" allows configurations with wildcards that do not match any inputs
     /// to be accepted without causing an error.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::required = false))]
     pub wildcard_matching: Option<WildcardMatching>,
 
     /// Default log schema for all events.
@@ -87,7 +86,6 @@ pub struct GlobalOptions {
     /// schema, whether or not the default is used, to assign event fields on incoming events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(
-        docs::required = false,
         docs::warnings = "These settings are ignored when `schema.log_namespace` is set to `true`."
     ))]
     pub log_schema: LogSchema,
@@ -97,7 +95,6 @@ pub struct GlobalOptions {
     /// Determines whether `source` and `service` tags should be emitted with the
     /// `component_sent_*` and `component_received_*` events.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::required = false))]
     pub telemetry: Telemetry,
 
     /// The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone.
@@ -112,7 +109,6 @@ pub struct GlobalOptions {
     pub timezone: Option<TimeZone>,
 
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::required = false))]
     pub proxy: ProxyConfig,
 
     /// Controls how acknowledgements are handled for all sinks by default.
@@ -126,7 +122,6 @@ pub struct GlobalOptions {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
-    #[configurable(metadata(docs::required = false))]
     pub acknowledgements: AcknowledgementsConfig,
 
     /// The amount of time, in seconds, that internal metrics will persist after having not been
@@ -144,7 +139,6 @@ pub struct GlobalOptions {
     /// Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
     /// so metrics live long enough to be emitted and captured.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
     /// This allows configuring different expiration intervals for different metric sets.

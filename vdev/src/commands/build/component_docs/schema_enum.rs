@@ -13,6 +13,12 @@ fn is_absence_sentinel(schema: &Value) -> bool {
     !required.is_empty() && schema.get("type").is_none()
 }
 
+/// Optional wrappers encode absence as JSON `null` (a nullable property) or as the absence
+/// sentinel (a flattened optional). Neither is a documentable variant.
+fn is_absence_branch(schema: &Value) -> bool {
+    schema.get("type").and_then(Value::as_str) == Some("null") || is_absence_sentinel(schema)
+}
+
 fn enum_variant_value(ctx: &SchemaContext, schema: &Value) -> Value {
     let desc = ctx.get_rendered_description_from_schema(schema);
     // Check both the top-level `deprecated` flag (#[configurable(deprecated)]) and the
@@ -49,16 +55,9 @@ impl SchemaContext {
             ),
         };
 
-        let is_optional = get_schema_metadata(schema, "docs::optional")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false);
+        let is_optional = subschemas.iter().any(is_absence_branch);
         subschemas.retain(|sub| {
-            // Optional wrappers encode absence as JSON `null` (a nullable property) or as
-            // `not: { required: [<tag>] }` (a flattened optional). Neither is a documentable
-            // variant; drop them so the remaining schema can unwrap.
-            sub.get("type").and_then(|t| t.as_str()) != Some("null")
-                && !is_absence_sentinel(sub)
-                && get_schema_metadata(sub, "docs::hidden").is_none()
+            !is_absence_branch(sub) && get_schema_metadata(sub, "docs::hidden").is_none()
         });
 
         let subschema_count = subschemas.len();
@@ -492,8 +491,7 @@ mod tests {
             json!({ "not": { "required": ["type"] } }),
         ] {
             let schema = json!({
-                "oneOf": [absent, { "type": "string" }],
-                "_metadata": { "docs::optional": true }
+                "oneOf": [absent, { "type": "string" }]
             });
             let resolved = test_context().resolve_enum_schema(&schema).unwrap();
             assert_eq!(
@@ -536,8 +534,7 @@ mod tests {
                         "docs::enum_tag_description": "The variant to use."
                     }
                 }
-            ],
-            "_metadata": { "docs::optional": true }
+            ]
         });
         let resolved = test_context().resolve_enum_schema(&schema).unwrap();
         let options = resolved
