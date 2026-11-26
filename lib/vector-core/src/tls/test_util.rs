@@ -7,11 +7,20 @@ use openssl::{
     nid::Nid,
     pkey::{PKey, Private},
     rsa::Rsa,
-    x509::{X509, X509NameBuilder, X509Ref},
+    x509::{X509, X509NameBuilder, X509Ref, extension::SubjectAlternativeName},
 };
 
 /// Generates a self-signed certificate, valid for a day, with the given common name, and its key.
 pub(super) fn self_signed_ca(common_name: &str) -> (X509, PKey<Private>) {
+    self_signed_cert(common_name, None)
+}
+
+/// Like [`self_signed_ca`], with `ip` as its only subject alternative name.
+pub(super) fn self_signed_cert_for_ip(ip: &str) -> (X509, PKey<Private>) {
+    self_signed_cert(ip, Some(ip))
+}
+
+fn self_signed_cert(common_name: &str, ip_san: Option<&str>) -> (X509, PKey<Private>) {
     let key = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
 
     let mut name = X509NameBuilder::new().unwrap();
@@ -35,6 +44,13 @@ pub(super) fn self_signed_ca(common_name: &str) -> (X509, PKey<Private>) {
     builder
         .set_not_after(&Asn1Time::days_from_now(1).unwrap())
         .unwrap();
+    if let Some(ip) = ip_san {
+        let san = SubjectAlternativeName::new()
+            .ip(ip)
+            .build(&builder.x509v3_context(None, None))
+            .unwrap();
+        builder.append_extension(san).unwrap();
+    }
     builder.sign(&key, MessageDigest::sha256()).unwrap();
 
     (builder.build(), key)

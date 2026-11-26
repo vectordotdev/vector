@@ -301,7 +301,7 @@ impl HttpProxyConnector {
         let host = tls_host(&destination)?;
         let mut configuration = destination_tls.configure()?;
         if let Some(settings) = &tls_settings {
-            settings.apply_connect_configuration(&mut configuration, false)?;
+            settings.apply_connect_configuration(&mut configuration, host, false)?;
         }
         let ssl = configuration.into_ssl(host)?;
         let mut stream = SslStream::new(ssl, upgraded)?;
@@ -396,9 +396,10 @@ fn https_connector(
     }
     let mut https = HttpsConnector::with_connector(http, tls_builder)?;
     let settings = tls.tls().cloned();
-    https.set_callback(move |configuration, _uri| {
+    https.set_callback(move |configuration, uri| {
         if let Some(settings) = &settings {
-            settings.apply_connect_configuration(configuration, skip_server_name)?;
+            let host = uri.host().unwrap_or_default();
+            settings.apply_connect_configuration(configuration, host, skip_server_name)?;
         }
         Ok(())
     });
@@ -700,6 +701,7 @@ mod tests {
         error::Error,
         io::{self, ErrorKind},
         iter,
+        sync::{Arc, Mutex},
         time::Duration,
     };
 
@@ -707,6 +709,14 @@ mod tests {
     use http_body_util::BodyExt as _;
     use hyper_openssl::client::legacy::MaybeHttpsStream;
     use hyper_util::rt::TokioIo;
+    use openssl::{
+        asn1::Asn1Time,
+        hash::MessageDigest,
+        pkey::{PKey, Private},
+        rsa::Rsa,
+        ssl::{NameType, SslAcceptor, SslMethod},
+        x509::{X509, X509NameBuilder, extension::SubjectAlternativeName},
+    };
     use socket2::SockRef;
     use tokio::{
         io::{AsyncReadExt as _, AsyncWriteExt as _, duplex},
@@ -716,7 +726,7 @@ mod tests {
     use tower::Service as _;
     use vector_core::{
         config::proxy::ProxyConfig,
-        tls::{MaybeTls, MaybeTlsSettings},
+        tls::{MaybeTls, MaybeTlsSettings, TlsConfig, TlsSettings},
     };
 
     use super::{MaxAgeIo, Route, RoutePlanner, connect_authority, https_connector, tls_host};
@@ -888,6 +898,71 @@ mod tests {
             !client_hello.is_empty(),
             "the client should have started the TLS handshake"
         );
+    }
+
+    /// Generates a self-signed certificate whose only subject alternative name is `ip`, and its key.
+    fn self_signed_cert_for_ip(ip: &str) -> (X509, PKey<Private>) {
+        let key = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+        let mut name = X509NameBuilder::new().unwrap();
+        name.append_entry_by_text("CN", ip).unwrap();
+        let name = name.build();
+        let mut builder = X509::builder().unwrap();
+        builder.set_version(2).unwrap();
+        builder.set_subject_name(&name).unwrap();
+        builder.set_issuer_name(&name).unwrap();
+        builder.set_pubkey(&key).unwrap();
+        builder
+            .set_not_before(&Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        builder
+            .set_not_after(&Asn1Time::days_from_now(1).unwrap())
+            .unwrap();
+        let san = SubjectAlternativeName::new()
+            .ip(ip)
+            .build(&builder.x509v3_context(None, None))
+            .unwrap();
+        builder.append_extension(san).unwrap();
+        builder.sign(&key, MessageDigest::sha256()).unwrap();
+        (builder.build(), key)
+    }
+
+    #[tokio::test]
+    async fn bracketed_ipv6_destination_sends_no_sni_and_verifies_the_ip() {
+        let (cert, key) = self_signed_cert_for_ip("::1");
+        let mut acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).unwrap();
+        acceptor.set_certificate(&cert).unwrap();
+        acceptor.set_private_key(&key).unwrap();
+        let received_sni = Arc::new(Mutex::new(None));
+        let sni = Arc::clone(&received_sni);
+        acceptor.set_servername_callback(move |ssl, _| {
+            *sni.lock().unwrap() = ssl.servername(NameType::HOST_NAME).map(str::to_owned);
+            Ok(())
+        });
+        let acceptor = acceptor.build();
+        let listener = std::net::TcpListener::bind("[::1]:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            acceptor
+                .accept(stream)
+                .map(drop)
+                .map_err(|error| error.to_string())
+        });
+        let ca_pem = String::from_utf8(cert.to_pem().unwrap()).unwrap();
+        let config = TlsConfig {
+            ca_file: Some(ca_pem.into()),
+            ..Default::default()
+        };
+        let tls = MaybeTls::Tls(TlsSettings::from_options(Some(&config)).unwrap());
+        let mut connector = https_connector(&tls, false, false).unwrap();
+
+        let stream = connector
+            .call(format!("https://[::1]:{port}/").parse().unwrap())
+            .await;
+
+        assert!(stream.is_ok(), "handshake failed: {:?}", stream.err());
+        assert_eq!(server.join().unwrap(), Ok(()));
+        assert_eq!(*received_sni.lock().unwrap(), None);
     }
 
     #[tokio::test]

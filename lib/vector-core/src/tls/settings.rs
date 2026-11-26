@@ -463,12 +463,23 @@ impl TlsSettings {
     /// upstream destination. The `server_name` override applies only to the destination; applying it
     /// to the proxy's own TLS connection would verify the proxy certificate against the upstream
     /// name and fail.
+    ///
+    /// `host` is the connection host that `ConnectConfiguration::into_ssl` will receive.
     pub fn apply_connect_configuration(
         &self,
         connection: &mut ConnectConfiguration,
+        host: &str,
         skip_server_name: bool,
     ) -> std::result::Result<(), openssl::error::ErrorStack> {
-        if let Some(server_name) = self.server_name.as_deref().filter(|_| !skip_server_name) {
+        // `Uri::host` keeps the brackets around an IPv6 literal, and `into_ssl` only treats a host
+        // that parses as `IpAddr` as an IP: it would send `[::1]` as SNI, which RFC 6066 forbids,
+        // and verify it as a DNS name. Handle it like an IP `server_name` instead.
+        let server_name = self
+            .server_name
+            .as_deref()
+            .filter(|_| !skip_server_name)
+            .or_else(|| ipv6_literal(host));
+        if let Some(server_name) = server_name {
             // Use the configured server name for both SNI and certificate hostname
             // verification. `ConnectConfiguration::into_ssl` (called by the connector
             // after this callback) would otherwise apply the URL host to SNI and the
@@ -504,6 +515,12 @@ impl TlsSettings {
         }
         Ok(())
     }
+}
+
+fn ipv6_literal(host: &str) -> Option<&str> {
+    host.strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .filter(|ip| ip.parse::<std::net::Ipv6Addr>().is_ok())
 }
 
 /// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.
@@ -1053,7 +1070,7 @@ mod test {
                 .map_err(|e| e.to_string())?;
             let mut config = builder.build().configure().unwrap();
             settings
-                .apply_connect_configuration(&mut config, skip_server_name)
+                .apply_connect_configuration(&mut config, url_host, skip_server_name)
                 .map_err(|e| e.to_string())?;
             let ssl = config.into_ssl(url_host).map_err(|e| e.to_string())?;
             let mut stream = tokio_openssl::SslStream::new(ssl, tcp).unwrap();
