@@ -742,7 +742,7 @@ impl EventStreamBuilder {
     /// Spawn a task to runs event stream until shutdown.
     fn start(&self, id: ContainerId, backoff: Option<Duration>) -> ContainerState {
         let this = self.clone();
-        crate::spawn_in_current_span(async move {
+        vector_lib::cpu_time::spawn_timed(async move {
             if let Some(duration) = backoff {
                 tokio::time::sleep(duration).await;
             }
@@ -780,7 +780,7 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            crate::spawn_in_current_span(this.run_event_stream(info));
+            vector_lib::cpu_time::spawn_timed(this.run_event_stream(info));
         }
     }
 

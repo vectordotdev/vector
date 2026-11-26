@@ -397,7 +397,7 @@ impl Ingestor {
                 acknowledgements,
             );
             let fut = process.run();
-            let handle = crate::spawn_in_current_span(fut);
+            let handle = vector_lib::cpu_time::spawn_timed(fut);
             handles.push(handle);
         }
 

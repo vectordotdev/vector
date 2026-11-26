@@ -425,7 +425,7 @@ components: sources: internal_metrics: {
 			tags:              _buffer_tags
 		}
 		component_cpu_usage_ns_total: {
-			description:       "The CPU time consumed by a component in nanoseconds. Available for transforms and sinks. Emitted only on Linux, macOS, and Windows. On Windows, the value is a rough estimate because thread CPU time is updated only at the scheduler clock tick. CPU spent on threads that third-party libraries manage on their own is not counted, notably librdkafka threads in the `kafka` sink; see the `measure_cpu_usage` option of each component for details."
+			description:       "The CPU time consumed by a component in nanoseconds. Available for sources, transforms, and sinks. Emitted only on Linux, macOS, and Windows. On Windows, the value is a rough estimate because thread CPU time is updated only at the scheduler clock tick. CPU spent on threads or tasks that third-party libraries manage on their own is not counted, notably librdkafka threads in the `kafka` source and sink, and gRPC connection tasks in the `vector` and `opentelemetry` sources; see the `measure_cpu_usage` option of each component for details."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags

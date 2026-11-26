@@ -13,6 +13,8 @@
 //!   inheritable by tasks spawned from it, without timing the future itself.
 //! - [`spawn_timed`] / [`spawn_timed_without_span`] — spawn helpers that attach the
 //!   counter of the calling task, if any, to the spawned task.
+//!   [`inherit_cpu_timer`] does the same for futures run by other means, and
+//!   [`spawn_blocking_timed`] for closures run on a blocking thread.
 //! - `register_counter` — registers the `component_cpu_usage_ns_total` metrics
 //!   counter for a component (available on Linux, macOS, and Windows only).
 //!
@@ -400,7 +402,12 @@ impl<F: Future> CpuTimedExt for F {}
 /// Wraps `future` in a [`CpuTimedFuture`] charging the [current
 /// counter](current_counter), if any. Returns it unchanged otherwise, with no
 /// per-poll overhead.
-fn inherit_cpu_timer<F: Future>(future: F) -> Either<CpuTimedFuture<F>, F> {
+///
+/// For futures run by other means than [`spawn_timed`], e.g. a
+/// [`tokio::task::JoinSet`] or a `block_on` call on a blocking thread. Call it
+/// from the component's task: the counter is read when this is called, not
+/// when the returned future is polled.
+pub fn inherit_cpu_timer<F: Future>(future: F) -> Either<CpuTimedFuture<F>, F> {
     match current_counter() {
         Some(counter) => Either::Left(future.cpu_timed(counter)),
         None => Either::Right(future),
@@ -431,7 +438,8 @@ where
 /// spawned task.
 ///
 /// For spawn sites where the current span does not describe the spawned work,
-/// e.g. executor hooks called by third-party code.
+/// e.g. executor hooks called by third-party code, or where the caller
+/// attaches its own span.
 #[track_caller]
 pub fn spawn_timed_without_span<F>(future: F) -> tokio::task::JoinHandle<F::Output>
 where
@@ -439,6 +447,33 @@ where
     F::Output: Send + 'static,
 {
     tokio::spawn(inherit_cpu_timer(future))
+}
+
+/// Like [`tokio::task::spawn_blocking`], but charges the thread CPU time of
+/// `f` to the [current counter](current_counter), if any. Tasks spawned from
+/// `f` inherit that counter too.
+#[track_caller]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve nanosecond accounting"
+)]
+pub fn spawn_blocking_timed<F, R>(f: F) -> tokio::task::JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let counter = current_counter();
+    tokio::task::spawn_blocking(move || match counter {
+        Some(counter) => {
+            let _scope = CounterScope::enter(&counter);
+            let t0 = ThreadTime::now();
+            let result = f();
+            counter.increment(t0.elapsed().as_nanos() as u64);
+            result
+        }
+        None => f(),
+    })
 }
 
 /// Registers the `component_cpu_usage_ns_total` counter for the calling
@@ -527,6 +562,23 @@ mod tests {
         assert_eq!(outer_value.load(Ordering::Relaxed), 1);
         assert!(current_counter().is_none());
         assert!(matches!(inherit_cpu_timer(async {}), Either::Right(_)));
+    }
+
+    #[tokio::test]
+    async fn blocking_closure_charges_scoped_counter() {
+        let (counter, value) = test_counter();
+
+        async {
+            spawn_blocking_timed(|| (0u64..1_000_000).map(std::hint::black_box).sum::<u64>())
+                .await
+                .unwrap()
+        }
+        .cpu_scoped(counter)
+        .await;
+
+        if cfg!(any(target_os = "linux", target_os = "macos")) {
+            assert!(value.load(Ordering::Relaxed) > 0);
+        }
     }
 
     #[test]

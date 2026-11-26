@@ -107,7 +107,7 @@ impl Finalizer {
                 OrderedFinalizer::<FinalizerEntry>::new(Some(shutdown.clone()));
 
             // Spawn background task to process acknowledgments and update checkpoints
-            crate::spawn_in_current_span(async move {
+            vector_lib::cpu_time::spawn_timed(async move {
                 while let Some((status, entry)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
@@ -266,7 +266,7 @@ where
     F: FnOnce(EventLogSubscription) -> (EventLogSubscription, R) + Send + 'static,
     R: Send + 'static,
 {
-    tokio::task::spawn_blocking(move || f(subscription))
+    vector_lib::cpu_time::spawn_blocking_timed(move || f(subscription))
         .await
         .map_err(|e| WindowsEventLogError::ConfigError {
             message: format!("Blocking subscription task panicked: {e}"),
@@ -382,7 +382,7 @@ impl WindowsEventLogSource {
             }
         };
         let shutdown_watcher = shutdown.clone();
-        crate::spawn_in_current_span(async move {
+        vector_lib::cpu_time::spawn_timed(async move {
             shutdown_watcher.await;
             unsafe {
                 let handle =

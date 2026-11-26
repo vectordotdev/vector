@@ -107,6 +107,7 @@ where
                     graph: self.graph.clone(),
                     sink_acknowledgements: false,
                     proxy: Default::default(),
+                    measure_cpu_usage: false,
                     inner: source,
                 },
             )

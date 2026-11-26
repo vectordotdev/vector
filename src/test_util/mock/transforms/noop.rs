@@ -5,6 +5,7 @@ use futures_util::{Stream, StreamExt as _};
 use vector_lib::{
     config::{DataType, Input, TransformOutput},
     configurable::configurable_component,
+    cpu_time::ThreadTime,
     event::{Event, EventContainer},
     schema::Definition,
     transform::{FunctionTransform, OutputBuffer, TaskTransform, Transform},
@@ -139,6 +140,15 @@ pub(crate) fn busy_spin(duration: Duration) {
         acc = std::hint::black_box(acc.wrapping_add(1));
     }
     std::hint::black_box(acc);
+}
+
+/// Spins until the current thread has used `duration` of CPU time. Unlike [`busy_spin`], the
+/// burn holds when the thread is preempted.
+pub(crate) fn burn_thread_cpu(duration: Duration) {
+    let start = ThreadTime::now();
+    while start.elapsed() < duration {
+        busy_spin(Duration::from_millis(1));
+    }
 }
 
 impl FunctionTransform for NoopTransform {
