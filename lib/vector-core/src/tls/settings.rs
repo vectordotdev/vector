@@ -554,7 +554,18 @@ impl TlsConfig {
                 let (data, filename) = open_read(filename, "certificate")?;
                 der_or_pem(
                     data,
-                    |der| self.parse_pkcs12_identity(&der),
+                    |der| match X509::from_der(&der) {
+                        Ok(cert) => {
+                            let key_file = self.key_file.as_ref().ok_or(TlsError::MissingKey)?;
+                            let key = load_key(key_file.as_path(), self.key_pass.as_ref())?;
+                            Ok(Some(IdentityStore {
+                                cert,
+                                key,
+                                ca: None,
+                            }))
+                        }
+                        Err(_) => self.parse_pkcs12_identity(&der),
+                    },
                     |pem| self.parse_pem_identity(&pem, &filename),
                 )
             }
@@ -851,6 +862,73 @@ mod test {
             TlsSettings::from_options(Some(&options)).expect("Failed to load PKCS#12 certificate");
         assert!(settings.identity.is_some());
         assert_eq!(settings.authorities.len(), 0);
+    }
+
+    #[test]
+    fn from_options_der() {
+        let cert = X509::from_pem(TEST_PEM_CRT_BYTES).unwrap();
+        let key = PKey::private_key_from_pem(TEST_PEM_KEY_BYTES).unwrap();
+        let dir = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+        std::fs::create_dir(&dir).unwrap();
+        let crt_file = dir.join("client.der");
+        let key_file = dir.join("key.der");
+        std::fs::write(&crt_file, cert.to_der().unwrap()).unwrap();
+        let mut options = TlsConfig {
+            crt_file: Some(crt_file),
+            key_file: Some(key_file),
+            ..Default::default()
+        };
+        let encrypted_key = key
+            .private_key_to_pkcs8_passphrase(openssl::symm::Cipher::aes_256_cbc(), b"test password")
+            .unwrap();
+        for (key_bytes, key_pass) in [
+            (key.private_key_to_der().unwrap(), None),
+            (key.private_key_to_pem_pkcs8().unwrap(), None),
+            (encrypted_key, Some("test password".to_owned())),
+        ] {
+            std::fs::write(options.key_file.as_ref().unwrap(), key_bytes).unwrap();
+            options.key_pass = key_pass;
+            let settings =
+                TlsSettings::from_options(Some(&options)).expect("Failed to load DER certificate");
+            let (cert_pem, key_pem) = settings.identity_pem().expect("Missing PEM identity");
+            assert_eq!(
+                X509::from_pem(&cert_pem).unwrap().to_der().unwrap(),
+                cert.to_der().unwrap()
+            );
+            assert!(
+                PKey::private_key_from_pem(&key_pem)
+                    .unwrap()
+                    .public_eq(&key)
+            );
+            let identity = settings.identity.unwrap();
+            assert_eq!(identity.cert.to_der().unwrap(), cert.to_der().unwrap());
+            assert!(identity.key.public_eq(&key));
+            assert!(identity.ca.is_none());
+        }
+        options.key_pass = None;
+        std::fs::write(options.key_file.as_ref().unwrap(), b"invalid key").unwrap();
+        assert!(matches!(
+            TlsSettings::from_options(Some(&options)),
+            Err(TlsError::PrivateKeyParseError { .. })
+        ));
+        std::fs::remove_file(options.crt_file.as_ref().unwrap()).unwrap();
+        std::fs::remove_file(options.key_file.as_ref().unwrap()).unwrap();
+        std::fs::remove_dir(dir).unwrap();
+    }
+
+    #[test]
+    fn der_identity_requires_key() {
+        let cert = X509::from_pem(TEST_PEM_CRT_BYTES).unwrap();
+        // Exercise format detection with no separate key, as for a PKCS#12 archive.
+        let filename = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+        std::fs::write(&filename, cert.to_der().unwrap()).unwrap();
+        let options = TlsConfig {
+            crt_file: Some(filename.clone()),
+            ..Default::default()
+        };
+        let result = TlsSettings::from_options(Some(&options));
+        std::fs::remove_file(filename).unwrap();
+        assert!(matches!(result, Err(TlsError::MissingKey)));
     }
 
     #[test]
