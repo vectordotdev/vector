@@ -5,3 +5,4 @@ sinks:
       - my-source-or-transform-id
     address: http://127.0.0.1:6000
     compression: none
+    idle_connection_timeout_secs: 90
