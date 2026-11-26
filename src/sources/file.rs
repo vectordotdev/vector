@@ -666,6 +666,7 @@ pub fn file_source(
             }
             event
         });
+        let (send_receiver_done, receiver_done) = oneshot::channel::<()>();
         tokio::spawn(async move {
             if let Ok(()) = out
                 .send_event_stream(&mut messages)
@@ -677,7 +678,17 @@ pub fn file_source(
                 let (count, _) = messages.size_hint();
                 emit(StreamClosedError { count });
             }
+            _ = send_receiver_done.send(());
         });
+
+        // Closing the file server's sender does not mean the receiver has
+        // processed its final batch. Keep checkpointing until that task finishes,
+        // and then, when enabled, until its pending acknowledgements finish too.
+        let shutdown_checkpointer = async move {
+            _ = receiver_done.await;
+            shutdown_checkpointer.await;
+        }
+        .boxed();
 
         let span = info_span!("file_server");
         tokio::task::spawn_blocking(move || {
