@@ -17,10 +17,10 @@ use crate::{
     EventCount,
     buffer_usage_data::BufferUsageHandle,
     encoding::FixedEncodable,
-    test::install_tracing_helpers,
+    test::{SizedRecord, acknowledge, install_tracing_helpers},
     variants::disk_v2::{
-        Buffer, DiskBufferConfig, WriterError, common::MAX_FILE_ID, record::RECORD_HEADER_LEN,
-        writer::RecordWriter,
+        Buffer, DiskBufferConfig, DiskBufferConfigBuilder, WriterError, common::MAX_FILE_ID,
+        record::RECORD_HEADER_LEN, writer::RecordWriter,
     },
 };
 
@@ -38,6 +38,31 @@ use self::record::Record;
 
 mod sequencer;
 use self::sequencer::{ActionSequencer, ReadActionResult, WriteActionResult};
+
+#[tokio::test]
+async fn reader_finish_propagates_checkpoint_failure() {
+    let dir = tempdir().unwrap();
+    let config = DiskBufferConfigBuilder::from_path(dir.path())
+        .filesystem(TestFilesystem::default())
+        .build()
+        .unwrap();
+    let (mut writer, mut reader, ledger) =
+        Buffer::from_config_inner(config, BufferUsageHandle::noop())
+            .await
+            .unwrap();
+    writer.write_record(SizedRecord::new(32)).await.unwrap();
+    writer.flush().await.unwrap();
+    writer.close();
+    let record = reader.next().await.unwrap().unwrap();
+    assert!(reader.next().await.unwrap().is_none());
+    acknowledge(record).await;
+    ledger.filesystem().set_flush_error(true);
+    let error = reader.finish().await.unwrap_err();
+    assert_eq!(error.to_string(), "injected checkpoint failure");
+    // A failed checkpoint remains retryable even after the final acknowledgement was consumed.
+    ledger.filesystem().set_flush_error(false);
+    reader.finish().await.unwrap();
+}
 
 /// Model for the filesystem.
 ///
@@ -283,6 +308,7 @@ struct ReaderModel {
     filesystem: Arc<FilesystemModel>,
     ledger: Arc<LedgerModel>,
     state: ReaderModelState,
+    input_exhausted: bool,
     current_file: Option<FileModel>,
     current_file_bytes_read: u64,
     current_file_records_read: usize,
@@ -299,6 +325,7 @@ impl ReaderModel {
             filesystem,
             ledger,
             state: ReaderModelState::Idle,
+            input_exhausted: false,
             current_file: None,
             current_file_bytes_read: 0,
             current_file_records_read: 0,
@@ -385,12 +412,7 @@ impl ReaderModel {
         let reader_file_id = self.ledger.get_reader_file_id();
         let writer_file_id = self.ledger.get_writer_file_id();
         let writer_done = self.ledger.is_writer_done();
-        let buffer_empty = self.ledger.get_buffer_size() == 0;
-
-        self.done_with_current_file()
-            && buffer_empty
-            && writer_done
-            && reader_file_id == writer_file_id
+        self.done_with_current_file() && writer_done && reader_file_id == writer_file_id
     }
 
     fn check_ready(&mut self) -> bool {
@@ -411,6 +433,9 @@ impl ReaderModel {
     }
 
     fn read_record(&mut self) -> Progress {
+        if self.input_exhausted {
+            return Progress::RecordRead(None);
+        }
         self.state.transition_to_reading();
 
         loop {
@@ -424,6 +449,8 @@ impl ReaderModel {
 
             // If the writer is all done, and we've caught up to it, then we have no more records to read.
             if self.done_overall() {
+                self.input_exhausted = true;
+                self.state.transition_to_idle();
                 return Progress::RecordRead(None);
             }
 

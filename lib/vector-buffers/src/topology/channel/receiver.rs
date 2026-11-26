@@ -1,5 +1,5 @@
 use std::{
-    mem,
+    io, mem,
     pin::Pin,
     task::{Context, Poll, ready},
 };
@@ -155,13 +155,31 @@ impl<T: Bufferable> BufferReceiver<T> {
     pub fn into_stream(self) -> BufferReceiverStream<T> {
         BufferReceiverStream::new(self)
     }
+
+    /// Waits for acknowledgements and persists checkpoints for all disk stages.
+    ///
+    /// Call after [`Self::next`] returns `None`. Memory stages need no additional work.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a disk stage has not reached EOF or its checkpoint cannot be persisted.
+    pub async fn finish(&mut self) -> io::Result<()> {
+        let mut receiver = Some(self);
+        while let Some(stage) = receiver {
+            if let ReceiverAdapter::DiskV2(reader) = &mut stage.base {
+                reader.finish().await?;
+            }
+            receiver = stage.overflow.as_deref_mut();
+        }
+        Ok(())
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
 enum StreamState<T: Bufferable> {
     Idle(BufferReceiver<T>),
     Polling,
-    Closed,
+    Closed(BufferReceiver<T>),
 }
 
 pub struct BufferReceiverStream<T: Bufferable> {
@@ -176,6 +194,20 @@ impl<T: Bufferable> BufferReceiverStream<T> {
             recv_fut: ReusableBoxFuture::new(make_recv_future(None)),
         }
     }
+
+    /// Finishes the receiver's acknowledgements and checkpoints after EOF.
+    ///
+    /// Before EOF, this is a no-op so reloads can reuse idle or pending receivers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a disk stage's checkpoint cannot be persisted.
+    pub async fn finish(&mut self) -> io::Result<()> {
+        if let StreamState::Closed(receiver) = &mut self.state {
+            receiver.finish().await?;
+        }
+        Ok(())
+    }
 }
 
 impl<T: Bufferable> Stream for BufferReceiverStream<T> {
@@ -184,7 +216,7 @@ impl<T: Bufferable> Stream for BufferReceiverStream<T> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
             match mem::replace(&mut self.state, StreamState::Polling) {
-                s @ StreamState::Closed => {
+                s @ StreamState::Closed(_) => {
                     self.state = s;
                     return Poll::Ready(None);
                 }
@@ -194,7 +226,7 @@ impl<T: Bufferable> Stream for BufferReceiverStream<T> {
                 StreamState::Polling => {
                     let (result, receiver) = ready!(self.recv_fut.poll(cx));
                     self.state = if result.is_none() {
-                        StreamState::Closed
+                        StreamState::Closed(receiver)
                     } else {
                         StreamState::Idle(receiver)
                     };

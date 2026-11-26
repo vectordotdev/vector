@@ -64,6 +64,11 @@ impl<S> Utilization<S> {
     pub fn into_inner(self) -> S {
         self.inner
     }
+
+    /// Returns a mutable reference to the inner stream.
+    pub const fn get_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
 }
 
 impl<S> Stream for Utilization<S>
