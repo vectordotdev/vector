@@ -3,6 +3,8 @@
 //! Type-local tests live next to their types. This file stays with `mod.rs` because it
 //! exercises event-level behavior that composes identifiers, spans, metadata, and finalizers.
 
+use std::mem::size_of;
+
 use similar_asserts::assert_eq;
 use vector_buffers::EventCount;
 use vector_common::{
@@ -10,7 +12,7 @@ use vector_common::{
     finalization::{BatchNotifier, BatchStatus, EventFinalizer, EventStatus, Finalizable},
 };
 
-use super::{Span, SpanId, TraceEvent, TraceId};
+use super::{AttrValue, Resource, Scope, Span, SpanId, TraceEvent, TraceId};
 
 fn trace_id(n: u128) -> TraceId {
     TraceId::new(n).expect("non-zero test id")
@@ -92,6 +94,27 @@ fn event_count_is_one_regardless_of_span_count() {
         event.spans_mut().push(Span::new(span_id(i), "s"));
     }
     assert_eq!(event.event_count(), 1);
+}
+
+#[test]
+fn allocated_size_charges_shared_resource_and_scope_on_every_clone() {
+    let payload = "x".repeat(4096);
+    let mut event = TraceEvent::new(trace_id(1));
+    event
+        .resource_mut()
+        .attributes
+        .insert("payload", AttrValue::String(payload.clone()));
+    event
+        .datadog_mut()
+        .tracer_mut()
+        .tags
+        .insert("payload", AttrValue::String(payload.clone()));
+    let clone = event.clone();
+
+    // Every holder pays for both payload copies and the out-of-line structs.
+    let floor = 2 * payload.len() + size_of::<Resource>() + size_of::<Scope>();
+    assert!(event.allocated_bytes() >= floor);
+    assert!(clone.allocated_bytes() >= floor);
 }
 
 #[test]
