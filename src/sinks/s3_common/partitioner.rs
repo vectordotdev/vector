@@ -1,7 +1,11 @@
-use vector_lib::{event::Event, internal_event::emit, partition::Partitioner};
+use vector_lib::{
+    event::Event,
+    partition::{PartitionDecision, Partitioner},
+    sink::PreparationError,
+};
 
 use crate::{
-    internal_events::TemplateRenderingError, sinks::util::partitioner::render_key_with_fallback,
+    sinks::util::partitioner::{render_key_with_fallback, render_partition_value},
     template::ConfinedTemplate,
 };
 
@@ -39,33 +43,36 @@ impl S3KeyPartitioner {
 
 impl Partitioner for S3KeyPartitioner {
     type Item = Event;
-    type Key = Option<S3PartitionKey>;
+    type Key = S3PartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        let key_prefix = render_key_with_fallback(
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        let PartitionDecision::Route(key_prefix) = render_key_with_fallback(
             &self.key_prefix_template,
             item,
             self.dead_letter_key_prefix.as_deref(),
-        )?;
+        )?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
 
-        let ssekms_key_id = self
-            .ssekms_key_id_template
-            .as_ref()
-            .map(|t| {
-                t.render_string(item).map_err(|error| {
-                    emit(TemplateRenderingError {
-                        error,
-                        field: Some("ssekms_key_id"),
-                        drop_event: true,
-                    });
-                })
-            })
-            .transpose()
-            .ok()?;
+        let ssekms_key_id = if let Some(template) = &self.ssekms_key_id_template {
+            let PartitionDecision::Route(key_id) =
+                render_partition_value(template.render_string(item), "ssekms_key_id")?
+            else {
+                return Ok(PartitionDecision::Discard);
+            };
+            Some(key_id)
+        } else {
+            None
+        };
 
-        Some(S3PartitionKey {
+        Ok(PartitionDecision::Route(S3PartitionKey {
             key_prefix,
             ssekms_key_id,
-        })
+        }))
     }
 }

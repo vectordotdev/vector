@@ -387,7 +387,7 @@ struct PubsubRequestBuilder {
 }
 
 impl RequestBuilder<PubsubBatch> for PubsubRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = PubsubBatch;
     type Encoder = PubsubBatchEncoder;
     type Payload = Bytes;
@@ -402,26 +402,29 @@ impl RequestBuilder<PubsubBatch> for PubsubRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut batch: PubsubBatch,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut batch: PubsubBatch) -> RequestParts<Self::Metadata, Self::Events> {
         let finalizers = mem::take(&mut batch.finalizers);
         let builder = RequestMetadataBuilder::new(
             batch.event_count,
             batch.events_byte_size,
             batch.events_sent(),
         );
-        (finalizers, builder, batch)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events: batch,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
+        HttpRequest::new(payload.into_payload(), finalizers, request_metadata, ())
     }
 }
 
@@ -570,11 +573,20 @@ mod tests {
         let builder = PubsubRequestBuilder {
             encoder: PubsubBatchEncoder,
         };
-        let (finalizers, metadata, events) = builder.split_input(batch);
+        let RequestParts {
+            events,
+            finalizers,
+            request_metadata_builder,
+            ..
+        } = builder.split_input(batch);
         let payload = builder
             .encode_events(events)
             .expect("encoding into memory should succeed");
-        (finalizers, metadata.build(&payload), payload)
+        (
+            finalizers,
+            request_metadata_builder.build(&payload),
+            payload,
+        )
     }
 
     /// The legacy body: each message is `{"data": <base64>}` inside a `messages` array.

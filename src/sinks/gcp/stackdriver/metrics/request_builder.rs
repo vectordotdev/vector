@@ -12,7 +12,7 @@ pub(super) struct StackdriverMetricsRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Metric>> for StackdriverMetricsRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = Vec<Metric>;
     type Encoder = StackdriverMetricsEncoder;
     type Payload = Bytes;
@@ -27,22 +27,25 @@ impl RequestBuilder<Vec<Metric>> for StackdriverMetricsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut events: Vec<Metric>,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut events: Vec<Metric>) -> RequestParts<Self::Metadata, Self::Events> {
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        (finalizers, builder, events)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
+        HttpRequest::new(payload.into_payload(), finalizers, request_metadata, ())
     }
 }
 

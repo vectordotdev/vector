@@ -11,8 +11,9 @@ use crate::{
             service::ElasticsearchRequest,
         },
         util::{
-            Compression, RequestBuilder, metadata::RequestMetadataBuilder,
-            request_builder::EncodeResult,
+            Compression, RequestBuilder,
+            metadata::RequestMetadataBuilder,
+            request_builder::{EncodeResult, RequestParts},
         },
     },
 };
@@ -24,7 +25,6 @@ pub struct ElasticsearchRequestBuilder {
 }
 
 pub struct Metadata {
-    finalizers: EventFinalizers,
     batch_size: usize,
     events_byte_size: JsonSize,
     original_events: Vec<ProcessedEvent>,
@@ -49,7 +49,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
     fn split_input(
         &self,
         mut events: Vec<ProcessedEvent>,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let events_byte_size = events
             .iter()
             .map(|x| x.log.estimated_json_encoded_size_of())
@@ -58,24 +58,30 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
 
+        let finalizers = events.take_finalizers();
         let es_metadata = Metadata {
-            finalizers: events.take_finalizers(),
             batch_size: events.len(),
             events_byte_size,
             original_events: events.clone(),
         };
-        (es_metadata, metadata_builder, events)
+        RequestParts {
+            metadata: es_metadata,
+            request_metadata_builder: metadata_builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         es_metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         ElasticsearchRequest {
             payload: payload.into_payload(),
-            finalizers: es_metadata.finalizers,
+            finalizers,
             batch_size: es_metadata.batch_size,
             events_byte_size: es_metadata.events_byte_size,
             metadata,

@@ -7,8 +7,10 @@ use vector_lib::{
 
 use super::encoder::AppsignalEncoder;
 use crate::sinks::util::{
-    Compression, RequestBuilder, http::HttpRequest, metadata::RequestMetadataBuilder,
-    request_builder::EncodeResult,
+    Compression, RequestBuilder,
+    http::HttpRequest,
+    metadata::RequestMetadataBuilder,
+    request_builder::{EncodeResult, RequestParts},
 };
 
 pub(super) struct AppsignalRequestBuilder {
@@ -17,7 +19,7 @@ pub(super) struct AppsignalRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for AppsignalRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = Vec<Event>;
     type Encoder = AppsignalEncoder;
     type Payload = Bytes;
@@ -32,22 +34,25 @@ impl RequestBuilder<Vec<Event>> for AppsignalRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut input: Vec<Event>,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut input: Vec<Event>) -> RequestParts<Self::Metadata, Self::Events> {
         let finalizers = input.take_finalizers();
         let metadata_builder = RequestMetadataBuilder::from_events(&input);
 
-        (finalizers, metadata_builder, input)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: metadata_builder,
+            events: input,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
+        HttpRequest::new(payload.into_payload(), finalizers, request_metadata, ())
     }
 }

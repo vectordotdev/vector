@@ -77,26 +77,21 @@ impl KeyPartitioner {
     }
 }
 
-impl Partitioner for KeyPartitioner {
-    type Item = Event;
-    type Key = Option<String>;
-
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        // Non-confined render failures fall back to "no tenant"; Confined is
-        // handled via render_tenant_id in encode_event which actually drops.
-        self.render_tenant_id(item).unwrap_or(None)
-    }
-}
-
 #[derive(Default)]
 struct RecordPartitioner;
 
 impl Partitioner for RecordPartitioner {
     type Item = Option<FilteredRecord>;
     type Key = Option<PartitionKey>;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.as_ref().map(FilteredRecord::partition)
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        Ok(PartitionDecision::Route(
+            item.as_ref().map(FilteredRecord::partition),
+        ))
     }
 }
 
@@ -119,7 +114,7 @@ impl From<std::io::Error> for RequestBuildError {
 }
 
 impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
-    type Metadata = (Option<String>, EventFinalizers);
+    type Metadata = Option<String>;
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
     type Payload = Bytes;
@@ -137,22 +132,27 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     fn split_input(
         &self,
         input: (PartitionKey, Vec<LokiRecord>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (key, mut events) = input;
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let finalizers = events.take_finalizers();
 
-        ((key.tenant_id, finalizers), metadata_builder, events)
+        RequestParts {
+            metadata: key.tenant_id,
+            request_metadata_builder: metadata_builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        loki_metadata: Self::Metadata,
+        tenant_id: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (tenant_id, finalizers) = loki_metadata;
         let compression = self.compression;
 
         LokiRequest {
@@ -447,6 +447,12 @@ impl FilteredRecord {
     }
 }
 
+impl Finalizable for FilteredRecord {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.inner.take_finalizers()
+    }
+}
+
 impl ByteSizeOf for FilteredRecord {
     fn size_of(&self) -> usize {
         self.inner.size_of()
@@ -582,6 +588,7 @@ impl LokiSink {
             .batched_partitioned(RecordPartitioner, batch_settings.timeout, |_| {
                 batch_settings.as_byte_size_config()
             })
+            .unwrap_infallible()
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;

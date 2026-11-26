@@ -50,7 +50,9 @@ use crate::{
                 http_response_retry_logic,
             },
             metadata::RequestMetadataBuilder,
-            request_builder::{EncodeResult, default_request_builder_concurrency_limit},
+            request_builder::{
+                EncodeResult, RequestParts, default_request_builder_concurrency_limit,
+            },
             service::ServiceBuilderExt,
         },
     },
@@ -494,7 +496,7 @@ struct InfluxDbLogsRequestBuilder {
 }
 
 impl RequestBuilder<LogBatch> for InfluxDbLogsRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = LogLines;
     type Encoder = LogLinesEncoder;
     type Payload = Bytes;
@@ -509,10 +511,7 @@ impl RequestBuilder<LogBatch> for InfluxDbLogsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        batch: LogBatch,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, batch: LogBatch) -> RequestParts<Self::Metadata, Self::Events> {
         let LogBatch {
             lines,
             finalizers,
@@ -523,12 +522,18 @@ impl RequestBuilder<LogBatch> for InfluxDbLogsRequestBuilder {
         // Events are reported untagged, with the estimated JSON size of the original events.
         let json_size = GroupedCountByteSize::from(CountByteSize(count, json_size));
         let builder = RequestMetadataBuilder::new(count, byte_size, json_size.clone());
-        (finalizers, builder, LogLines { lines, json_size })
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events: LogLines { lines, json_size },
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        finalizers: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {

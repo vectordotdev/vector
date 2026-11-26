@@ -9,7 +9,7 @@ use vector_lib::{
             CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, Framer, FramingConfig,
         },
     },
-    partition::Partitioner,
+    partition::{PartitionDecision, Partitioner},
     request_metadata::GroupedCountByteSize,
     serde::AsciiChar,
 };
@@ -73,11 +73,14 @@ fn azure_blob_build_request_without_compression() {
     let blob_time_format = String::new();
     let blob_append_uuid = false;
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -99,12 +102,16 @@ fn azure_blob_build_request_without_compression() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
 
     assert_eq!(request.metadata.partition_key, "blob.log".to_string());
     assert_eq!(request.content_encoding, None);
@@ -124,11 +131,14 @@ fn azure_blob_build_request_with_compression() {
     let blob_time_format = String::new();
     let blob_append_uuid = false;
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -150,12 +160,16 @@ fn azure_blob_build_request_with_compression() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
 
     assert_eq!(request.metadata.partition_key, "blob.log.gz".to_string());
     assert_eq!(request.content_encoding, Some("gzip"));
@@ -175,11 +189,14 @@ fn azure_blob_build_request_with_time_format() {
     let blob_time_format = String::from("%F");
     let blob_append_uuid = false;
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -201,12 +218,16 @@ fn azure_blob_build_request_with_time_format() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
 
     assert_eq!(
         request.metadata.partition_key,
@@ -229,11 +250,14 @@ fn azure_blob_build_request_with_uuid() {
     let blob_time_format = String::new();
     let blob_append_uuid = true;
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -255,12 +279,16 @@ fn azure_blob_build_request_with_uuid() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
 
     assert_ne!(request.metadata.partition_key, "blob.log".to_string());
     assert_eq!(request.content_encoding, None);
@@ -571,11 +599,14 @@ fn azure_blob_build_request_with_blob_tags() {
     tags.insert("Project".to_string(), "Blue".to_string());
     tags.insert("Owner".to_string(), "ops team".to_string());
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -597,12 +628,16 @@ fn azure_blob_build_request_with_blob_tags() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
 
     // BTreeMap ordering: "Owner" < "Project"; space is percent-encoded as %20.
     assert_eq!(
@@ -628,11 +663,14 @@ fn azure_blob_build_request_with_blob_metadata() {
     let mut metadata = HashMap::new();
     metadata.insert("source".to_string(), "vector".to_string());
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -654,12 +692,17 @@ fn azure_blob_build_request_with_blob_metadata() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (azure_metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata: azure_metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(azure_metadata, request_metadata, payload);
+    let request =
+        request_options.build_request(azure_metadata, finalizers, request_metadata, payload);
 
     assert_eq!(request.tags, None);
     assert_eq!(request.blob_metadata, Some(metadata));
@@ -678,11 +721,14 @@ fn azure_blob_build_request_with_empty_blob_tags_and_metadata() {
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     // Empty maps must collapse to `None` so we do not emit empty headers.
     let request_options = AzureBlobRequestOptions {
@@ -705,12 +751,16 @@ fn azure_blob_build_request_with_empty_blob_tags_and_metadata() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
 
     assert_eq!(request.tags, None);
     assert_eq!(request.blob_metadata, None);
@@ -726,11 +776,14 @@ fn azure_blob_build_request_append_blob_defaults() {
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -752,8 +805,12 @@ fn azure_blob_build_request_append_blob_defaults() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
@@ -762,7 +819,7 @@ fn azure_blob_build_request_append_blob_defaults() {
     // `Utc::now()`. Comparing against a single later `Utc::now()` would flake if the test
     // crossed an hour boundary between the two calls, so accept either side of the boundary.
     let before = Utc::now().format("%Y-%m-%dT%H").to_string();
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
     let after = Utc::now().format("%Y-%m-%dT%H").to_string();
 
     let key = &request.metadata.partition_key;
@@ -1043,11 +1100,14 @@ fn azure_blob_build_request_append_blob_with_compression() {
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -1069,12 +1129,16 @@ fn azure_blob_build_request_append_blob_with_compression() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
 
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
 
     assert!(
         request.metadata.partition_key.ends_with(".log.gz"),
@@ -1127,11 +1191,14 @@ fn azure_blob_block_blob_request_carries_block_type() {
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -1153,11 +1220,15 @@ fn azure_blob_block_blob_request_carries_block_type() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
 
     assert_eq!(request.blob_type, AzureBlobType::Block);
 }
@@ -1175,11 +1246,14 @@ fn azure_blob_append_blob_with_uuid_override_generates_unique_keys() {
 
     let make_key = || {
         let log = Event::Log(LogEvent::from("test message"));
-        let key = sink_config
+        let PartitionDecision::Route(key) = sink_config
             .key_partitioner()
             .unwrap()
             .partition(&log)
-            .expect("key wasn't provided");
+            .expect("key wasn't provided")
+        else {
+            panic!("expected the event to route");
+        };
 
         let request_options = AzureBlobRequestOptions {
             container_name: container_name.clone(),
@@ -1201,12 +1275,16 @@ fn azure_blob_append_blob_with_uuid_override_generates_unique_keys() {
         let mut byte_size = GroupedCountByteSize::new_untagged();
         byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-        let (metadata, request_metadata_builder, _events) =
-            request_options.split_input((key, vec![log]));
+        let RequestParts {
+            metadata,
+            request_metadata_builder,
+            finalizers,
+            ..
+        } = request_options.split_input((key, vec![log]));
         let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
         let request_metadata = request_metadata_builder.build(&payload);
         request_options
-            .build_request(metadata, request_metadata, payload)
+            .build_request(metadata, finalizers, request_metadata, payload)
             .metadata
             .partition_key
     };
@@ -1232,11 +1310,14 @@ fn azure_blob_append_blob_stable_name_without_uuid_and_time() {
 
     let make_key = || {
         let log = Event::Log(LogEvent::from("test message"));
-        let key = sink_config
+        let PartitionDecision::Route(key) = sink_config
             .key_partitioner()
             .unwrap()
             .partition(&log)
-            .expect("key wasn't provided");
+            .expect("key wasn't provided")
+        else {
+            panic!("expected the event to route");
+        };
 
         let request_options = AzureBlobRequestOptions {
             container_name: container_name.clone(),
@@ -1258,12 +1339,16 @@ fn azure_blob_append_blob_stable_name_without_uuid_and_time() {
         let mut byte_size = GroupedCountByteSize::new_untagged();
         byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-        let (metadata, request_metadata_builder, _events) =
-            request_options.split_input((key, vec![log]));
+        let RequestParts {
+            metadata,
+            request_metadata_builder,
+            finalizers,
+            ..
+        } = request_options.split_input((key, vec![log]));
         let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
         let request_metadata = request_metadata_builder.build(&payload);
         request_options
-            .build_request(metadata, request_metadata, payload)
+            .build_request(metadata, finalizers, request_metadata, payload)
             .metadata
             .partition_key
     };
@@ -1294,11 +1379,14 @@ fn azure_blob_append_blob_compression_change_rotates_blob_name() {
     // The naming that makes the hazard possible at all: one stable blob per partition.
     let make_key = |compression: Compression| {
         let log = Event::Log(LogEvent::from("test message"));
-        let key = sink_config
+        let PartitionDecision::Route(key) = sink_config
             .key_partitioner()
             .unwrap()
             .partition(&log)
-            .expect("key wasn't provided");
+            .expect("key wasn't provided")
+        else {
+            panic!("expected the event to route");
+        };
 
         let request_options = AzureBlobRequestOptions {
             container_name: container_name.clone(),
@@ -1320,12 +1408,16 @@ fn azure_blob_append_blob_compression_change_rotates_blob_name() {
         let mut byte_size = GroupedCountByteSize::new_untagged();
         byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-        let (metadata, request_metadata_builder, _events) =
-            request_options.split_input((key, vec![log]));
+        let RequestParts {
+            metadata,
+            request_metadata_builder,
+            finalizers,
+            ..
+        } = request_options.split_input((key, vec![log]));
         let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
         let request_metadata = request_metadata_builder.build(&payload);
         request_options
-            .build_request(metadata, request_metadata, payload)
+            .build_request(metadata, finalizers, request_metadata, payload)
             .metadata
             .partition_key
     };
@@ -1370,11 +1462,14 @@ fn azure_blob_append_blob_custom_time_format_hourly_rotation() {
         ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
     };
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -1396,15 +1491,19 @@ fn azure_blob_append_blob_custom_time_format_hourly_rotation() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
 
     // Bracket build_request with two Utc::now() samples so an hour boundary between the
     // formatter's clock read and the assertion doesn't flake the test.
     let before = Utc::now().format("%Y-%m-%d-%H").to_string();
-    let request = request_options.build_request(metadata, request_metadata, payload);
+    let request = request_options.build_request(metadata, finalizers, request_metadata, payload);
     let after = Utc::now().format("%Y-%m-%d-%H").to_string();
 
     let key = &request.metadata.partition_key;
@@ -1675,11 +1774,14 @@ fn azure_blob_build_request_append_blob_with_tags_and_metadata() {
     let mut metadata = HashMap::new();
     metadata.insert("source".to_string(), "vector".to_string());
 
-    let key = sink_config
+    let PartitionDecision::Route(key) = sink_config
         .key_partitioner()
         .unwrap()
         .partition(&log)
-        .expect("key wasn't provided");
+        .expect("key wasn't provided")
+    else {
+        panic!("expected the event to route");
+    };
 
     let request_options = AzureBlobRequestOptions {
         container_name,
@@ -1701,11 +1803,16 @@ fn azure_blob_build_request_append_blob_with_tags_and_metadata() {
     let mut byte_size = GroupedCountByteSize::new_untagged();
     byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
-    let (azure_metadata, request_metadata_builder, _events) =
-        request_options.split_input((key, vec![log]));
+    let RequestParts {
+        metadata: azure_metadata,
+        request_metadata_builder,
+        finalizers,
+        ..
+    } = request_options.split_input((key, vec![log]));
     let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
     let request_metadata = request_metadata_builder.build(&payload);
-    let request = request_options.build_request(azure_metadata, request_metadata, payload);
+    let request =
+        request_options.build_request(azure_metadata, finalizers, request_metadata, payload);
 
     // Tags/metadata must be propagated into the request regardless of blob_type: append blobs
     // apply them at blob-creation time (see service.rs::append_blob).

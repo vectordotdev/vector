@@ -19,13 +19,13 @@ use vector_lib::config;
 use crate::{kafka::KafkaStatisticsContext, sinks::prelude::*};
 
 pub(crate) struct KafkaRequest {
+    pub(super) finalizers: EventFinalizers,
     pub body: Bytes,
     pub metadata: KafkaRequestMetadata,
     pub request_metadata: RequestMetadata,
 }
 
 pub(crate) struct KafkaRequestMetadata {
-    pub finalizers: EventFinalizers,
     pub key: Option<Bytes>,
     pub timestamp_millis: Option<i64>,
     pub headers: Option<OwnedHeaders>,
@@ -54,7 +54,7 @@ impl DriverResponse for KafkaResponse {
 
 impl Finalizable for KafkaRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.metadata.finalizers)
+        std::mem::take(&mut self.finalizers)
     }
 }
 

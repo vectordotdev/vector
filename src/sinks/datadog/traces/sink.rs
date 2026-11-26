@@ -11,8 +11,8 @@ use vector_lib::{
     config::log_schema,
     event::{Event, Value},
     internal_event::emit,
-    partition::Partitioner,
-    sink::StreamSink,
+    partition::{PartitionDecision, Partitioner},
+    sink::{PreparationError, StreamSink},
     stream::{BatcherSettings, DriverResponse},
 };
 use vrl::{event_path, path::PathPrefix};
@@ -42,9 +42,13 @@ pub(crate) struct PartitionKey {
 impl Partitioner for EventPartitioner {
     type Item = Event;
     type Key = PartitionKey;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        match item {
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        let key = match item {
             Event::Metric(_) => {
                 panic!("unexpected metric");
             }
@@ -66,7 +70,8 @@ impl Partitioner for EventPartitioner {
                 target_tps: t.get(event_path!("target_tps")).and_then(Value::as_integer),
                 error_tps: t.get(event_path!("error_tps")).and_then(Value::as_integer),
             },
-        }
+        };
+        Ok(PartitionDecision::Route(key))
     }
 }
 
@@ -108,6 +113,7 @@ where
             .batched_partitioned(EventPartitioner, batch_settings.timeout, |_| {
                 batch_settings.as_byte_size_config()
             })
+            .unwrap_infallible()
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
             .filter_map(|request| async move {

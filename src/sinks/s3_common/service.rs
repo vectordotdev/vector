@@ -19,6 +19,7 @@ use super::{config::S3Options, partitioner::S3PartitionKey};
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
+    pub(crate) finalizers: EventFinalizers,
     pub body: Bytes,
     pub bucket: String,
     pub metadata: S3Metadata,
@@ -29,7 +30,7 @@ pub struct S3Request {
 
 impl Finalizable for S3Request {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.metadata.finalizers)
+        std::mem::take(&mut self.finalizers)
     }
 }
 
@@ -47,7 +48,6 @@ impl MetaDescriptive for S3Request {
 pub struct S3Metadata {
     pub partition_key: S3PartitionKey,
     pub s3_key: String,
-    pub finalizers: EventFinalizers,
 }
 
 #[derive(Debug)]
