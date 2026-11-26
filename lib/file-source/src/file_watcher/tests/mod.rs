@@ -218,6 +218,40 @@ async fn gzip_multi_stream_reads_all_members() {
     assert_eq!(lines, vec!["first", "second"]);
 }
 
+#[tokio::test]
+async fn read_error_after_a_discard_is_not_treated_as_eof() {
+    // A corrupt gzip trailer fails the read after the line has already crossed the limit.
+    let mut bytes = Vec::new();
+    GzipEncoder::new(vec![b'x'; 100_000].as_slice())
+        .read_to_end(&mut bytes)
+        .await
+        .unwrap();
+    let crc_position = bytes.len() - 8;
+    bytes[crc_position] ^= 0xff;
+
+    let dir = tempfile::TempDir::new().expect("could not create tempdir");
+    let path = dir.path().join("corrupt.gz");
+    fs::write(&path, &bytes).unwrap();
+
+    let mut fw = FileWatcher::new(
+        path,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from("\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    // A rotated file can't be found by its path anymore, which at EOF would mark it dead.
+    fw.set_file_findable(false);
+
+    let result = fw.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_none());
+    assert_eq!(result.discarded_for_size_and_truncated.len(), 1);
+    assert!(!fw.dead());
+}
+
 fn watcher_for_timing() -> FileWatcher {
     let now = Instant::now();
 

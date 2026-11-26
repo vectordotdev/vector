@@ -384,9 +384,23 @@ impl FileWatcher {
         )
         .await
         {
+            // The read stopped on an error rather than at EOF, so the file isn't finished with even
+            // if it can't be found anymore.
+            Ok(ReadResult {
+                discarded_for_size_and_truncated,
+                read_error: Some(e),
+                ..
+            }) => {
+                self.handle_read_error(&e);
+                Ok(RawLineResult {
+                    raw_line: None,
+                    discarded_for_size_and_truncated,
+                })
+            }
             Ok(ReadResult {
                 successfully_read: Some(_),
                 discarded_for_size_and_truncated,
+                ..
             }) => {
                 self.track_read_success();
                 Ok(RawLineResult {
@@ -400,6 +414,7 @@ impl FileWatcher {
             Ok(ReadResult {
                 successfully_read: None,
                 discarded_for_size_and_truncated,
+                ..
             }) => {
                 if self.file_findable() {
                     self.track_read_eof();
@@ -432,11 +447,15 @@ impl FileWatcher {
                 }
             }
             Err(e) => {
-                if let io::ErrorKind::NotFound = e.kind() {
-                    self.set_dead();
-                }
+                self.handle_read_error(&e);
                 Err(e)
             }
+        }
+    }
+
+    fn handle_read_error(&mut self, error: &io::Error) {
+        if let io::ErrorKind::NotFound = error.kind() {
+            self.set_dead();
         }
     }
 
