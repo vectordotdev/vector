@@ -2,6 +2,8 @@
 
 #![deny(missing_docs)]
 
+use std::collections::BTreeMap;
+
 use k8s_openapi::{
     api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
@@ -16,6 +18,7 @@ use vector_lib::{
         owned_value_path, path,
     },
 };
+use vrl::value::{ObjectMap, Value};
 
 use super::{
     Config,
@@ -373,41 +376,65 @@ fn annotate_from_metadata(
     }
 
     if let Some(labels) = &metadata.labels {
-        let legacy_key_prefix = fields_spec.pod_labels.path.as_ref().map(|k| &k.path);
-
-        for (key, value) in labels {
-            let key_path = path!(key);
-            let legacy_key = legacy_key_prefix
-                .map(|k| k.concat(key_path))
-                .map(LegacyKey::Overwrite);
-
-            log_namespace.insert_source_metadata(
-                Config::NAME,
-                log,
-                legacy_key,
-                path!("pod_labels", key),
-                value.to_owned(),
-            );
-        }
+        insert_metadata_map(
+            log,
+            &fields_spec.pod_labels,
+            "pod_labels",
+            labels,
+            log_namespace,
+        );
     }
 
     if let Some(annotations) = &metadata.annotations {
-        let legacy_key_prefix = fields_spec.pod_annotations.path.as_ref().map(|k| &k.path);
+        insert_metadata_map(
+            log,
+            &fields_spec.pod_annotations,
+            "pod_annotations",
+            annotations,
+            log_namespace,
+        );
+    }
+}
 
-        for (key, value) in annotations {
-            let key_path = path!(key);
-            let legacy_key = legacy_key_prefix
-                .map(|k| k.concat(key_path))
-                .map(LegacyKey::Overwrite);
+// Resolve the shared ancestor once rather than once per metadata key.
+fn insert_metadata_map(
+    log: &mut LogEvent,
+    legacy_key: &OptionalTargetPath,
+    metadata_key: &str,
+    values: &BTreeMap<String, String>,
+    log_namespace: LogNamespace,
+) {
+    if values.is_empty() {
+        return;
+    }
 
-            log_namespace.insert_source_metadata(
-                Config::NAME,
-                log,
-                legacy_key,
-                path!("pod_annotations", key),
-                value.to_owned(),
-            );
+    match log_namespace {
+        LogNamespace::Vector => merge_metadata_map(
+            log.metadata_mut().value_mut(),
+            path!(Config::NAME, metadata_key),
+            values,
+        ),
+        LogNamespace::Legacy => {
+            if let Some(key) = &legacy_key.path {
+                merge_metadata_map(log.value_mut(), &key.path, values);
+            }
         }
+    }
+}
+
+fn merge_metadata_map<'a>(
+    root: &mut Value,
+    path: impl ValuePath<'a>,
+    values: &BTreeMap<String, String>,
+) {
+    let entries = values
+        .iter()
+        .map(|(key, value)| (key.clone().into(), Value::from(value.clone())));
+    if let Some(Value::Object(map)) = root.get_mut(path.clone()) {
+        // Extend only incoming keys: replacing the object would drop other fields.
+        map.extend(entries);
+    } else {
+        root.insert(path, Value::Object(entries.collect::<ObjectMap>()));
     }
 }
 
@@ -550,6 +577,71 @@ mod tests {
     use vector_lib::lookup::{event_path, metadata_path};
 
     use super::*;
+
+    #[test]
+    fn batch_metadata_matches_per_key_insertion() {
+        let values = BTreeMap::from([
+            ("app.kubernetes.io/name".to_owned(), "new".to_owned()),
+            (String::new(), "empty key".to_owned()),
+            ("literal[0]".to_owned(), "not an array".to_owned()),
+            ("other".to_owned(), "value".to_owned()),
+        ]);
+        for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            for legacy_key in [
+                OptionalTargetPath::none(),
+                OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_labels")).into(),
+                OwnedTargetPath::event(owned_value_path!("custom", 0, "labels")).into(),
+                OwnedTargetPath::event(owned_value_path!("custom", -1, "labels")).into(),
+                OwnedTargetPath::event(owned_value_path!()).into(),
+            ] {
+                for initial in [
+                    Value::Null,
+                    Value::from("scalar"),
+                    Value::Object(ObjectMap::new()),
+                    Value::Object(ObjectMap::from([
+                        ("retained".into(), Value::from("keep")),
+                        ("app.kubernetes.io/name".into(), Value::from("old")),
+                    ])),
+                ] {
+                    for incoming in [&values, &BTreeMap::new()] {
+                        let mut expected = LogEvent::default();
+                        namespace.insert_source_metadata(
+                            Config::NAME,
+                            &mut expected,
+                            legacy_key
+                                .path
+                                .as_ref()
+                                .map(|key| LegacyKey::Overwrite(&key.path)),
+                            path!("pod_labels"),
+                            initial.clone(),
+                        );
+                        let mut actual = expected.clone();
+                        for (key, value) in incoming {
+                            let key_path = path!(key);
+                            namespace.insert_source_metadata(
+                                Config::NAME,
+                                &mut expected,
+                                legacy_key.path.as_ref().map(|prefix| {
+                                    LegacyKey::Overwrite((&prefix.path).concat(key_path))
+                                }),
+                                path!("pod_labels", key),
+                                value.clone(),
+                            );
+                        }
+                        insert_metadata_map(
+                            &mut actual,
+                            &legacy_key,
+                            "pod_labels",
+                            incoming,
+                            namespace,
+                        );
+                        assert_eq!(actual.value(), expected.value());
+                        assert_eq!(actual.metadata().value(), expected.metadata().value());
+                    }
+                }
+            }
+        }
+    }
 
     #[allow(
         clippy::too_many_lines,
