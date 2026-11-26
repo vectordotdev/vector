@@ -80,9 +80,11 @@ struct PartitionState {
     /// indefinitely; permanent ones are skipped after
     /// `MAX_REDELIVERY_ATTEMPTS`.
     rejected: BTreeMap<u64, bool>,
-    /// Offsets the broker could not decode or decrypt and a seek moved past;
-    /// a late acknowledgement for one must not re-fence the partition.
-    /// Earlier offsets stay actionable: they gate the checkpoint.
+    /// Offsets a seek moved past: broker-undecodable records and poison
+    /// messages whose replay budget expired. A late acknowledgement for one
+    /// must not re-fence the partition; a marker lives until the last copy in
+    /// flight settles. Earlier offsets stay actionable: they gate the
+    /// checkpoint.
     skipped: BTreeSet<u64>,
     /// Replay attempts already made for the current fence.
     retry_attempts: u32,
@@ -111,6 +113,7 @@ struct PartitionState {
 }
 
 /// What the source should do about an outstanding rejection.
+#[derive(Debug, PartialEq, Eq)]
 enum RetryOutcome {
     /// Seek the partition back to this offset so the message is replayed.
     Seek(u64),
@@ -118,6 +121,15 @@ enum RetryOutcome {
     Skipped(u64),
     /// No rejection is outstanding.
     Idle,
+}
+
+/// Backoff shared by initialization, reads, seeks, and failed stores. The
+/// broker needs time to recover; one topology should not keep retrying it
+/// faster than half a second.
+const fn sdk_backoff() -> ExponentialBackoff {
+    ExponentialBackoff::from_millis(2)
+        .factor(250)
+        .max_delay(Duration::from_secs(30))
 }
 
 /// Delay before replaying a rejected offset. The delay doubles per attempt, so
@@ -174,6 +186,9 @@ impl PartitionState {
             }
             None => {}
         }
+        if !self.in_flight_offsets.contains_key(&offset) {
+            self.skipped.remove(&offset);
+        }
     }
 
     const fn is_settled(&self) -> bool {
@@ -197,10 +212,18 @@ impl PartitionState {
     /// true for `BatchStatus::Errored`, where another replay may succeed, and
     /// false for a permanent `Rejected`. Returns `true` if the fence moved.
     fn record_rejection(&mut self, offset: u64, transient: bool) -> bool {
-        if self.skipped.remove(&offset) {
-            // Undecodable and already moved past: replaying fails the same way
-            // forever. Lower offsets stay actionable and still hold the
-            // checkpoint.
+        if self.skipped.contains(&offset) {
+            // Undecodable or skipped: replaying fails the same way forever.
+            // The marker suppresses every late acknowledgement of the offset,
+            // including copies from a recovery seek, and is dropped when the
+            // last copy settles.
+            self.recompute_pending();
+            return false;
+        }
+        if self.committed.is_some_and(|committed| offset <= committed) {
+            // A copy re-read by a recovery seek can fail after a later offset
+            // was confirmed: the record is already committed, and fencing it
+            // would replay delivered data and lower the watermark.
             self.recompute_pending();
             return false;
         }
@@ -226,6 +249,11 @@ impl PartitionState {
             // Commit past the poison offset so later deliveries can be
             // checkpointed; the skipped event was already dropped downstream.
             self.rejected.remove(&fence);
+            // Copies registered by a recovery seek can still acknowledge;
+            // record the skip so none of them re-fences with a fresh budget.
+            if self.in_flight_offsets.contains_key(&fence) {
+                self.skipped.insert(fence);
+            }
             self.max_delivered = Some(self.max_delivered.map_or(fence, |m| m.max(fence)));
             self.retry_attempts = 0;
             self.recompute_pending();
@@ -269,12 +297,19 @@ impl PartitionState {
         // A skip or poison-message skip can raise `max_delivered` above
         // messages that were polled but have not settled. Capping at the
         // lowest unsettled offset keeps a restart from resuming past them.
-        let max = match self.in_flight_offsets.first_key_value() {
-            Some((&0, _)) => {
+        // A skipped offset no longer holds the checkpoint back: its remaining
+        // acknowledgements are ignored, so only live messages fence it.
+        let lowest = self
+            .in_flight_offsets
+            .keys()
+            .find(|offset| !self.skipped.contains(*offset))
+            .copied();
+        let max = match lowest {
+            Some(0) => {
                 self.pending = None;
                 return;
             }
-            Some((&lowest, _)) => max.min(lowest - 1),
+            Some(lowest) => max.min(lowest - 1),
             None => max,
         };
         self.pending = match self.fence() {
@@ -294,6 +329,13 @@ impl PartitionState {
     /// delivered checkpoint cannot commit safely and stays pending.
     fn take_pending(&mut self) -> Option<(u64, Checkpoint)> {
         let pending = self.pending?;
+        if self.committed.is_some_and(|committed| pending <= committed) {
+            // An in-flight copy below the watermark can lower `pending`; the
+            // offset is already stored, so enqueue nothing rather than
+            // re-sending it and downgrading `committed`.
+            self.pending = None;
+            return None;
+        }
         let checkpoint = if let Some(checkpoint) = self.checkpoints.get(&pending).copied() {
             checkpoint
         } else {
@@ -305,7 +347,12 @@ impl PartitionState {
     }
 
     fn committed_through(&mut self, offset: u64) {
-        self.committed = Some(offset);
+        // Stores can complete out of order after a re-read; a lower confirmed
+        // offset must not move the watermark backwards.
+        self.committed = Some(
+            self.committed
+                .map_or(offset, |committed| committed.max(offset)),
+        );
         self.checkpoints.retain(|&polled, _| polled > offset);
     }
 
@@ -395,9 +442,7 @@ impl PartitionSlot {
                 own_seek: None,
                 last_settled_commit: None,
                 commit_retry_at: None,
-                commit_backoff: ExponentialBackoff::from_millis(2)
-                    .factor(250)
-                    .max_delay(Duration::from_secs(30)),
+                commit_backoff: sdk_backoff(),
             },
             stream,
         )
@@ -497,12 +542,30 @@ impl PartitionSlots {
         let slot = self.entry(partition_id);
         let previous = slot.generation.replace(generation);
         let own_seek = slot.own_seek.take();
-        if previous != Some(generation) && !seek_started(own_seek, offset) {
+        if previous == Some(generation) {
+            return false;
+        }
+        if seek_started(own_seek, offset) {
+            // The seek starts a new generation of the same history: fences and
+            // acknowledgements stay, but the SDK silently drops a commit whose
+            // stamp names the old generation. Drop those checkpoints and let
+            // the replay supply fresh ones.
+            slot.state.checkpoints.retain(|_, saved| {
+                saved
+                    .stamp()
+                    .is_some_and(|stamp| stamp.generation == generation)
+            });
+            if slot.state.last_checkpoint.is_some_and(|last| {
+                last.stamp()
+                    .is_none_or(|stamp| stamp.generation != generation)
+            }) {
+                slot.state.last_checkpoint = None;
+            }
+            false
+        } else {
             self.reset(partition_id);
             self.entry(partition_id).generation = Some(generation);
             true
-        } else {
-            false
         }
     }
 }
@@ -552,7 +615,14 @@ fn record_ack(state: &mut PartitionState, partition_id: u32, status: BatchStatus
     // below `committed`. That is harmless: delivered offsets only raise the
     // maximum, and a skipped record's own acknowledgement must not re-fence.
     // Every acknowledgement settles exactly one registered message.
+    let skipped = state.skipped.contains(&offset);
     state.settle(offset);
+    if skipped {
+        // Settling the last copy drops the marker, so read it first: every
+        // late acknowledgement of a skipped offset is ignored, not just one.
+        state.recompute_pending();
+        return;
+    }
     match status {
         BatchStatus::Delivered => {
             if state.record_delivered(offset) {
@@ -782,7 +852,7 @@ fn apply_commit_result(
                         + current
                             .commit_backoff
                             .next()
-                            .unwrap_or(Duration::from_secs(30)),
+                            .expect("capped backoff always yields a delay"),
                 );
             }
             emit(IggyOffsetUpdateError { error });
@@ -990,9 +1060,7 @@ pub(crate) async fn run_iggy_source(
     // Initializing here rather than in `build` keeps a broker that is not up
     // yet, or a topic a sink in the same topology still has to create, from
     // failing topology construction outright.
-    let mut init_backoff = ExponentialBackoff::from_millis(2)
-        .factor(250)
-        .max_delay(Duration::from_secs(30));
+    let mut init_backoff = sdk_backoff();
     let (keep_alive_client, mut consumer) = loop {
         let initialized = tokio::select! {
             _ = &mut shutdown => {
@@ -1007,7 +1075,9 @@ pub(crate) async fn run_iggy_source(
                 emit(IggyConsumerInitError {
                     error: error.to_string(),
                 });
-                let delay = init_backoff.next().unwrap_or(Duration::from_secs(30));
+                let delay = init_backoff
+                    .next()
+                    .expect("capped backoff always yields a delay");
                 tokio::select! {
                     _ = &mut shutdown => {
                         info!("Shutdown signal received while initializing the Iggy consumer.");
@@ -1050,8 +1120,8 @@ pub(crate) async fn run_iggy_source(
     // all its polled messages settle, paced per partition so a paced commit on
     // another partition cannot suppress it. The timer is a shutdown backstop.
     let commit_after = u64::from((config.batch_length / 2).max(1));
-    let settled_commit_gap = Duration::from_millis(config.poll_interval_ms.max(1));
-    let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs.max(1)));
+    let settled_commit_gap = Duration::from_millis(config.poll_interval_ms);
+    let mut commit_timer = interval(Duration::from_secs(config.commit_interval_secs));
     commit_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
     // Offset stores run on their own task so a slow broker cannot stall reads;
@@ -1066,29 +1136,27 @@ pub(crate) async fn run_iggy_source(
         commit_result_tx,
     ));
 
-    // Set when the downstream sender closes so post-loop cleanup still runs.
-    // Returning from the select arm would leave the TCP session open until
-    // the broker times it out and delay rebalance.
-    let mut downstream_closed = false;
-    // A consumer EOF before shutdown stops the source; report it as a failure
-    // so the topology does not treat the stopped component as completed.
-    let mut consumer_ended = false;
+    // Set when the downstream sender closes or the consumer ends before
+    // shutdown. Post-loop cleanup still runs: returning from the select arm
+    // would leave the TCP session open until the broker times it out and delay
+    // rebalance. Both cases report a failure so the topology does not treat
+    // the stopped component as completed.
+    let mut failed = false;
 
     // Back off on repeated read failures so a broker outage does not log and
     // count an error every 500 ms. Doubles from 500 ms to 30 s and resets
     // after a successful poll.
-    let mut read_backoff = ExponentialBackoff::from_millis(2)
-        .factor(250)
-        .max_delay(Duration::from_secs(30));
+    let mut read_backoff = sdk_backoff();
+    // When the next poll may run. Read errors pause only the read arm, so
+    // acknowledgements, commit results, and seeks keep running meanwhile.
+    let mut read_retry_at: Option<tokio::time::Instant> = None;
 
     // Seek requests are queued here because the select arm holds a borrow on
     // the consumer. Deadlines are per partition: a failed seek must not drop
     // another partition's queued recovery, and the SDK stops polling a
     // partition it refused, so no read result would schedule a retry.
     let mut pending_seeks: HashMap<u32, PendingSeek> = HashMap::new();
-    let mut seek_backoff = ExponentialBackoff::from_millis(2)
-        .factor(250)
-        .max_delay(Duration::from_secs(30));
+    let mut seek_backoff = sdk_backoff();
 
     loop {
         let now = tokio::time::Instant::now();
@@ -1139,7 +1207,9 @@ pub(crate) async fn run_iggy_source(
                             Err(error) => emit(IggyReadError { error }),
                         }
                     }
-                    let delay = seek_backoff.next().unwrap_or(Duration::from_secs(30));
+                    let delay = seek_backoff
+                        .next()
+                        .expect("capped backoff always yields a delay");
                     queue_seek(
                         &mut pending_seeks,
                         partition_id,
@@ -1262,10 +1332,22 @@ pub(crate) async fn run_iggy_source(
                 break;
             }
 
-            next = consumer.next(), if !at_capacity(partitions.slots.values().map(|slot| &slot.state)) => {
+            // The backoff deadline pauses this arm only; the other arms keep
+            // running for the healthy partitions.
+            () = sleep_until(read_retry_at.unwrap_or_else(tokio::time::Instant::now)),
+                if read_retry_at.is_some() =>
+            {
+                read_retry_at = None;
+            }
+
+            next = consumer.next(),
+                if !at_capacity(partitions.slots.values().map(|slot| &slot.state))
+                    && read_retry_at.is_none_or(|at| at <= now) =>
+            {
                 match next {
                     Some(Ok(received)) => {
                         read_backoff.reset();
+                        read_retry_at = None;
 
                         // A new assignment starts a fresh partition generation.
                         // Fences and pending acks from the previous one must not
@@ -1304,7 +1386,7 @@ pub(crate) async fn run_iggy_source(
                         .await
                         .is_err()
                         {
-                            downstream_closed = true;
+                            failed = true;
                             break;
                         }
                     }
@@ -1389,7 +1471,7 @@ pub(crate) async fn run_iggy_source(
                         }
                         // An expired HTTP access token is renewed from the
                         // connection string; the SDK never refreshes it.
-                        let mut delay = read_backoff.next().unwrap_or(Duration::from_secs(30));
+                        let mut delay = read_backoff.next().expect("capped backoff always yields a delay");
                         if unauthenticated && logs_in_over_http(&config.url) {
                             match login_if_http(&keep_alive_client, &config.url).await {
                                 Ok(()) => {
@@ -1401,19 +1483,12 @@ pub(crate) async fn run_iggy_source(
                             }
                         }
                         // Some SDK errors do not sleep internally, so without
-                        // this delay the loop spins and floods the log. The
-                        // sleep races against shutdown to keep stops prompt.
-                        tokio::select! {
-                            _ = &mut shutdown => {
-                                info!("Shutdown signal received. Stopping Iggy consumer.");
-                                break;
-                            }
-                            () = sleep(delay) => {}
-                        }
+                        // this delay the read arm would spin and flood the log.
+                        read_retry_at = Some(tokio::time::Instant::now() + delay);
                     }
                     None => {
                         emit(IggyConsumerStreamEndedError);
-                        consumer_ended = true;
+                        failed = true;
                         break;
                     }
                 }
@@ -1528,11 +1603,7 @@ pub(crate) async fn run_iggy_source(
     }
 
     info!("Iggy source shut down.");
-    if downstream_closed || consumer_ended {
-        Err(())
-    } else {
-        Ok(())
-    }
+    if failed { Err(()) } else { Ok(()) }
 }
 
 #[cfg(test)]
@@ -1945,6 +2016,11 @@ mod tests {
         s.record_delivered(10);
         s.committed = Some(10);
         assert_eq!(s.lag(), 0);
+
+        // A rejection below the watermark is ignored; the first offset still
+        // fences everything when nothing was committed.
+        let mut s = PartitionState::default();
+        s.record_delivered(10);
         s.record_rejection(0, false);
         assert_eq!(s.pending, None);
         assert_eq!(s.lag(), 0);
@@ -2016,6 +2092,44 @@ mod tests {
         }
         assert_eq!(s.fence(), Some(5));
         assert_eq!(s.pending, Some(4));
+    }
+
+    #[test]
+    fn a_failed_copy_below_the_committed_watermark_does_not_fence() {
+        let mut s = PartitionState::default();
+        s.mark_offset_in_flight(10);
+        s.record_delivered(10);
+        s.committed_through(10);
+
+        // A recovery seek re-reads 5 while the store of 10 completes; the copy
+        // fails after its record was committed. Fencing it would replay
+        // delivered data and lower the watermark.
+        s.mark_offset_in_flight(5);
+        assert!(!s.record_rejection(5, true));
+        assert_eq!(s.fence(), None);
+        assert_eq!(s.take_pending(), None);
+        assert_eq!(s.committed, Some(10));
+    }
+
+    #[test]
+    fn a_poison_skip_ignores_every_duplicate_acknowledgement() {
+        let mut s = PartitionState::default();
+        s.mark_offset_in_flight(0);
+        s.mark_offset_in_flight(0);
+        s.rejected.insert(0, false);
+        s.retry_attempts = MAX_REDELIVERY_ATTEMPTS;
+
+        assert_eq!(s.retry(), RetryOutcome::Skipped(0));
+        assert_eq!(s.fence(), None);
+
+        // Both copies are still in flight; neither late acknowledgement may
+        // re-fence the skipped offset with a fresh replay budget or pin the
+        // checkpoint.
+        record_ack(&mut s, 0, BatchStatus::Rejected, 0);
+        record_ack(&mut s, 0, BatchStatus::Rejected, 0);
+        assert_eq!(s.fence(), None);
+        assert_eq!(s.pending, Some(0));
+        assert!(s.skipped.is_empty());
     }
 
     #[test]
