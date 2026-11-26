@@ -1,0 +1,24 @@
+[package]
+name = "trace-conversion"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2024"
+publish = false
+license = "MPL-2.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+bytes.workspace = true
+chrono.workspace = true
+indexmap.workspace = true
+opentelemetry-proto = { path = "../opentelemetry-proto", features = ["typed-trace"] }
+tracing.workspace = true
+vector-core = { path = "../vector-core", default-features = false, features = ["typed-trace"] }
+vrl.workspace = true
+
+[dev-dependencies]
+ordered-float.workspace = true
+similar-asserts.workspace = true
+vector-core = { path = "../vector-core", default-features = false, features = ["test", "typed-trace"] }

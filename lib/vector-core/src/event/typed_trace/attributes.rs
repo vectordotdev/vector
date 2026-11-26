@@ -1,6 +1,6 @@
 //! Attribute maps mirroring OTLP `AnyValue`.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Write as _};
 
 use bytes::Bytes;
 use vector_common::byte_size_of::ByteSizeOf;
@@ -41,6 +41,15 @@ impl Attributes {
     /// Inserts `key` / `value`, returning the previous value if present.
     pub fn insert(&mut self, key: impl Into<KeyString>, value: AttrValue) -> Option<AttrValue> {
         self.0.insert(key.into(), value)
+    }
+
+    /// Inserts `key` as a string attribute when `value` is present and non-empty.
+    pub fn insert_nonempty(&mut self, key: impl Into<KeyString>, value: Option<String>) {
+        if let Some(text) = value
+            && !text.is_empty()
+        {
+            self.insert(key, AttrValue::String(text));
+        }
     }
 
     /// Removes `key` if present.
@@ -149,6 +158,89 @@ impl AttrValue {
             _ => None,
         }
     }
+
+    /// Unquoted spelling of a non-finite float: `NaN`, `Infinity`, or `-Infinity`.
+    ///
+    /// Finite values return `None`. [`Self::write_json`] writes this spelling as a JSON string.
+    #[must_use]
+    pub const fn non_finite_spelling(value: f64) -> Option<&'static str> {
+        if value.is_nan() {
+            Some("NaN")
+        } else if value.is_infinite() {
+            if value.is_sign_negative() {
+                Some("-Infinity")
+            } else {
+                Some("Infinity")
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Appends compact JSON for this value to `out`.
+    ///
+    /// Map keys are written in order. Non-finite floats are the JSON strings `NaN`,
+    /// `Infinity`, and `-Infinity`. Bytes are lossy UTF-8, then a JSON string.
+    pub fn write_json(&self, out: &mut String) {
+        match self {
+            Self::Null => out.push_str("null"),
+            Self::Bool(true) => out.push_str("true"),
+            Self::Bool(false) => out.push_str("false"),
+            Self::Integer(value) => write!(out, "{value}").expect("integer formats"),
+            Self::Float(value) => write_json_float(out, *value),
+            Self::String(value) => push_json_string(out, value),
+            Self::Bytes(value) => push_json_string(out, &String::from_utf8_lossy(value)),
+            Self::Array(values) => {
+                out.push('[');
+                for (index, value) in values.iter().enumerate() {
+                    if index > 0 {
+                        out.push(',');
+                    }
+                    value.write_json(out);
+                }
+                out.push(']');
+            }
+            Self::Map(map) => {
+                out.push('{');
+                for (index, (key, value)) in map.iter().enumerate() {
+                    if index > 0 {
+                        out.push(',');
+                    }
+                    push_json_string(out, key.as_ref());
+                    out.push(':');
+                    value.write_json(out);
+                }
+                out.push('}');
+            }
+        }
+    }
+}
+
+fn write_json_float(out: &mut String, value: f64) {
+    if let Some(spelling) = AttrValue::non_finite_spelling(value) {
+        push_json_string(out, spelling);
+    } else {
+        serde_json::to_writer(JsonBuf(out), &value).expect("finite f64 serializes to JSON");
+    }
+}
+
+fn push_json_string(out: &mut String, value: &str) {
+    serde_json::to_writer(JsonBuf(out), value).expect("string serializes to JSON");
+}
+
+/// Appends `serde_json` output to a [`String`]. Each write is valid UTF-8.
+struct JsonBuf<'a>(&'a mut String);
+
+impl std::io::Write for JsonBuf<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .push_str(simdutf8::basic::from_utf8(buf).expect("JSON is UTF-8"));
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 impl PartialEq for AttrValue {
@@ -221,14 +313,13 @@ impl From<f64> for AttrValue {
 mod tests {
     use similar_asserts::assert_eq;
 
-    use super::{AttrMap, AttrValue};
+    use super::{AttrMap, AttrValue, Attributes};
 
     #[test]
     fn equality_uses_float_bits() {
         assert_eq!(AttrValue::Float(f64::NAN), AttrValue::Float(f64::NAN));
         assert_ne!(AttrValue::Float(0.0), AttrValue::Float(-0.0));
     }
-
     #[test]
     fn variant_accessors_return_only_their_variant() {
         assert_eq!(AttrValue::from("s").into_string(), Some("s".to_owned()));
@@ -245,5 +336,38 @@ mod tests {
         assert_eq!(AttrValue::from(1.0).into_integer(), None);
         assert_eq!(AttrValue::from(1_i64).into_float(), None);
         assert_eq!(AttrValue::Null.into_map(), None);
+    }
+
+    #[test]
+    fn write_json_is_compact_and_quotes_non_finite_floats() {
+        let mut out = String::new();
+        let mut map = AttrMap::new();
+        map.insert("z".into(), AttrValue::Integer(1));
+        map.insert("a".into(), AttrValue::Float(f64::NEG_INFINITY));
+        AttrValue::Map(map).write_json(&mut out);
+        assert_eq!(out, r#"{"a":"-Infinity","z":1}"#);
+
+        out.clear();
+        AttrValue::Array(vec![
+            AttrValue::String("a\"b".into()),
+            AttrValue::Float(-0.0),
+            AttrValue::Bytes(bytes::Bytes::from_static(b"ok")),
+            AttrValue::Null,
+        ])
+        .write_json(&mut out);
+        assert_eq!(out, r#"["a\"b",-0.0,"ok",null]"#);
+        assert_eq!(AttrValue::non_finite_spelling(1.5), None);
+        assert_eq!(AttrValue::non_finite_spelling(f64::NAN), Some("NaN"));
+    }
+
+    #[test]
+    fn insert_nonempty_skips_absent_and_empty() {
+        let mut attributes = Attributes::new();
+        attributes.insert_nonempty("a", None);
+        attributes.insert_nonempty("b", Some(String::new()));
+        attributes.insert_nonempty("c", Some("ok".into()));
+        assert!(attributes.get("a").is_none());
+        assert!(attributes.get("b").is_none());
+        assert_eq!(attributes.get("c"), Some(&AttrValue::String("ok".into())));
     }
 }

@@ -1,18 +1,24 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::Utc;
+#[cfg(not(feature = "typed-trace"))]
 use vrl::event_path;
 
-use super::{
-    BUCKET_DURATION_NANOSECONDS, ClientStatsBucket, ClientStatsPayload, PartitionKey,
-    bucket::Bucket,
-};
+#[cfg(not(feature = "typed-trace"))]
+use super::PartitionKey;
+use super::{BUCKET_DURATION_NANOSECONDS, ClientStatsBucket, ClientStatsPayload, bucket::Bucket};
+#[cfg(not(feature = "typed-trace"))]
 use crate::event::{ObjectMap, TraceEvent, Value};
 
+#[cfg(not(feature = "typed-trace"))]
 const MEASURED_KEY: &str = "_dd.measured";
+#[cfg(not(feature = "typed-trace"))]
 const PARTIAL_VERSION_KEY: &str = "_dd.partial_version";
+#[cfg(not(feature = "typed-trace"))]
 const TAG_STATUS_CODE: &str = "http.status_code";
+#[cfg(not(feature = "typed-trace"))]
 const TAG_SYNTHETICS: &str = "synthetics";
+#[cfg(not(feature = "typed-trace"))]
 const TOP_LEVEL_KEY: &str = "_top_level";
 
 /// The number of bucket durations to keep in memory before flushing them.
@@ -25,6 +31,7 @@ pub(crate) struct AggregationKey {
 }
 
 impl AggregationKey {
+    #[cfg(not(feature = "typed-trace"))]
     fn new_aggregation_from_span(
         span: &ObjectMap,
         payload_key: PayloadAggregationKey,
@@ -60,6 +67,30 @@ impl AggregationKey {
             },
         }
     }
+
+    #[cfg(feature = "typed-trace")]
+    pub(crate) fn from_wire(
+        span: &super::super::dd_proto::Span,
+        payload_key: PayloadAggregationKey,
+        synthetics: bool,
+    ) -> Self {
+        let status_code = span
+            .meta
+            .get("http.status_code")
+            .and_then(|code| code.parse().ok())
+            .unwrap_or(0);
+        Self {
+            payload_key,
+            bucket_key: BucketAggregationKey {
+                service: span.service.clone(),
+                name: span.name.clone(),
+                resource: span.resource.clone(),
+                ty: span.r#type.clone(),
+                status_code,
+                synthetics,
+            },
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -70,6 +101,7 @@ pub(crate) struct PayloadAggregationKey {
     pub(crate) container_id: String,
 }
 
+#[cfg(not(feature = "typed-trace"))]
 impl PayloadAggregationKey {
     fn with_span_context(self, span: &ObjectMap) -> Self {
         PayloadAggregationKey {
@@ -141,6 +173,7 @@ impl Aggregator {
     }
 
     /// Updates cached properties from the Agent.
+    #[cfg(not(feature = "typed-trace"))]
     pub(crate) fn update_agent_properties(&mut self, partition_key: &PartitionKey) {
         if self.agent_env.is_none()
             && let Some(env) = &partition_key.env
@@ -182,7 +215,59 @@ impl Aggregator {
             .unwrap_or_else(|| Arc::clone(&self.default_api_key))
     }
 
+    #[cfg(feature = "typed-trace")]
+    pub(crate) fn note_agent(
+        &mut self,
+        api_key: Option<&Arc<str>>,
+        host: &str,
+        env: &str,
+        version: &str,
+    ) {
+        if self.agent_env.is_none() && !env.is_empty() {
+            self.agent_env = Some(env.to_owned());
+        }
+        if self.agent_hostname.is_none() && !host.is_empty() {
+            self.agent_hostname = Some(host.to_owned());
+        }
+        if self.agent_version.is_none() && !version.is_empty() {
+            self.agent_version = Some(version.to_owned());
+        }
+        if self.api_key.is_none()
+            && let Some(api_key) = api_key
+        {
+            self.api_key = Some(Arc::clone(api_key));
+        }
+    }
+
+    #[cfg(feature = "typed-trace")]
+    pub(crate) fn record_encoded_span(
+        &mut self,
+        span: &super::super::dd_proto::Span,
+        weight: f64,
+        is_top: bool,
+        synthetics: bool,
+        mut payload_key: PayloadAggregationKey,
+    ) {
+        if let Some(env) = span.meta.get("env") {
+            payload_key.env.clone_from(env);
+        }
+        let aggkey = AggregationKey::from_wire(span, payload_key, synthetics);
+        let start = u64::try_from(span.start).unwrap_or_else(|_| now_nanos());
+        let duration = u64::try_from(span.duration).unwrap_or(0);
+        let mut btime = align_timestamp(start.saturating_add(duration));
+        if btime < self.oldest_timestamp {
+            btime = self.oldest_timestamp;
+        }
+        let bucket = self.buckets.entry(btime).or_insert_with(|| Bucket {
+            start: btime,
+            duration: BUCKET_DURATION_NANOSECONDS,
+            data: BTreeMap::new(),
+        });
+        bucket.add_encoded(span.error, duration, weight, is_top, aggkey);
+    }
+
     /// Iterates over a trace's constituting spans and upon matching conditions it updates statistics (mostly using the top level span).
+    #[cfg(not(feature = "typed-trace"))]
     pub(crate) fn handle_trace(&mut self, partition_key: &PartitionKey, trace: &TraceEvent) {
         // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L148-L184
 
@@ -225,6 +310,7 @@ impl Aggregator {
         clippy::cast_sign_loss,
         reason = "Preserve timestamp and duration conversions."
     )]
+    #[cfg(not(feature = "typed-trace"))]
     fn handle_span(
         &mut self,
         span: &ObjectMap,
@@ -385,6 +471,14 @@ impl Aggregator {
 
 /// Returns the provided timestamp truncated to the bucket size.
 /// This is the start time of the time bucket in which such timestamp falls.
+#[cfg(feature = "typed-trace")]
+#[allow(clippy::cast_sign_loss, reason = "Preserve timestamp conversions.")]
+fn now_nanos() -> u64 {
+    Utc::now()
+        .timestamp_nanos_opt()
+        .expect("Timestamp out of range") as u64
+}
+
 const fn align_timestamp(start: u64) -> u64 {
     // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L232-L234
     start - (start % BUCKET_DURATION_NANOSECONDS)
@@ -392,6 +486,7 @@ const fn align_timestamp(start: u64) -> u64 {
 
 /// Assumes that all metrics are all encoded as `Value::Float`.
 /// Return the f64 of the specified key or None of key not present.
+#[cfg(not(feature = "typed-trace"))]
 fn get_metric_value_float(span: &ObjectMap, key: &str) -> Option<f64> {
     span.get("metrics")
         .and_then(|m| m.as_object())
@@ -405,6 +500,7 @@ fn get_metric_value_float(span: &ObjectMap, key: &str) -> Option<f64> {
 /// Returns true if the value of this metric is equal to 1.0
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(clippy::float_cmp, reason = "Span markers use exact values.")]
+#[cfg(not(feature = "typed-trace"))]
 fn metric_value_is_1(span: &ObjectMap, key: &str) -> bool {
     match get_metric_value_float(span, key) {
         Some(f) => f == 1.0,
@@ -413,6 +509,7 @@ fn metric_value_is_1(span: &ObjectMap, key: &str) -> bool {
 }
 
 /// Returns true if span is top-level.
+#[cfg(not(feature = "typed-trace"))]
 fn has_top_level(span: &ObjectMap) -> bool {
     // Based on: https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L28-L31
 
@@ -420,6 +517,7 @@ fn has_top_level(span: &ObjectMap) -> bool {
 }
 
 /// Returns true if a span should be measured (i.e. it should get trace metrics calculated).
+#[cfg(not(feature = "typed-trace"))]
 fn is_measured(span: &ObjectMap) -> bool {
     // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L40-L43
 
@@ -430,6 +528,7 @@ fn is_measured(span: &ObjectMap) -> bool {
 /// These types of spans are partial images of long-running spans.
 /// When incomplete, a partial snapshot has a metric `_dd.partial_version` which is a positive integer.
 /// The metric usually increases each time a new version of the same span is sent by the tracer
+#[cfg(not(feature = "typed-trace"))]
 fn is_partial_snapshot(span: &ObjectMap) -> bool {
     // Based on: https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/traceutil/span.go#L49-L52
 

@@ -12,21 +12,26 @@ use vector_lib::{
     event::{EventFinalizers, Finalizable},
     request_metadata::RequestMetadata,
 };
+#[cfg(not(feature = "typed-trace"))]
 use vrl::event_path;
 
+#[cfg(not(feature = "typed-trace"))]
+use super::apm_stats::compute_apm_stats;
 use super::{
-    apm_stats::{Aggregator, compute_apm_stats},
+    apm_stats::Aggregator,
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
     dd_proto,
     service::TraceApiRequest,
     sink::PartitionKey,
 };
-use crate::{
-    common::datadog::decode_u64_id,
-    event::{Event, ObjectMap, TraceEvent, Value},
-    sinks::util::{
-        Compression, Compressor, IncrementalRequestBuilder, metadata::RequestMetadataBuilder,
-    },
+#[cfg(not(feature = "typed-trace"))]
+use crate::common::datadog::decode_u64_id;
+#[cfg(feature = "typed-trace")]
+use crate::event::typed_trace::TraceEvent;
+#[cfg(not(feature = "typed-trace"))]
+use crate::event::{Event, ObjectMap, TraceEvent, Value};
+use crate::sinks::util::{
+    Compression, Compressor, IncrementalRequestBuilder, metadata::RequestMetadataBuilder,
 };
 
 #[derive(Debug, Snafu)]
@@ -104,6 +109,7 @@ pub(crate) struct DDTracesMetadata {
     pub content_type: String,
 }
 
+#[cfg(not(feature = "typed-trace"))]
 impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequestBuilder {
     type Metadata = (DDTracesMetadata, RequestMetadata);
     type Payload = Bytes;
@@ -214,6 +220,155 @@ pub(crate) fn build_request(
 /// An encoded payload and the trace events it contains.
 type EncodeResult = Result<(Vec<u8>, Vec<TraceEvent>), RequestBuilderError>;
 
+#[cfg(feature = "typed-trace")]
+impl IncrementalRequestBuilder<(PartitionKey, Vec<TraceEvent>)> for DatadogTracesRequestBuilder {
+    type Metadata = (DDTracesMetadata, RequestMetadata);
+    type Payload = Bytes;
+    type Request = TraceApiRequest;
+    type Error = RequestBuilderError;
+
+    fn encode_events_incremental(
+        &mut self,
+        input: (PartitionKey, Vec<TraceEvent>),
+    ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
+        let (key, events) = input;
+        let mut reporter = super::typed::IssueLog;
+        let groups = super::typed::group_typed_traces(events, &mut reporter);
+        if !self.disable_apm_stats {
+            super::apm_stats::compute_typed_apm_stats(
+                key.api_key.as_ref(),
+                &self.stats_aggregator,
+                &groups,
+            );
+        }
+
+        encode_typed_groups(&groups, self.max_size)
+            .into_iter()
+            .map(|result| {
+                result.and_then(|(payload, mut processed)| {
+                    let uncompressed_size = payload.len();
+                    let metadata = DDTracesMetadata {
+                        api_key: key
+                            .api_key
+                            .clone()
+                            .unwrap_or_else(|| Arc::clone(&self.api_key)),
+                        endpoint: DatadogTracesEndpoint::Traces,
+                        finalizers: processed.take_finalizers(),
+                        uncompressed_size,
+                        content_type: "application/x-protobuf".to_string(),
+                    };
+                    let builder = RequestMetadataBuilder::from_events(&processed);
+                    let mut compressor = Compressor::from(self.compression);
+                    match compressor.write_all(&payload) {
+                        Ok(()) => {
+                            let bytes = compressor.into_inner().freeze();
+                            let bytes_len = NonZeroUsize::new(bytes.len())
+                                .expect("payload should never be zero length");
+                            let request_metadata = builder.with_request_size(bytes_len);
+                            Ok(((metadata, request_metadata), bytes))
+                        }
+                        Err(e) => Err(RequestBuilderError::FailedToBuild {
+                            message: "Payload compression failed.",
+                            reason: e.to_string(),
+                            dropped_events: processed.len(),
+                        }),
+                    }
+                })
+            })
+            .collect()
+    }
+
+    fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+        build_request(
+            metadata,
+            payload,
+            self.compression,
+            &self.endpoint_configuration,
+        )
+    }
+}
+
+#[cfg(feature = "typed-trace")]
+fn encode_typed_groups(groups: &[super::typed::AgentGroup], max_size: usize) -> Vec<EncodeResult> {
+    groups
+        .iter()
+        .flat_map(|group| encode_typed_group(group, max_size))
+        .collect()
+}
+
+#[cfg(feature = "typed-trace")]
+fn encode_typed_group(group: &super::typed::AgentGroup, max_size: usize) -> Vec<EncodeResult> {
+    let encoded = group.encode();
+    if encoded.encoded_len() < max_size {
+        return vec![Ok((encoded.encode_to_vec(), group.events.clone()))];
+    }
+
+    let mut results = Vec::new();
+    let mut payload = empty_agent(group);
+    let mut processed = Vec::new();
+    let remember = |processed: &mut Vec<TraceEvent>, chunk: &super::typed::ChunkGroup| {
+        processed.extend(
+            chunk
+                .event_indexes
+                .iter()
+                .map(|index| group.events[*index].clone()),
+        );
+    };
+
+    for (mut tracer_proto, tracer) in encoded.tracer_payloads.into_iter().zip(&group.tracers) {
+        let chunks = std::mem::take(&mut tracer_proto.chunks);
+        for (chunk_proto, chunk) in chunks.into_iter().zip(&tracer.chunks) {
+            let mut piece = tracer_proto.clone();
+            piece.chunks.push(chunk_proto);
+            payload.tracer_payloads.push(piece);
+            if payload.encoded_len() < max_size {
+                remember(&mut processed, chunk);
+                continue;
+            }
+
+            let oversized = payload.tracer_payloads.pop().expect("just pushed");
+            if !payload.tracer_payloads.is_empty() {
+                results.push(Ok((
+                    payload.encode_to_vec(),
+                    std::mem::take(&mut processed),
+                )));
+                payload = empty_agent(group);
+            }
+            payload.tracer_payloads.push(oversized);
+            if payload.encoded_len() >= max_size {
+                payload.tracer_payloads.clear();
+                results.push(Err(RequestBuilderError::FailedToBuild {
+                    message: "Dropped trace event",
+                    reason: "Trace is larger than allowed payload size".into(),
+                    dropped_events: chunk.event_indexes.len(),
+                }));
+            } else {
+                remember(&mut processed, chunk);
+            }
+        }
+    }
+    if !payload.tracer_payloads.is_empty() {
+        results.push(Ok((payload.encode_to_vec(), processed)));
+    }
+    results
+}
+
+#[cfg(feature = "typed-trace")]
+fn empty_agent(group: &super::typed::AgentGroup) -> dd_proto::AgentPayload {
+    dd_proto::AgentPayload {
+        host_name: group.host_name.clone(),
+        env: group.env.clone(),
+        tracer_payloads: Vec::new(),
+        tags: group.tags.clone(),
+        agent_version: group.agent_version.clone(),
+        target_tps: group.target_tps,
+        error_tps: group.error_tps,
+        rare_sampler_enabled: group.rare_sampler_enabled,
+        idx_tracer_payloads: Vec::new(),
+    }
+}
+
+#[cfg(not(feature = "typed-trace"))]
 fn encode_traces(
     key: &PartitionKey,
     trace_events: Vec<TraceEvent>,
@@ -262,6 +417,7 @@ fn encode_traces(
 
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(clippy::cast_precision_loss, reason = "Sampling rates use f64.")]
+#[cfg(not(feature = "typed-trace"))]
 fn build_empty_payload(key: &PartitionKey) -> dd_proto::AgentPayload {
     dd_proto::AgentPayload {
         host_name: key.hostname.clone().unwrap_or_default(),
@@ -282,6 +438,7 @@ fn build_empty_payload(key: &PartitionKey) -> dd_proto::AgentPayload {
     clippy::cast_possible_truncation,
     reason = "Preserve wire priority conversion."
 )]
+#[cfg(not(feature = "typed-trace"))]
 fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
     let tags = trace
         .get(event_path!("tags"))
@@ -367,6 +524,7 @@ fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
     clippy::cast_sign_loss,
     reason = "Preserve wire ID and error conversions."
 )]
+#[cfg(not(feature = "typed-trace"))]
 fn convert_span(span: &ObjectMap) -> dd_proto::Span {
     let trace_id = match span.get("trace_id") {
         Some(Value::Integer(val)) => *val,
@@ -468,6 +626,7 @@ fn convert_span(span: &ObjectMap) -> dd_proto::Span {
     }
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn convert_span_links(links: &[Value]) -> Vec<dd_proto::SpanLink> {
     links
         .iter()
@@ -475,6 +634,7 @@ fn convert_span_links(links: &[Value]) -> Vec<dd_proto::SpanLink> {
         .collect()
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn convert_span_events(events: &[Value]) -> Vec<dd_proto::SpanEvent> {
     events
         .iter()
@@ -488,6 +648,7 @@ fn convert_span_events(events: &[Value]) -> Vec<dd_proto::SpanEvent> {
     clippy::cast_sign_loss,
     reason = "Preserve wire flag conversion."
 )]
+#[cfg(not(feature = "typed-trace"))]
 fn convert_span_link(link: &ObjectMap) -> dd_proto::SpanLink {
     dd_proto::SpanLink {
         trace_id: u64_id_field(link, "trace_id"),
@@ -501,6 +662,7 @@ fn convert_span_link(link: &ObjectMap) -> dd_proto::SpanLink {
 
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(clippy::cast_sign_loss, reason = "Preserve wire timestamp conversion.")]
+#[cfg(not(feature = "typed-trace"))]
 fn convert_span_event(event: &ObjectMap) -> dd_proto::SpanEvent {
     dd_proto::SpanEvent {
         time_unix_nano: match event.get("time_unix_nano") {
@@ -517,6 +679,7 @@ fn convert_span_event(event: &ObjectMap) -> dd_proto::SpanEvent {
     }
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn encode_span_event_attributes(
     attrs: &ObjectMap,
 ) -> BTreeMap<String, dd_proto::AttributeAnyValue> {
@@ -526,6 +689,7 @@ fn encode_span_event_attributes(
         .collect()
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn integer_field(object: &ObjectMap, key: &str) -> i64 {
     match object.get(key) {
         Some(Value::Integer(val)) => *val,
@@ -533,10 +697,12 @@ fn integer_field(object: &ObjectMap, key: &str) -> i64 {
     }
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn u64_id_field(object: &ObjectMap, key: &str) -> u64 {
     object.get(key).map_or(0, decode_u64_id)
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn string_field(object: &ObjectMap, key: &str) -> String {
     object
         .get(key)
@@ -544,6 +710,7 @@ fn string_field(object: &ObjectMap, key: &str) -> String {
         .unwrap_or_default()
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn string_map_field(object: &ObjectMap, key: &str) -> BTreeMap<String, String> {
     object
         .get(key)
@@ -552,6 +719,7 @@ fn string_map_field(object: &ObjectMap, key: &str) -> BTreeMap<String, String> {
         .unwrap_or_default()
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn object_to_string_map(object: &ObjectMap) -> BTreeMap<String, String> {
     object
         .iter()
@@ -559,6 +727,7 @@ fn object_to_string_map(object: &ObjectMap) -> BTreeMap<String, String> {
         .collect()
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn encode_attribute_any_value(value: &Value) -> dd_proto::AttributeAnyValue {
     use dd_proto::attribute_any_value::AttributeAnyValueType;
 
@@ -593,6 +762,7 @@ fn encode_attribute_any_value(value: &Value) -> dd_proto::AttributeAnyValue {
     }
 }
 
+#[cfg(not(feature = "typed-trace"))]
 fn encode_attribute_array_value(value: &Value) -> dd_proto::AttributeArrayValue {
     use dd_proto::attribute_array_value::AttributeArrayValueType;
 
@@ -620,7 +790,7 @@ fn encode_attribute_array_value(value: &Value) -> dd_proto::AttributeArrayValue 
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "typed-trace")))]
 mod test {
     use proptest::prelude::*;
     use vrl::event_path;
@@ -731,5 +901,59 @@ mod test {
         assert_eq!(encoded.trace_id, u64::MAX);
         assert_eq!(encoded.trace_id_high, 1u64 << 63);
         assert_eq!(encoded.span_id, 0xdead_beef_cafe_babe);
+    }
+}
+
+#[cfg(all(test, feature = "typed-trace"))]
+mod typed_size {
+    use prost::Message;
+
+    use super::{RequestBuilderError, dd_proto, encode_typed_group};
+    use crate::{
+        event::typed_trace::{
+            Span, SpanId, TraceConversionIssue, TraceConversionReporter, TraceEvent, TraceId,
+        },
+        sinks::datadog::traces::typed::group_typed_traces,
+    };
+
+    struct Quiet;
+
+    impl TraceConversionReporter for Quiet {
+        fn report(&mut self, _issue: TraceConversionIssue<'_>) {}
+    }
+
+    fn traced(trace: u128, span_id: u64, name: &str) -> TraceEvent {
+        let mut event = TraceEvent::new(TraceId::new(trace).expect("non-zero"));
+        event.resource_mut().service = Some("a".to_owned());
+        *event.spans_mut() = vec![Span::new(SpanId::new(span_id).expect("non-zero"), name)];
+        event
+    }
+
+    #[test]
+    fn drops_only_the_chunk_that_alone_exceeds_the_limit() {
+        let big = "x".repeat(4_000);
+        for (events, kept_index) in [
+            (vec![traced(1, 1, "small"), traced(2, 2, &big)], 0),
+            (vec![traced(2, 2, &big), traced(1, 1, "small")], 1),
+        ] {
+            let groups = group_typed_traces(events, &mut Quiet);
+            let results = encode_typed_group(&groups[0], 1_000);
+            assert_eq!(results.len(), 2);
+            let (body, processed) = results[kept_index].as_ref().expect("small chunk fits");
+            assert_eq!(processed.len(), 1);
+            assert_eq!(processed[0].spans()[0].span_id.get(), 1);
+            let payload = dd_proto::AgentPayload::decode(body.as_slice()).unwrap();
+            assert_eq!(payload.tracer_payloads[0].chunks[0].spans[0].span_id, 1);
+            let Err(error) = &results[1 - kept_index] else {
+                panic!("big chunk drops");
+            };
+            assert!(matches!(
+                error,
+                RequestBuilderError::FailedToBuild {
+                    dropped_events: 1,
+                    ..
+                }
+            ));
+        }
     }
 }

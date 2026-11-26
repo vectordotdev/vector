@@ -15,6 +15,7 @@ file-source = { path = "../file-source", optional = true }
 file-source-common = { path = "../file-source-common", optional = true }
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
 prometheus-parser = { path = "../prometheus-parser", optional = true }
+trace-conversion = { path = "../trace-conversion", optional = true }
 vector-api-client = { path = "../vector-api-client", optional = true }
 vector-buffers = { path = "../vector-buffers", default-features = false }
 vector-common = { path = "../vector-common" }
@@ -34,7 +35,7 @@ parquet = ["codecs/parquet"]
 api = ["vector-tap/api"]
 file-source = ["dep:file-source", "dep:file-source-common"]
 lua = ["vector-core/lua"]
-typed-trace = ["vector-core/typed-trace", "opentelemetry-proto?/typed-trace", "codecs/typed-trace"]
+typed-trace = ["vector-core/typed-trace", "opentelemetry-proto?/typed-trace", "codecs/typed-trace", "dep:trace-conversion"]
 opentelemetry = ["dep:opentelemetry-proto", "codecs/opentelemetry"]
 prometheus = ["dep:prometheus-parser"]
 proptest = ["vector-lookup/proptest", "vrl/proptest"]

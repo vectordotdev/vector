@@ -7,10 +7,9 @@ use super::{
     aggregation::{AggregationKey, PayloadAggregationKey},
     ddsketch_full,
 };
-use crate::{
-    event::{ObjectMap, Value},
-    metrics::AgentDDSketch,
-};
+#[cfg(not(feature = "typed-trace"))]
+use crate::event::{ObjectMap, Value};
+use crate::metrics::AgentDDSketch;
 
 pub(crate) struct GroupedStats {
     hits: f64,
@@ -148,6 +147,32 @@ impl Bucket {
         m
     }
 
+    #[cfg(feature = "typed-trace")]
+    #[allow(clippy::cast_precision_loss, reason = "Stats use f64.")]
+    pub(crate) fn add_encoded(
+        &mut self,
+        error: i32,
+        duration: u64,
+        weight: f64,
+        is_top: bool,
+        aggkey: AggregationKey,
+    ) {
+        let gs = self.data.entry(aggkey).or_insert_with(GroupedStats::new);
+        if is_top {
+            gs.top_level_hits += weight;
+        }
+        gs.hits += weight;
+        let duration = duration as f64;
+        gs.duration += duration * weight;
+        if error != 0 {
+            gs.errors += weight;
+            gs.err_distribution.insert(duration);
+        } else {
+            gs.ok_distribution.insert(duration);
+        }
+    }
+
+    #[cfg(not(feature = "typed-trace"))]
     pub(crate) fn add(
         &mut self,
         span: &ObjectMap,
@@ -168,6 +193,7 @@ impl Bucket {
     /// execution time, with isolated measurements for spans flagged as errored and spans without error.
     // https://github.com/vectordotdev/vector/issues/23659
     #[allow(clippy::cast_precision_loss, reason = "Stats use f64.")]
+    #[cfg(not(feature = "typed-trace"))]
     fn update(span: &ObjectMap, weight: f64, is_top: bool, gs: &mut GroupedStats) {
         is_top.then(|| {
             gs.top_level_hits += weight;
