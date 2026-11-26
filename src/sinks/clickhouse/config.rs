@@ -117,6 +117,12 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub insert_random_shard: bool,
 
+    /// Accepts metric events in addition to logs.
+    ///
+    /// Metrics are encoded as JSON objects in Vector's native metric shape. Not supported with the `arrow_stream` format.
+    #[serde(default)]
+    pub accept_metrics: bool,
+
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
@@ -216,7 +222,12 @@ impl SinkConfig for ClickhouseConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        // Metrics are opt-in so existing sinks with mixed inputs keep receiving only logs.
+        if self.accept_metrics {
+            Input::new(DataType::Metric | DataType::Log)
+        } else {
+            Input::log()
+        }
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -235,6 +246,11 @@ impl ValidatedSink for ClickhouseConfig {
                 .try_into()
                 .expect("'default' should be a valid template")
         });
+
+        // ArrowStream is log-only, with or without a batch encoder.
+        if self.accept_metrics && self.format == Format::ArrowStream {
+            return Err("'accept_metrics' is not supported with 'format: arrow_stream'.".into());
+        }
 
         // For batch_encoding with ArrowStream, validate compatibility
         if let Some(batch_encoding) = &self.batch_encoding {
@@ -484,6 +500,39 @@ mod tests {
     use super::*;
     use crate::config::ValidatedSink;
     use crate::template::ConfinementConfig;
+
+    #[test]
+    fn input_is_log_only_by_default() {
+        let input = ClickhouseConfig::default().input();
+        assert_eq!(input.data_type(), DataType::Log);
+    }
+
+    #[test]
+    fn input_accepts_metrics_when_enabled() {
+        let config = ClickhouseConfig {
+            accept_metrics: true,
+            ..Default::default()
+        };
+        assert_eq!(config.input().data_type(), DataType::Metric | DataType::Log);
+    }
+
+    #[test]
+    fn rejects_accept_metrics_with_arrow_stream() {
+        let batch_encodings = [
+            None,
+            Some(ClickhouseBatchEncoding::ArrowStream(
+                ArrowStreamSerializerConfig::default(),
+            )),
+        ];
+        for batch_encoding in batch_encodings {
+            let config = ClickhouseConfig {
+                accept_metrics: true,
+                ..create_test_config(Format::ArrowStream, batch_encoding)
+            };
+            let err = config.validate().unwrap_err().to_string();
+            assert!(err.contains("'accept_metrics' is not supported"), "{err}");
+        }
+    }
 
     #[test]
     fn generate_config() {

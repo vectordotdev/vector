@@ -1,6 +1,15 @@
 package metadata
 
 generated: components: sinks: clickhouse: configuration: {
+	accept_metrics: {
+		description: """
+			Accepts metric events in addition to logs.
+
+			Metrics are encoded as JSON objects in Vector's native metric shape. Not supported with the `arrow_stream` format.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
