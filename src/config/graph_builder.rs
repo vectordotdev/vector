@@ -245,7 +245,7 @@ mod tests {
 
         assert_eq!(
             config.build().unwrap_err(),
-            vec!["Cyclic dependency detected in the chain [ update -> update ]"]
+            vec!["Cyclic dependency detected among components [ update ]"]
         );
     }
 
