@@ -629,6 +629,9 @@ impl WebSocketSource {
                     (Serializer::Text(_) | Serializer::RawMessage(_), Value::Bytes(bytes)) => {
                         LogEvent::from_bytes_legacy(&bytes).into()
                     }
+                    (Serializer::Text(_) | Serializer::RawMessage(_), Value::String(string)) => {
+                        LogEvent::from_bytes_legacy(string.as_bytes()).into()
+                    }
                     (_, value) => LogEvent::from_parts(value, EventMetadata::default()).into(),
                 },
                 &mut message_bytes,
