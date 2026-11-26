@@ -460,6 +460,25 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              component_received_events_total.tags
 		}
+		component_received_network_bytes_total: {
+			description: """
+				The number of network payload bytes received before decompression, framing,
+				and decoding, including payloads subsequently rejected by the component.
+
+				Currently emitted by sources using the shared TCP reader or capped HTTP
+				request-body collector, and by the UDP socket source. TCP counts bytes
+				exposed by the stream; HTTP counts body data. Transport headers, TLS
+				overhead, and bytes not exposed by the transport are not included.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				protocol: {
+					description: "The protocol used to receive the bytes."
+					required:    true
+				}
+			}
+		}
 		component_received_bytes: {
 			description:       string | *"The size in bytes of each event received by the source."
 			type:              "histogram"
@@ -567,6 +586,27 @@ components: sources: internal_metrics: {
 				region: {
 					description: "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname."
 					required:    false
+				}
+			}
+		}
+		component_sent_network_bytes_total: {
+			description: """
+				The number of network payload bytes sent, independently of delivery
+				success. Retries count again; partial writes still count if a subsequent
+				write or flush fails.
+
+				Currently emitted by the shared HTTP client and socket sink utilities.
+				HTTP counts body data handed to the transport after compression. Socket
+				sinks count bytes accepted by stream writes or datagram sends. Transport
+				headers and TLS overhead are not included. These metrics are not yet
+				available for all components.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				protocol: {
+					description: "The protocol used to send the bytes."
+					required:    true
 				}
 			}
 		}

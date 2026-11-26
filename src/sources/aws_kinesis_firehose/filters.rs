@@ -30,6 +30,7 @@ use crate::{
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 #[allow(clippy::too_many_arguments)]
 pub(super) fn firehose(
+    protocol: &'static str,
     access_keys: Vec<String>,
     store_access_key: bool,
     record_compression: Compression,
@@ -70,7 +71,7 @@ pub(super) fn firehose(
         .and(parse_common_attributes_header(
             !context.common_attributes.is_empty(),
         ))
-        .and(parse_body())
+        .and(parse_body(protocol))
         .and(warp::any().map(move || context.clone()))
         .and_then(handlers::firehose)
         .recover(handle_firehose_rejection)
@@ -79,13 +80,14 @@ pub(super) fn firehose(
 /// Decode (if needed) and parse request body
 ///
 /// Firehose can be configured to gzip compress messages so we handle this here
-fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::reject::Rejection> + Clone
-{
+fn parse_body(
+    protocol: &'static str,
+) -> impl Filter<Extract = (FirehoseRequest,), Error = warp::reject::Rejection> + Clone {
     warp::any()
         .and(warp::header::optional::<String>("Content-Encoding"))
         .and(warp::header("X-Amz-Firehose-Request-Id"))
         .and(warp::header::optional("X-Amz-Firehose-Access-Key"))
-        .and(capped_body())
+        .and(capped_body(protocol))
         .and_then(
             |encoding: Option<String>,
              request_id: String,
@@ -284,7 +286,7 @@ mod tests {
                 io::Read::read_to_end(&mut gz, &mut buffer).unwrap();
                 buffer
             })
-            .filter(&parse_body())
+            .filter(&parse_body("http"))
             .await
             .unwrap();
 

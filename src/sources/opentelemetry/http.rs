@@ -119,6 +119,7 @@ pub(crate) async fn run_http_server(
 
 #[allow(clippy::too_many_arguments)] // TODO change to a builder struct
 pub(crate) fn build_warp_filter(
+    protocol: &'static str,
     acknowledgements: bool,
     log_namespace: LogNamespace,
     out: SourceSender,
@@ -130,6 +131,7 @@ pub(crate) fn build_warp_filter(
     traces_deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
+        protocol,
         acknowledgements,
         log_namespace,
         out.clone(),
@@ -139,6 +141,7 @@ pub(crate) fn build_warp_filter(
         logs_deserializer,
     );
     let metrics_filters = build_warp_metrics_filter(
+        protocol,
         acknowledgements,
         log_namespace,
         out.clone(),
@@ -148,6 +151,7 @@ pub(crate) fn build_warp_filter(
         metrics_deserializer,
     );
     let trace_filters = build_warp_trace_filter(
+        protocol,
         acknowledgements,
         out,
         bytes_received,
@@ -209,6 +213,7 @@ fn parse_with_deserializer(
 }
 
 fn build_ingest_filter<Resp, F>(
+    protocol: &'static str,
     telemetry_type: &'static str,
     acknowledgements: bool,
     out: SourceSender,
@@ -222,7 +227,7 @@ where
         + 'static
         + Fn(Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
 {
-    let body_filter = capped_body();
+    let body_filter = capped_body(protocol);
 
     warp::post()
         .and(warp::path("v1"))
@@ -250,7 +255,9 @@ where
         .boxed()
 }
 
+#[allow(clippy::too_many_arguments)] // TODO change to a builder struct
 fn build_warp_log_filter(
+    protocol: &'static str,
     acknowledgements: bool,
     log_namespace: LogNamespace,
     source_sender: SourceSender,
@@ -285,13 +292,16 @@ fn build_warp_log_filter(
     };
 
     build_ingest_filter::<ExportLogsServiceResponse, _>(
+        protocol,
         LOGS,
         acknowledgements,
         source_sender,
         make_events,
     )
 }
+#[allow(clippy::too_many_arguments)] // TODO change to a builder struct
 fn build_warp_metrics_filter(
+    protocol: &'static str,
     acknowledgements: bool,
     log_namespace: LogNamespace,
     source_sender: SourceSender,
@@ -326,6 +336,7 @@ fn build_warp_metrics_filter(
     };
 
     build_ingest_filter::<ExportMetricsServiceResponse, _>(
+        protocol,
         METRICS,
         acknowledgements,
         source_sender,
@@ -334,6 +345,7 @@ fn build_warp_metrics_filter(
 }
 
 fn build_warp_trace_filter(
+    protocol: &'static str,
     acknowledgements: bool,
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
@@ -372,6 +384,7 @@ fn build_warp_trace_filter(
     };
 
     build_ingest_filter::<ExportTraceServiceResponse, _>(
+        protocol,
         TRACES,
         acknowledgements,
         source_sender,

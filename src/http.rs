@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+mod network;
 use std::{
     collections::HashMap, error::Error as StdError, future::Future, net::SocketAddr, pin::pin,
     time::Duration,

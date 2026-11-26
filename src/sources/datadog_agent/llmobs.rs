@@ -32,7 +32,7 @@ pub(super) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(capped_body())
+        .and(capped_body(source.protocol))
         .and_then({
             let handler = handler.clone();
             let source = source.clone();
@@ -66,7 +66,7 @@ pub(super) fn build_warp_filter(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(capped_body())
+        .and(capped_body(source.protocol))
         .and_then(
             move |path: FullPath,
                   encoding_header: Option<String>,

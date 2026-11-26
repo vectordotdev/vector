@@ -540,7 +540,7 @@ impl SplunkSource {
             .and(warp::addr::remote())
             .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(Self::gzip())
-            .and(capped_body())
+            .and(capped_body(protocol))
             .and(warp::path::full())
             .and_then(
                 move |_,
@@ -677,7 +677,7 @@ impl SplunkSource {
             .and(warp::addr::remote())
             .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(Self::gzip())
-            .and(capped_body())
+            .and(capped_body(protocol))
             .and(warp::path::full())
             .and_then(
                 move |_,
@@ -802,12 +802,14 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn lenient_json_content_type_check<T>() -> impl Filter<Extract = (T,), Error = Rejection> + Clone
+    fn lenient_json_content_type_check<T>(
+        protocol: &'static str,
+    ) -> impl Filter<Extract = (T,), Error = Rejection> + Clone
     where
         T: Send + DeserializeOwned + 'static,
     {
         warp::header::optional::<HeaderValue>(CONTENT_TYPE.as_str())
-            .and(capped_body())
+            .and(capped_body(protocol))
             .and_then(
                 |ctype: Option<HeaderValue>, body: bytes::Bytes| async move {
                     let ok = ctype
@@ -834,7 +836,7 @@ impl SplunkSource {
             .and(warp::path!("ack"))
             .and(self.authorization())
             .and(SplunkSource::required_channel())
-            .and(Self::lenient_json_content_type_check::<HecAckStatusRequest>())
+            .and(Self::lenient_json_content_type_check::<HecAckStatusRequest>(self.protocol))
             .and_then(move |_, channel: String, req: HecAckStatusRequest| {
                 let idx_ack = idx_ack.clone();
                 async move {

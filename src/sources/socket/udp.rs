@@ -236,6 +236,10 @@ pub(super) fn udp(
         }
 
         let bytes_received = register(BytesReceived::from(Protocol::UDP));
+        let network_bytes_received =
+            register(vector_lib::internal_event::SourceNetworkBytesReceived {
+                protocol: "udp".into(),
+            });
 
         info!(message = "Listening.", address = %config.address);
         // We add 1 to the max_length in order to determine if the received data has been truncated.
@@ -250,6 +254,9 @@ pub(super) fn udp(
                             #[cfg(windows)]
                             if let Some(err) = error.raw_os_error() {
                                 if err == 10040 {
+                                    // Winsock fills the receive buffer before reporting WSAEMSGSIZE.
+                                    // Count the consumed prefix even though this datagram is rejected.
+                                    network_bytes_received.emit(ByteSize(buf.len()));
                                     // 10040 is the Windows error that the Udp message has exceeded max_length
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
@@ -267,6 +274,7 @@ pub(super) fn udp(
                        }
                     };
 
+                    network_bytes_received.emit(ByteSize(byte_size));
                     bytes_received.emit(ByteSize(byte_size));
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;

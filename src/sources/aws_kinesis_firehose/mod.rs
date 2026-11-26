@@ -177,7 +177,9 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             "common_attributes",
         ))?;
 
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let svc = filters::firehose(
+            tls.http_protocol_name(),
             access_keys.map(|key| key.inner().to_string()).collect(),
             self.store_access_key,
             self.record_compression,
@@ -188,7 +190,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             common_attributes,
         );
 
-        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let listener = tls
             .bind(&self.address)
             .await?

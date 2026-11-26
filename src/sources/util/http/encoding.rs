@@ -1,7 +1,9 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures_util::StreamExt;
 use snap::raw::Decoder as SnappyDecoder;
-use vector_lib::internal_event::emit;
+use vector_lib::internal_event::{
+    ByteSize, InternalEventHandle, SourceNetworkBytesReceived, emit, register,
+};
 use warp::http::StatusCode;
 use warp::{Filter, filters::BoxedFilter};
 
@@ -18,7 +20,7 @@ use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 /// The cap is the global decompressed-size limit ([`max_decompressed_size_bytes`]): it bounds the
 /// raw (still-compressed) body a source buffers before decompression, so a large upload cannot
 /// drive unbounded allocation independently of the decompressed-size cap.
-pub(crate) fn capped_body() -> BoxedFilter<(Bytes,)> {
+pub(crate) fn capped_body(protocol: &'static str) -> BoxedFilter<(Bytes,)> {
     let max_body_size = max_decompressed_size_bytes();
     let max_body_size_header = u64::try_from(max_body_size).unwrap_or(u64::MAX);
 
@@ -35,7 +37,7 @@ pub(crate) fn capped_body() -> BoxedFilter<(Bytes,)> {
         .untuple_one()
         .and(warp::body::stream())
         .and_then(move |body| async move {
-            collect_body_with_limit(body, max_body_size)
+            collect_body_with_limit(body, max_body_size, protocol)
                 .await
                 .map_err(warp::reject::custom)
         })
@@ -134,13 +136,20 @@ const ADDITIONAL_CAPACITY_FOR_CHUNKS_BEYOND_FIRST_TWO: usize = 16 * 1024;
 /// to avoid having to reallocate multiple times once other chunks arrive) is
 /// only allocated once a second chunk arrives.
 /// (<https://github.com/hyperium/hyper/blob/v0.14.32/src/body/to_bytes.rs>).
-async fn collect_body_with_limit<S, B>(body: S, max_body_size: usize) -> Result<Bytes, ErrorMessage>
+async fn collect_body_with_limit<S, B>(
+    body: S,
+    max_body_size: usize,
+    protocol: &'static str,
+) -> Result<Bytes, ErrorMessage>
 where
     S: futures_util::Stream<Item = Result<B, warp::Error>>,
     B: Buf,
 {
     futures_util::pin_mut!(body);
 
+    let network_bytes = register(SourceNetworkBytesReceived {
+        protocol: protocol.into(),
+    });
     let mut total_body_size: usize = 0;
     let mut admit_chunk_within_limit = |chunk: Result<B, warp::Error>| -> Result<B, ErrorMessage> {
         let chunk = chunk.map_err(|error| {
@@ -150,6 +159,8 @@ where
             )
         })?;
 
+        // Count received data even when the size cap or subsequent decoding rejects it.
+        network_bytes.emit(ByteSize(chunk.remaining()));
         total_body_size = total_body_size.saturating_add(chunk.remaining());
         if total_body_size > max_body_size {
             return Err(request_body_too_large_error(max_body_size));
@@ -251,6 +262,84 @@ mod tests {
     use zstd::stream::Encoder as ZstdEncoder;
 
     use super::*;
+    use crate::test_util::{metrics::counter_value_with_tags, trace_init};
+    use tracing::Instrument;
+
+    #[rstest::rstest]
+    #[case("http")]
+    #[case("https")]
+    #[tokio::test]
+    async fn network_bytes_count_compressed_body_before_decompression(
+        #[case] protocol: &'static str,
+    ) {
+        trace_init();
+        let component = "network_http_compressed";
+        async {
+            let plaintext = vec![b'a'; 4096];
+            let compressed = gzip_payload(&plaintext);
+            let compressed_size = compressed.len();
+            let body = collect_body_with_limit(
+                stream::iter([Ok::<_, warp::Error>(compressed)]),
+                8192,
+                protocol,
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                decompress_body_with_limit(Some("gzip"), body, 8192).unwrap(),
+                plaintext
+            );
+            assert_eq!(
+                counter_value_with_tags(
+                    "component_received_network_bytes_total",
+                    &[("component_id", component), ("protocol", protocol)],
+                )
+                .to_bits(),
+                f64::from(u32::try_from(compressed_size).unwrap()).to_bits(),
+            );
+        }
+        .instrument(tracing::info_span!("component", component_id = component))
+        .await;
+    }
+
+    #[rstest::rstest]
+    #[case("http")]
+    #[case("https")]
+    #[tokio::test]
+    async fn network_bytes_include_rejected_body_chunks(#[case] protocol: &'static str) {
+        trace_init();
+        let component = "network_http_rejected";
+        async {
+            let body = collect_body_with_limit(
+                stream::iter([
+                    Ok::<_, warp::Error>(Bytes::from_static(b"abc")),
+                    Ok(Bytes::from_static(b"def")),
+                ]),
+                4,
+                protocol,
+            )
+            .await;
+            assert!(body.is_err());
+            assert_eq!(
+                counter_value_with_tags(
+                    "component_received_network_bytes_total",
+                    &[("component_id", component), ("protocol", protocol)],
+                )
+                .to_bits(),
+                6.0_f64.to_bits(),
+            );
+            assert_eq!(
+                counter_value_with_tags(
+                    "component_received_bytes_total",
+                    &[("component_id", component)],
+                )
+                .to_bits(),
+                0.0_f64.to_bits(),
+            );
+        }
+        .instrument(tracing::info_span!("component", component_id = component))
+        .await;
+    }
 
     fn gzip_payload(plaintext: &[u8]) -> Bytes {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -365,7 +454,7 @@ mod tests {
             Ok::<_, warp::Error>(Bytes::from_static(b" world")),
         ]);
 
-        let collected = collect_body_with_limit(body, 11).await.unwrap();
+        let collected = collect_body_with_limit(body, 11, "http").await.unwrap();
         assert_eq!(collected, Bytes::from_static(b"hello world"));
     }
 
@@ -376,7 +465,7 @@ mod tests {
             Ok::<_, warp::Error>(Bytes::from_static(b" world")),
         ]);
 
-        let err = collect_body_with_limit(body, 5)
+        let err = collect_body_with_limit(body, 5, "http")
             .await
             .expect_err("should reject");
         assert_eq!(err.status_code(), StatusCode::PAYLOAD_TOO_LARGE);

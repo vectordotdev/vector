@@ -2,7 +2,10 @@ use std::net::SocketAddr;
 
 use vector_lib::{
     NamedInternalEvent, counter,
-    internal_event::{CounterName, InternalEvent, emit, error_stage, error_type},
+    internal_event::{
+        ByteSize, CounterName, InternalEvent, InternalEventHandle, SourceNetworkBytesReceived,
+        emit, error_stage, error_type, register,
+    },
 };
 
 use crate::{internal_events::SocketOutgoingConnectionError, tls::TlsError};
@@ -211,6 +214,10 @@ impl InternalEvent for TcpBytesReceived {
             CounterName::ComponentReceivedBytesTotal, "protocol" => "tcp"
         )
         .increment(self.byte_size as u64);
+        register(SourceNetworkBytesReceived {
+            protocol: "tcp".into(),
+        })
+        .emit(ByteSize(self.byte_size));
     }
 }
 
@@ -223,7 +230,30 @@ mod tests {
     use vector_lib::internal_event::InternalEvent;
     use vector_lib::metrics::Controller;
 
-    use super::{TcpSendAckError, TcpSourceConnectionClosed};
+    use super::{TcpBytesReceived, TcpSendAckError, TcpSourceConnectionClosed};
+
+    #[test]
+    fn network_bytes_count_tcp_reads_without_changing_serialized_bytes() {
+        crate::test_util::trace_init();
+        let component = "network_tcp_received";
+        let span = tracing::info_span!("component", component_id = component);
+        let _entered = span.enter();
+        TcpBytesReceived {
+            byte_size: 7,
+            peer_addr: "192.0.2.10:54321".parse().unwrap(),
+        }
+        .emit();
+
+        for name in [
+            "component_received_bytes_total",
+            "component_received_network_bytes_total",
+        ] {
+            assert_eq!(
+                counter_value(name, &[("component_id", component), ("protocol", "tcp")]).to_bits(),
+                7.0_f64.to_bits(),
+            );
+        }
+    }
 
     /// Returns the current value of a counter matching `name` and all `tags`.
     /// Counters that have not yet been touched aren't in the snapshot and

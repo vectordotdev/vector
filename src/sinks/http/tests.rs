@@ -623,6 +623,81 @@ async fn custom_retry_retries_only_configured_status_code() {
 }
 
 #[tokio::test]
+async fn network_bytes_count_compressed_payload_again_on_sink_retry() {
+    use tracing::Instrument;
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+
+    use crate::test_util::{metrics::counter_value_with_tags, trace_init};
+
+    trace_init();
+    let component = "network_http_sink_retry";
+    let server = MockServer::start().await;
+    let attempts = Arc::new(atomic::AtomicUsize::new(0));
+    let response_attempts = Arc::clone(&attempts);
+    Mock::given(method("POST"))
+        .respond_with(move |_: &wiremock::Request| {
+            if response_attempts.fetch_add(1, atomic::Ordering::SeqCst) == 0 {
+                ResponseTemplate::new(503)
+            } else {
+                ResponseTemplate::new(200)
+            }
+        })
+        .expect(2)
+        .mount(&server)
+        .await;
+    let config: HttpSinkConfig = serde_yaml::from_str(&format!(
+        r#"
+uri: "{}"
+encoding:
+  codec: text
+compression: gzip
+batch:
+  max_events: 1
+request:
+  retry_attempts: 1
+  retry_initial_backoff_secs: 1
+  retry_max_duration_secs: 1
+"#,
+        server.uri(),
+    ))
+    .unwrap();
+    let plaintext = "a".repeat(4096);
+    let (batch, mut delivered) = BatchNotifier::new_with_receiver();
+    let event = Event::Log(LogEvent::from(plaintext.clone())).with_batch_notifier(&batch);
+    drop(batch);
+    async {
+        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            sink.run_events(vec![event]),
+        )
+        .await
+        .expect("HTTP sink retry timed out")
+        .unwrap();
+    }
+    .instrument(tracing::info_span!("component", component_id = component))
+    .await;
+    assert_eq!(delivered.try_recv(), Ok(BatchStatus::Delivered));
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 2, "the sink must retry the failed attempt");
+    assert_eq!(requests[0].body, requests[1].body);
+    assert!(requests[0].body.len() < plaintext.len());
+    let decoded = CappedDecoder::gzip_with_limit(requests[0].body.as_slice(), 8192)
+        .decompress()
+        .unwrap();
+    assert_eq!(decoded, format!("{plaintext}\n").into_bytes());
+    let expected = u32::try_from(requests.iter().map(|r| r.body.len()).sum::<usize>()).unwrap();
+    assert_eq!(
+        counter_value_with_tags(
+            "component_sent_network_bytes_total",
+            &[("component_id", component), ("protocol", "http")],
+        )
+        .to_bits(),
+        f64::from(expected).to_bits(),
+    );
+}
+
+#[tokio::test]
 async fn custom_retry_does_not_retry_unconfigured_status_code() {
     components::assert_sink_error(&COMPONENT_ERROR_TAGS, async {
         const NUM_LINES: usize = 1;

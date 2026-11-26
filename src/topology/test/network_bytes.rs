@@ -1,0 +1,303 @@
+use std::io::Write;
+
+use flate2::{Compression, write::GzEncoder};
+use futures::StreamExt;
+use tokio::time::{Duration, timeout};
+
+use crate::{
+    config::{Config, log_schema},
+    event::into_event_stream,
+    sources::http_server::SimpleHttpConfig,
+    test_util::{
+        addr::next_addr, metrics::counter_value_with_tags, mock::basic_sink, start_topology,
+        trace_init, wait_for_tcp,
+    },
+};
+
+#[cfg(feature = "sources-socket")]
+#[tokio::test]
+async fn tcp_network_bytes_include_rejected_payloads_with_source_component_labels() {
+    use tokio::io::AsyncWriteExt;
+
+    trace_init();
+    let (_guard, address) = next_addr();
+    let component = "network_tcp_source";
+    let (events, sink) = basic_sink(10);
+    let mut events = Box::pin(events.flat_map(into_event_stream));
+    let mut config = Config::builder();
+    config.add_source(
+        component,
+        serde_yaml::from_str::<crate::sources::socket::SocketConfig>(&format!(
+            "mode: tcp\naddress: \"{address}\"\ndecoding:\n  codec: json\n"
+        ))
+        .unwrap(),
+    );
+    config.add_sink("network_tcp_output", &[component], sink);
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+    wait_for_tcp(address).await;
+    let tags = &[
+        ("component_id", component),
+        ("component_kind", "source"),
+        ("component_type", "socket"),
+        ("protocol", "tcp"),
+    ];
+    let mut total = 0_u32;
+    // Separate connections exercise the shared reader's spawned connection tasks. The first
+    // connection produces no events, but its rejected bytes must already be accounted for.
+    for payload in [b"not json\n".as_slice(), b"{\"message\":\"accepted\"}\n"] {
+        let mut sender = tokio::net::TcpStream::connect(address).await.unwrap();
+        sender.write_all(payload).await.unwrap();
+        sender.shutdown().await.unwrap();
+        total += u32::try_from(payload.len()).unwrap();
+        timeout(Duration::from_secs(10), async {
+            while counter_value_with_tags("component_received_network_bytes_total", tags).to_bits()
+                != f64::from(total).to_bits()
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("TCP network counter did not include bytes from the connection");
+    }
+    let event = timeout(Duration::from_secs(10), events.next())
+        .await
+        .expect("TCP source did not emit the valid event")
+        .expect("TCP source output closed");
+    assert_eq!(
+        event
+            .as_log()
+            .get(log_schema().message_key_target_path().unwrap())
+            .unwrap()
+            .to_string_lossy(),
+        "accepted",
+    );
+    assert_eq!(
+        counter_value_with_tags("component_received_bytes_total", tags).to_bits(),
+        f64::from(total).to_bits(),
+        "serialized-byte accounting must retain its existing behavior",
+    );
+    timeout(Duration::from_secs(10), topology.stop())
+        .await
+        .expect("TCP source topology did not shut down");
+}
+
+#[cfg(feature = "sources-socket")]
+#[tokio::test]
+async fn udp_network_bytes_include_rejected_payloads_with_source_component_labels() {
+    trace_init();
+    let (_guard, address) = next_addr();
+    let component = "network_udp_source";
+    let (events, sink) = basic_sink(10);
+    let mut events = Box::pin(events.flat_map(into_event_stream));
+    let mut config = Config::builder();
+    config.add_source(
+        component,
+        serde_yaml::from_str::<crate::sources::socket::SocketConfig>(&format!(
+            "mode: udp\naddress: \"{address}\"\nmax_length: 32\ndecoding:\n  codec: json\n"
+        ))
+        .unwrap(),
+    );
+    config.add_sink("network_udp_output", &[component], sink);
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+    let tags = &[
+        ("component_id", component),
+        ("component_kind", "source"),
+        ("component_type", "socket"),
+        ("protocol", "udp"),
+    ];
+    // The source registers its counter after binding and before receiving. Unlike probing
+    // bind errors, observing registration does not depend on OS socket-reuse semantics.
+    timeout(Duration::from_secs(10), async {
+        loop {
+            let registered = vector_lib::metrics::Controller::get()
+                .expect("metrics controller initialized")
+                .capture_metrics()
+                .iter()
+                .any(|metric| {
+                    metric.name() == "component_received_network_bytes_total"
+                        && tags.iter().all(|(key, value)| {
+                            metric
+                                .tags()
+                                .is_some_and(|tags| tags.get(key) == Some(*value))
+                        })
+                });
+            if registered {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("UDP source did not register its receive counter");
+
+    let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let mut total = 0_u32;
+    let mut legacy_total = 0_u32;
+    for payload in [
+        b"not json".as_slice(),
+        &[b'x'; 64],
+        br#"{"message":"accepted"}"#,
+    ] {
+        sender.send_to(payload, address).await.unwrap();
+        // The receive buffer includes one extra byte to detect truncation. Windows returns
+        // WSAEMSGSIZE after filling it; Unix returns the prefix as a successful receive.
+        let received = u32::try_from(payload.len().min(33)).unwrap();
+        total += received;
+        if !cfg!(windows) || payload.len() <= 33 {
+            legacy_total += received;
+        }
+        // Check each datagram separately, including the one rejected by the JSON decoder.
+        timeout(Duration::from_secs(10), async {
+            while counter_value_with_tags("component_received_network_bytes_total", tags).to_bits()
+                != f64::from(total).to_bits()
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("UDP network counter did not include the received datagram");
+    }
+    let event = timeout(Duration::from_secs(10), events.next())
+        .await
+        .expect("UDP source did not emit the valid event")
+        .expect("UDP source output closed");
+    assert_eq!(
+        event
+            .as_log()
+            .get(log_schema().message_key_target_path().unwrap())
+            .unwrap()
+            .to_string_lossy(),
+        "accepted",
+    );
+    assert_eq!(
+        counter_value_with_tags("component_received_bytes_total", tags).to_bits(),
+        f64::from(legacy_total).to_bits(),
+        "serialized-byte accounting must retain its existing behavior",
+    );
+    timeout(Duration::from_secs(10), topology.stop())
+        .await
+        .expect("UDP source topology did not shut down");
+}
+
+// The test metrics recorder is thread-local; spawned server tasks must use the same runtime thread.
+#[rstest::rstest]
+#[case::http(false)]
+#[case::https(true)]
+#[tokio::test]
+async fn http_network_bytes_retain_source_component_labels_across_server_tasks(#[case] tls: bool) {
+    trace_init();
+    let protocol = if tls { "https" } else { "http" };
+    let tls_config = if tls {
+        format!(
+            "tls:\n  enabled: true\n  crt_file: \"{}\"\n  key_file: \"{}\"\n",
+            crate::tls::TEST_PEM_CRT_PATH,
+            crate::tls::TEST_PEM_KEY_PATH,
+        )
+    } else {
+        String::new()
+    };
+    let (_first_guard, first_addr) = next_addr();
+    let (_second_guard, second_addr) = next_addr();
+    let sources = [
+        ("network_http_source_first", first_addr, "first".repeat(256)),
+        (
+            "network_http_source_second",
+            second_addr,
+            "second".repeat(256),
+        ),
+    ];
+    let (events, sink) = basic_sink(10);
+    let mut events = Box::pin(events.flat_map(into_event_stream));
+    let mut config = Config::builder();
+    for (id, address, _) in &sources {
+        config.add_source(
+            *id,
+            serde_yaml::from_str::<SimpleHttpConfig>(&format!(
+                "address: \"{address}\"\n{tls_config}"
+            ))
+            .unwrap(),
+        );
+    }
+    config.add_sink(
+        "network_http_source_output",
+        &["network_http_source_first", "network_http_source_second"],
+        sink,
+    );
+    // Let the real topology create the component spans. Neither this test nor its HTTP
+    // client is instrumented with the source's labels.
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+    let client_tls = crate::tls::TlsEnableableConfig {
+        enabled: Some(tls),
+        options: crate::tls::TlsConfig {
+            ca_file: Some(crate::tls::TEST_PEM_CA_PATH.into()),
+            ..Default::default()
+        },
+    };
+    let client = crate::http::HttpClient::new(
+        crate::tls::MaybeTlsSettings::from_config(Some(&client_tls), false).unwrap(),
+        &crate::config::ProxyConfig::default(),
+    )
+    .unwrap();
+    for (id, address, plaintext) in sources {
+        wait_for_tcp(address).await;
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(plaintext.as_bytes()).unwrap();
+        let compressed = encoder.finish().unwrap();
+        let network_size = f64::from(u32::try_from(compressed.len()).unwrap());
+        let serialized_size = f64::from(u32::try_from(plaintext.len()).unwrap());
+        assert!(network_size < serialized_size);
+        let request = http::Request::post(format!("{protocol}://localhost:{}/", address.port()))
+            .header("content-encoding", "gzip")
+            .header("x-forwarded-proto", if tls { "http" } else { "https" })
+            .body(vector_http::full_body(bytes::Bytes::from(compressed)))
+            .unwrap();
+        let response = timeout(Duration::from_secs(10), client.send(request))
+            .await
+            .expect("HTTP source request timed out")
+            .unwrap();
+        assert_eq!(response.status(), 200);
+        let event = timeout(Duration::from_secs(10), events.next())
+            .await
+            .expect("timed out waiting for the HTTP source event")
+            .expect("HTTP source output closed");
+        assert_eq!(
+            event
+                .as_log()
+                .get(log_schema().message_key_target_path().unwrap())
+                .unwrap()
+                .to_string_lossy(),
+            plaintext,
+        );
+        let tags = &[
+            ("component_id", id),
+            ("component_kind", "source"),
+            ("component_type", "http_server"),
+            ("protocol", protocol),
+        ];
+        for (name, expected) in [
+            ("component_received_network_bytes_total", network_size),
+            ("component_received_bytes_total", serialized_size),
+        ] {
+            assert_eq!(
+                counter_value_with_tags(name, tags).to_bits(),
+                expected.to_bits(),
+                "{name} must retain the receiving source's labels",
+            );
+            assert_eq!(
+                counter_value_with_tags(
+                    name,
+                    &[
+                        ("component_id", id),
+                        ("protocol", if tls { "http" } else { "https" }),
+                    ],
+                )
+                .to_bits(),
+                0.0_f64.to_bits(),
+                "{name} must use the listener's protocol, not forwarded headers",
+            );
+        }
+    }
+    timeout(Duration::from_secs(10), topology.stop())
+        .await
+        .expect("HTTP source topology did not shut down");
+}
