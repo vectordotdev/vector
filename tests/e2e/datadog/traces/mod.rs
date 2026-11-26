@@ -8,9 +8,10 @@ use std::{
 };
 
 use base64::{Engine, prelude::BASE64_STANDARD};
-use datadog_proto::trace::{AgentPayload, Span};
+use datadog_proto::trace::AgentPayload;
 use prost::Message;
 use serde::Serialize;
+use similar_asserts::SimpleDiff;
 use vector_common::decompression::CappedDecoder;
 
 use super::*;
@@ -59,30 +60,78 @@ fn decode_payloads(response: &FakeIntakeResponseRaw) -> Result<Vec<AgentPayload>
 /// Wire `Span.traceID` (low 64 bits) and `Span.spanID`.
 type SpanKey = (u64, u64);
 
-/// Every span with its occurrences, so missing, extra and duplicate spans all differ.
-/// Payload, tracer payload and chunk grouping are ignored.
-fn spans(payloads: &[AgentPayload]) -> BTreeMap<SpanKey, Vec<Vec<u8>>> {
-    let mut spans: BTreeMap<SpanKey, Vec<Vec<u8>>> = BTreeMap::new();
-    for span in payloads
-        .iter()
-        .flat_map(|payload| &payload.tracer_payloads)
-        .flat_map(|tracer| &tracer.chunks)
-        .flat_map(|chunk| &chunk.spans)
-    {
-        spans
-            .entry((span.trace_id, span.span_id))
-            .or_default()
-            .push(span.encode_to_vec());
+/// Today's legacy relay, not the typed model's target behavior. Apply ONLY to input:
+/// when a migration fixes a loss, remove its rule instead of normalizing the output.
+/// RFC sections below refer to rfcs/2026-04-29-25329-trace-data-model/datadog-mapping.md.
+/// Expects a singleton record constructed by `records`; panics without a tracer/chunk.
+fn expected_mapping(mut record: AgentPayload) -> AgentPayload {
+    let tracer = &mut record.tracer_payloads[0];
+    let chunk = &mut tracer.chunks[0];
+
+    // Legacy env replacement: source discards tracer env; sink uses Agent env.
+    // RFC: "Ingress and egress mapping" / "Envelope reconstruction and chunk re-coalescence".
+    tracer.env.clone_from(&record.env);
+    // Legacy hostname loss: source discards it; sink reads `hostname`, not default `host`.
+    // RFC: "Ingress and egress mapping" / "Envelope reconstruction and chunk re-coalescence".
+    tracer.hostname.clear();
+    // Legacy tag-scope collapse: Agent > tracer > chunk, copied to tracer AND chunk.
+    // RFC: "Datadog event-scoped state" / "Datadog chunk context".
+    chunk.tags.extend(tracer.tags.clone());
+    chunk.tags.extend(record.tags.clone());
+    tracer.tags.clone_from(&chunk.tags);
+    // Legacy Agent tag loss: sink emits tags only at tracer/chunk scope.
+    // RFC: "Datadog event-scoped state".
+    record.tags.clear();
+    // Legacy targetTPS loss: source stores Float, partitioner reads Integer.
+    // RFC: "Datadog event-scoped state".
+    record.target_tps = 0.0;
+    // Legacy errorTPS loss: source stores Float, partitioner reads Integer.
+    // RFC: "Datadog event-scoped state".
+    record.error_tps = 0.0;
+    // Legacy rare-sampler flag loss: source omits it, sink emits false.
+    // RFC: "Datadog event-scoped state".
+    record.rare_sampler_enabled = false;
+    // Permanent RFC exclusion, NOT a legacy loss to fix: container resolution diagnostics.
+    // RFC: "Out of scope" (`TracerPayload.containerDebug`).
+    tracer.container_debug = None;
+    record
+}
+
+/// A record is a singleton `AgentPayload` -> `TracerPayload` -> `TraceChunk` -> Span.
+/// Cloning the enclosing messages retains every decoded field, ignoring only grouping.
+/// Encoded records have deterministic `BTreeMap` ordering and retain occurrence counts.
+fn records(
+    payloads: &[AgentPayload],
+    map: fn(AgentPayload) -> AgentPayload,
+) -> BTreeMap<SpanKey, Vec<Vec<u8>>> {
+    let mut records: BTreeMap<SpanKey, Vec<Vec<u8>>> = BTreeMap::new();
+    for agent in payloads {
+        for tracer in &agent.tracer_payloads {
+            for chunk in &tracer.chunks {
+                for span in &chunk.spans {
+                    let mut record = agent.clone();
+                    let mut tracer = tracer.clone();
+                    let mut chunk = chunk.clone();
+                    chunk.spans = vec![span.clone()];
+                    tracer.chunks = vec![chunk];
+                    record.tracer_payloads = vec![tracer];
+                    records
+                        .entry((span.trace_id, span.span_id))
+                        .or_default()
+                        .push(map(record).encode_to_vec());
+                }
+            }
+        }
     }
-    for occurrences in spans.values_mut() {
+    for occurrences in records.values_mut() {
         occurrences.sort();
     }
-    spans
+    records
 }
 
 fn compare(input: &[AgentPayload], output: &[AgentPayload]) -> Vec<String> {
-    let input = spans(input);
-    let output = spans(output);
+    let input = records(input, expected_mapping);
+    let output = records(output, std::convert::identity);
     let keys: BTreeSet<_> = input.keys().chain(output.keys()).collect();
     keys.into_iter()
         .filter_map(|key| {
@@ -91,19 +140,26 @@ fn compare(input: &[AgentPayload], output: &[AgentPayload]) -> Vec<String> {
             if expected == actual {
                 return None;
             }
-            let decode = |spans: Vec<Vec<u8>>| {
-                spans
+            let decode = |records: Vec<Vec<u8>>| {
+                records
                     .iter()
-                    .map(|span| Span::decode(span.as_slice()).unwrap())
+                    .map(|record| AgentPayload::decode(record.as_slice()).unwrap())
                     .collect::<Vec<_>>()
             };
-            Some(format!(
-                "trace={:016x} span={:016x}\nexpected: {:#?}\nactual: {:#?}",
+            // Contextual diff puts changed fields first, rather than truncating a full
+            // expected record before the actual value can appear in CI logs. Strip styling
+            // so terminal color settings cannot affect assertions or the evidence files.
+            Some(strip_ansi_escapes::strip_str(format!(
+                "trace={:016x} span={:016x}\n{}",
                 key.0,
                 key.1,
-                decode(expected),
-                decode(actual),
-            ))
+                SimpleDiff::from_str(
+                    &format!("{:#?}", decode(expected)),
+                    &format!("{:#?}", decode(actual)),
+                    "expected",
+                    "actual",
+                ),
+            )))
         })
         .collect()
 }
@@ -281,12 +337,12 @@ fn validate_captures(
     failures.extend(coverage.missing());
     if !differences.is_empty() {
         failures.push(format!(
-            "{} differing span identities; see differences.txt",
+            "{} differing span identities (full records); see differences.txt",
             differences.len()
         ));
     }
     let result = if failures.is_empty() {
-        "PASS: every span reached the output exactly once, unchanged.".to_string()
+        "PASS: every span record reached the output with unchanged multiplicity and expected envelope, tracer, chunk and span fields.".to_string()
     } else {
         failures.join("\n")
     };
@@ -328,7 +384,9 @@ async fn trace_relay() {
 
 #[cfg(test)]
 mod tests {
-    use datadog_proto::trace::{SpanEvent, SpanLink, TraceChunk, TracerPayload};
+    use datadog_proto::trace::{
+        ContainerDebug, Span, SpanEvent, SpanLink, TraceChunk, TracerPayload,
+    };
 
     use super::*;
 
@@ -429,6 +487,120 @@ mod tests {
         );
     }
 
+    /// Non-default values exercise losses the native workload may not produce.
+    fn full_record() -> AgentPayload {
+        AgentPayload {
+            host_name: "agent-host".into(),
+            env: "agent-env".into(),
+            tags: BTreeMap::from([
+                ("agent".into(), "a".into()),
+                ("shared".into(), "agent-wins".into()),
+            ]),
+            agent_version: "7.84.6".into(),
+            target_tps: 123.5,
+            error_tps: 45.5,
+            rare_sampler_enabled: true,
+            tracer_payloads: vec![TracerPayload {
+                container_id: "container".into(),
+                language_name: "python".into(),
+                language_version: "3.13".into(),
+                tracer_version: "4.16.0".into(),
+                runtime_id: "runtime".into(),
+                env: "tracer-env".into(),
+                hostname: "tracer-host".into(),
+                app_version: "1.0".into(),
+                tags: BTreeMap::from([
+                    ("tracer".into(), "t".into()),
+                    ("shared".into(), "tracer-loses".into()),
+                    ("tracer-chunk".into(), "tracer-wins".into()),
+                ]),
+                container_debug: Some(ContainerDebug {
+                    error: "diagnostic".into(),
+                    ..Default::default()
+                }),
+                chunks: vec![TraceChunk {
+                    priority: 2,
+                    origin: "synthetics".into(),
+                    dropped_trace: true,
+                    tags: BTreeMap::from([
+                        ("chunk".into(), "c".into()),
+                        ("shared".into(), "chunk-loses".into()),
+                        ("tracer-chunk".into(), "chunk-loses".into()),
+                    ]),
+                    spans: vec![span("service", 1, 2, 0)],
+                }],
+            }],
+            idx_tracer_payloads: vec![],
+        }
+    }
+
+    /// Expected wire output written independently of `expected_mapping`.
+    fn relayed_record() -> AgentPayload {
+        let mut output = full_record();
+        output.tags.clear();
+        output.target_tps = 0.0;
+        output.error_tps = 0.0;
+        output.rare_sampler_enabled = false;
+        let tracer = &mut output.tracer_payloads[0];
+        tracer.env = "agent-env".into();
+        tracer.hostname.clear();
+        tracer.container_debug = None;
+        tracer.tags = BTreeMap::from([
+            ("agent".into(), "a".into()),
+            ("tracer".into(), "t".into()),
+            ("chunk".into(), "c".into()),
+            ("shared".into(), "agent-wins".into()),
+            ("tracer-chunk".into(), "tracer-wins".into()),
+        ]);
+        tracer.chunks[0].tags = tracer.tags.clone();
+        output
+    }
+
+    #[test]
+    fn expected_mapping_covers_legacy_losses_and_tag_precedence() {
+        assert_eq!(expected_mapping(full_record()), relayed_record());
+        assert_eq!(
+            compare(&[full_record()], &[relayed_record()]),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn comparison_detects_changes_at_every_scope_including_legacy_fixes() {
+        // Mutate OUTPUT, including fields with expected losses: normalizing both sides
+        // would incorrectly let these changes (and future fixes) pass unnoticed.
+        macro_rules! changed {
+            ($($field:ident $([$index:literal])?).+ => $value:expr) => {{
+                let mut output = relayed_record();
+                output.$($field $([$index])?).+ = $value;
+                let differences = compare(&[full_record()], &[output]);
+                assert_eq!(differences.len(), 1, "{}", stringify!($($field).+));
+            }};
+        }
+        changed!(host_name => "wrong".into());
+        changed!(env => "wrong".into());
+        changed!(agent_version => "wrong".into());
+        changed!(tags => BTreeMap::from([("unexpected".into(), "tag".into())]));
+        changed!(target_tps => 123.5);
+        changed!(error_tps => 45.5);
+        changed!(rare_sampler_enabled => true);
+        changed!(tracer_payloads[0].container_id => "wrong".into());
+        changed!(tracer_payloads[0].language_name => "wrong".into());
+        changed!(tracer_payloads[0].language_version => "wrong".into());
+        changed!(tracer_payloads[0].tracer_version => "wrong".into());
+        changed!(tracer_payloads[0].runtime_id => "wrong".into());
+        changed!(tracer_payloads[0].app_version => "wrong".into());
+        changed!(tracer_payloads[0].env => "tracer-env".into());
+        changed!(tracer_payloads[0].hostname => "tracer-host".into());
+        changed!(tracer_payloads[0].tags => BTreeMap::new());
+        changed!(tracer_payloads[0].container_debug => full_record().tracer_payloads[0].container_debug.clone());
+        changed!(tracer_payloads[0].chunks[0].priority => 0);
+        changed!(tracer_payloads[0].chunks[0].origin => "wrong".into());
+        changed!(tracer_payloads[0].chunks[0].dropped_trace => false);
+        changed!(tracer_payloads[0].chunks[0].tags => BTreeMap::new());
+        changed!(tracer_payloads[0].chunks[0].spans[0].service => "wrong".into());
+    }
+
     #[test]
     fn comparison_ignores_grouping_but_preserves_spans_and_multiplicity() {
         let input = covered();
@@ -441,7 +613,22 @@ mod tests {
                 });
             }
         }
-        assert_eq!(compare(&input, &[regrouped]), Vec::<String>::new());
+        regrouped.tracer_payloads.reverse();
+        for tracer in &mut regrouped.tracer_payloads {
+            for chunk in &mut tracer.chunks {
+                chunk.spans.reverse();
+            }
+        }
+        // Split Agent envelopes as well as tracer payloads/chunks, reversing order.
+        let regrouped: Vec<_> = regrouped
+            .tracer_payloads
+            .into_iter()
+            .map(|tracer| AgentPayload {
+                tracer_payloads: vec![tracer],
+                ..Default::default()
+            })
+            .collect();
+        assert_eq!(compare(&input, &regrouped), Vec::<String>::new());
 
         let mut duplicated = input.clone();
         duplicated.push(input[0].clone());
@@ -453,6 +640,22 @@ mod tests {
             .span_links
             .clear();
         assert_eq!(compare(&input, &changed).len(), 1);
+    }
+
+    #[test]
+    fn comparison_keeps_context_for_repeated_span_identities() {
+        let first = full_record();
+        let mut second = first.clone();
+        second.agent_version = "another-agent".into();
+        let input = [first, second.clone()];
+        let first = relayed_record();
+        let mut second = expected_mapping(second);
+        let output = [second.clone(), first.clone()];
+        assert_eq!(compare(&input, &output), Vec::<String>::new());
+        // Same identity and multiplicity, but the two contexts must not collapse.
+        assert_eq!(compare(&input, &[first.clone(), first]).len(), 1);
+        second.tracer_payloads[0].chunks[0].spans.clear();
+        assert_eq!(compare(&input, &[second]).len(), 1);
     }
 
     #[test]
@@ -471,8 +674,11 @@ mod tests {
         let mut changed = input.clone();
         changed[0].tracer_payloads[0].chunks[0].spans[0].name = "changed".into();
         let error = validate_captures(directory.path(), &input, &changed).unwrap_err();
+        assert!(!error.contains('\u{1b}'), "{error:?}");
         assert!(error.contains("1 differing span identities"), "{error}");
         assert!(error.contains("name: \"changed\""), "{error}");
+        let differences = fs::read_to_string(directory.path().join("differences.txt")).unwrap();
+        assert!(!differences.contains('\u{1b}'), "{differences:?}");
 
         let mut indexed = input.clone();
         indexed[0]
