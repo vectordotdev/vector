@@ -1,4 +1,4 @@
-FROM python:3.12-slim@sha256:12316debbfb86890f6b2d825820612741ba527ad5a44e3902759141d572bfe8f
+FROM python:3.14-slim@sha256:22eafb370920ad8b429e0aec3fff433e0669968519f5d60469d83729c138b28b
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --require-hashes -r requirements.txt

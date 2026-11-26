@@ -29,7 +29,7 @@ generated: components: sources: opentelemetry: configuration: {
 		required: false
 		type: object: options: {
 			codec: {
-				description: "Preserves the OTLP representation of the selected signals."
+				description: "The codec to use. Only `otlp` is supported."
 				required:    true
 				type: string: enum: otlp: "Preserves the OTLP representation of the selected signals."
 			}

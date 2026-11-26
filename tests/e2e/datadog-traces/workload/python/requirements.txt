@@ -1,5 +1,5 @@
-# Locked for Python 3.12 on Linux. Regenerate in this directory with:
-# uv pip compile --python-version 3.12 --python-platform linux --generate-hashes requirements.in -o requirements.txt
+# Locked for Python 3.14 on Linux. Regenerate in this directory with:
+# uv pip compile --python-version 3.14 --python-platform linux --generate-hashes requirements.in -o requirements.txt
 
 blinker==1.9.0 \
     --hash=sha256:b4ce2265a7abece45e7cc896e98dbebe6cead56bcf805a3d23136d145f5445bf \

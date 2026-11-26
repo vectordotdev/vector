@@ -91,7 +91,6 @@ pub struct RouteConfig {
     /// Otherwise, the unmatched event is instead silently discarded.
     #[configurable(metadata(docs::additional_props_description = "An individual route."))]
     #[configurable(metadata(docs::examples = "route_examples()"))]
-    #[configurable(metadata(docs::required = true))]
     route: IndexMap<String, AnyCondition>,
 }
 
