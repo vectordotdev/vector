@@ -270,3 +270,97 @@ async fn test_buffer_metrics_overflow_block() {
     assert_eq!(4, snapshot.sent_event_count);
     assert_eq!(0, snapshot.dropped_event_count_intentional);
 }
+
+/// Memory -> disk overflow: records spilled to the disk stage during an outage must be delivered
+/// while the memory stage keeps receiving live traffic, without a restart.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn overflow_disk_stage_drains_while_memory_stage_is_live() {
+    use std::{collections::HashSet, num::NonZeroU64, num::NonZeroUsize};
+
+    use tracing::Span;
+
+    use crate::{
+        config::MemoryBufferSize,
+        test::with_temp_dir,
+        topology::{builder::TopologyBuilder, test_util::Sample},
+        variants::{DiskV2Buffer, MemoryBuffer},
+    };
+
+    // Each record is ~320 KiB, larger than the disk reader's 256 KiB read buffer, so every
+    // record needs more than one `fill_buf` to be read.
+    const VALUES: usize = 40_000;
+    const SPILLED: u64 = 60;
+    const LIVE: u64 = 2_000;
+
+    fn record(id: u64) -> Sample {
+        let mut v = vec![0u64; VALUES];
+        v[0] = id;
+        Sample::HeapAllocatedValues(v)
+    }
+    fn id_of(s: &Sample) -> u64 {
+        match s {
+            Sample::HeapAllocatedValues(v) => v[0],
+            Sample::SingleValue(v) => *v,
+        }
+    }
+
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+        async move {
+            let mut builder = TopologyBuilder::<Sample>::default();
+            builder.stage(
+                MemoryBuffer::new(MemoryBufferSize::MaxEvents(NonZeroUsize::new(4).unwrap())),
+                WhenFull::Overflow,
+            );
+            builder.stage(
+                DiskV2Buffer::new(
+                    "overflow".to_string(),
+                    data_dir,
+                    NonZeroU64::new(1 << 30).unwrap(),
+                ),
+                WhenFull::Block,
+            );
+            let (mut tx, mut rx) = builder
+                .build("overflow".to_string(), Span::none())
+                .await
+                .expect("build");
+
+            // Outage: nobody reads, so everything past the memory stage spills to disk.
+            for id in 0..SPILLED {
+                tx.send(record(id), None).await.unwrap();
+                tx.flush().await.unwrap();
+            }
+
+            // Recovery: live traffic keeps the memory stage busy while the sink drains.
+            let producer = tokio::spawn(async move {
+                for id in SPILLED..SPILLED + LIVE {
+                    tx.send(Sample::SingleValue(id), None).await.unwrap();
+                    tx.flush().await.unwrap();
+                    tokio::task::yield_now().await;
+                }
+                tx
+            });
+
+            let mut seen = HashSet::new();
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while (seen.len() as u64) < SPILLED + LIVE && Instant::now() < deadline {
+                match tokio::time::timeout(Duration::from_secs(2), rx.next()).await {
+                    Ok(Some(item)) => {
+                        seen.insert(id_of(&item));
+                    }
+                    Ok(None) | Err(_) => break,
+                }
+            }
+            let _tx = producer.await.unwrap();
+
+            let missing_spilled = (0..SPILLED).filter(|id| !seen.contains(id)).count();
+            let missing_live = (SPILLED..SPILLED + LIVE).filter(|id| !seen.contains(id)).count();
+            assert_eq!(
+                (missing_spilled, missing_live),
+                (0, 0),
+                "spilled records missing: {missing_spilled}/{SPILLED}, live missing: {missing_live}/{LIVE}"
+            );
+        }
+    })
+    .await;
+}
