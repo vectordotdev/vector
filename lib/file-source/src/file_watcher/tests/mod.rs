@@ -9,7 +9,7 @@ use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
 use tokio::{io::AsyncReadExt as _, time::Instant};
 
-use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileReader, FileWatcher};
+use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileReader, FileWatcher, is_gzipped};
 
 // Welcome.
 //
@@ -317,6 +317,68 @@ async fn updating_path_resets_eof_backoff() {
         let line = watcher.read_line().await.unwrap().raw_line.unwrap();
         let expected: &[u8] = if replace_file { b"second" } else { b"first" };
         assert_eq!(line.bytes.as_ref(), expected);
+    }
+}
+
+#[tokio::test]
+async fn is_gzipped_handles_one_byte_short_reads() {
+    use std::{
+        io::{self, Cursor, SeekFrom},
+        pin::Pin,
+        task::{Context, Poll},
+    };
+    use tokio::io::{AsyncRead, AsyncSeek, BufReader, ReadBuf};
+
+    struct OneByteReader(Cursor<Vec<u8>>);
+
+    impl AsyncRead for OneByteReader {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            let mut single = [0u8; 1];
+            let mut sub = ReadBuf::new(&mut single);
+            match Pin::new(&mut self.0).poll_read(cx, &mut sub) {
+                Poll::Ready(Ok(())) => {
+                    buf.put_slice(sub.filled());
+                    Poll::Ready(Ok(()))
+                }
+                other => other,
+            }
+        }
+    }
+
+    impl AsyncSeek for OneByteReader {
+        fn start_seek(mut self: Pin<&mut Self>, position: SeekFrom) -> io::Result<()> {
+            Pin::new(&mut self.0).start_seek(position)
+        }
+
+        fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+            Pin::new(&mut self.0).poll_complete(cx)
+        }
+    }
+
+    let mut gz = Vec::new();
+    GzipEncoder::new(&b"hello\n"[..])
+        .read_to_end(&mut gz)
+        .await
+        .unwrap();
+
+    let mut reader = BufReader::new(OneByteReader(Cursor::new(gz.clone())));
+    assert!(is_gzipped(&mut reader).await.unwrap());
+    // Verify reader was rewound to offset 0 so no header bytes were consumed.
+    let mut after = Vec::new();
+    reader.read_to_end(&mut after).await.unwrap();
+    assert_eq!(after, gz);
+
+    // 0-byte, 1-byte (0x1f), and plain-text files return false without erroring.
+    for data in [vec![], vec![0x1f], b"plain\n".to_vec()] {
+        let mut r = BufReader::new(OneByteReader(Cursor::new(data.clone())));
+        assert!(!is_gzipped(&mut r).await.unwrap());
+        let mut rest = Vec::new();
+        r.read_to_end(&mut rest).await.unwrap();
+        assert_eq!(rest, data);
     }
 }
 
