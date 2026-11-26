@@ -1129,18 +1129,19 @@ pub fn build_client(
         }
         (_, Some(auth @ AzureAuthentication::Specific(..))) => {
             info!("Using Azure Authentication method.");
-            let credential_result: Arc<dyn TokenCredential> = auth.credential().map_err(|e| {
-                Error::with_message(
-                    ErrorKind::Credential,
-                    format!("Failed to configure Azure Authentication: {e}"),
-                )
-            })?;
+            let credential_result: Arc<dyn TokenCredential> =
+                auth.credential(proxy).map_err(|e| {
+                    Error::with_message(
+                        ErrorKind::Credential,
+                        format!("Failed to configure Azure Authentication: {e}"),
+                    )
+                })?;
             credential = Some(credential_result);
         }
         #[cfg(test)]
         (_, Some(auth @ AzureAuthentication::MockCredential)) => {
             warn!("Using mock token credential authentication.");
-            credential = Some(auth.credential()?);
+            credential = Some(auth.credential(proxy)?);
         }
     }
 
