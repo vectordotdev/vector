@@ -1,7 +1,7 @@
 use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
-use http::Uri;
+use http::{HeaderValue, Uri, header::AUTHORIZATION};
 use prost::Message;
 use tonic::{IntoRequest, body::Body as TonicBody};
 use tower::Service;
@@ -23,7 +23,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub(super) struct VectorService {
-    pub client: proto_vector::Client<GrpcTransport<TonicBody>>,
+    pub client: proto_vector::Client<AuthTransport>,
     pub protocol: String,
     pub endpoint: String,
 }
@@ -73,10 +73,12 @@ impl VectorService {
         client: Http2Client<TonicBody>,
         uri: Uri,
         compression: VectorCompression,
+        auth: Option<HeaderValue>,
     ) -> crate::Result<Self> {
         let origin = grpc_origin(&uri)?;
         let (protocol, endpoint) = uri::protocol_endpoint(uri);
-        let mut proto_client = proto_vector::Client::with_origin(GrpcTransport(client), origin);
+        let mut proto_client =
+            proto_vector::Client::with_origin(AuthTransport::new(client, auth), origin);
 
         if let Some(encoding) = compression.as_tonic_encoding() {
             proto_client = proto_client.send_compressed(encoding);
@@ -146,5 +148,38 @@ impl Service<VectorRequest> for VectorService {
         };
 
         Box::pin(future)
+    }
+}
+
+/// Adds the configured `Authorization` header to each request sent over the shared transport.
+#[derive(Clone, Debug)]
+pub(super) struct AuthTransport {
+    inner: GrpcTransport<TonicBody>,
+    auth: Option<HeaderValue>,
+}
+
+impl AuthTransport {
+    const fn new(client: Http2Client<TonicBody>, auth: Option<HeaderValue>) -> Self {
+        Self {
+            inner: GrpcTransport(client),
+            auth,
+        }
+    }
+}
+
+impl Service<http::Request<TonicBody>> for AuthTransport {
+    type Response = <GrpcTransport<TonicBody> as Service<http::Request<TonicBody>>>::Response;
+    type Error = <GrpcTransport<TonicBody> as Service<http::Request<TonicBody>>>::Error;
+    type Future = <GrpcTransport<TonicBody> as Service<http::Request<TonicBody>>>::Future;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, mut request: http::Request<TonicBody>) -> Self::Future {
+        if let Some(auth) = &self.auth {
+            request.headers_mut().insert(AUTHORIZATION, auth.clone());
+        }
+        self.inner.call(request)
     }
 }
