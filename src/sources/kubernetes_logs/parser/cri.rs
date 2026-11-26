@@ -40,7 +40,7 @@ impl Cri {
 }
 
 impl FunctionTransform for Cri {
-    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, mut event: Event) {
         let message_path = get_message_path(self.log_namespace);
 
         // Get the log field with the message, if it exists, and coerce it to bytes.
@@ -284,7 +284,7 @@ pub(super) mod tests {
     fn test_parsing_valid_vector_namespace() {
         trace_init();
         test_util::test_parser(
-            || Cri::new(LogNamespace::Vector),
+            |output, event| Cri::new(LogNamespace::Vector).transform(output, event),
             |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
@@ -294,7 +294,7 @@ pub(super) mod tests {
     fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
-            || Cri::new(LogNamespace::Legacy),
+            |output, event| Cri::new(LogNamespace::Legacy).transform(output, event),
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );

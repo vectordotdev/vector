@@ -108,12 +108,8 @@ generated: components: sinks: aws_s3: configuration: {
 		required: false
 		type: object: options: {
 			codec: {
-				description: """
-					Encodes events in [Apache Parquet][apache_parquet] columnar format.
-
-					[apache_parquet]: https://parquet.apache.org/
-					"""
-				required: true
+				description: "The codec to use for batch encoding events."
+				required:    true
 				type: string: enum: parquet: """
 					Encodes events in [Apache Parquet][apache_parquet] columnar format.
 

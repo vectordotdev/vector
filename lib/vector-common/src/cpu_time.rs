@@ -286,9 +286,9 @@ impl Inner {
 /// - `send_outputs` / fanout dispatch to downstream channels
 /// - Per-event schema validation and latency recording
 /// - Tasks spawned from it with [`spawn_timed`] or [`spawn_timed_without_span`]
-///   (e.g. `aws_ec2_metadata` IMDS refresh, `throttle`'s flush loop): those
-///   tasks' polls feed the **same** counter rather than being silently
-///   excluded. See [counter inheritance](self#counter-inheritance).
+///   (e.g. `aws_ec2_metadata` IMDS refresh, `throttle`'s flush loop, sink
+///   request building): those tasks' polls feed the **same** counter rather
+///   than being silently excluded. See [counter inheritance](self#counter-inheritance).
 ///
 /// And **does not** include:
 ///

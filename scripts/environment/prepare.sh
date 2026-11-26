@@ -4,6 +4,9 @@ set -euo pipefail
 SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 
 # Tool versions. Keep pins here so CI and local setup use the same versions.
+# rustup 1.29.3 bootstrap script; update the commit and checksum together.
+RUSTUP_INIT_COMMIT="edbc831cec44dc2858a4a4dce768c74361d027dc"
+RUSTUP_INIT_SHA256="d890e2fef6fa991b19cde2e608199bc1dca4e37f41f884edf8849ff693048de6"
 CARGO_DEB_VERSION="3.6.2"
 CROSS_VERSION="0.2.5"
 CARGO_NEXTEST_VERSION="0.9.152"
@@ -138,7 +141,19 @@ parse_args() {
 
 ensure_active_toolchain_is_installed() {
   if ! command -v rustup >/dev/null 2>&1; then
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    (
+      rustup_init="$(mktemp)" || exit 1
+      trap 'rm -f "$rustup_init"' EXIT
+      curl --proto '=https' --tlsv1.2 -fsSL \
+        "https://raw.githubusercontent.com/rust-lang/rustup/${RUSTUP_INIT_COMMIT}/rustup-init.sh" \
+        -o "$rustup_init" || exit 1
+      if command -v sha256sum >/dev/null 2>&1; then
+        echo "$RUSTUP_INIT_SHA256  $rustup_init" | sha256sum --check || exit 1
+      else
+        echo "$RUSTUP_INIT_SHA256  $rustup_init" | shasum -a 256 --check || exit 1
+      fi
+      sh "$rustup_init" -y --default-toolchain stable
+    ) || return $?
   fi
 
   # Ensure cargo/rustup are on PATH even if rustup was preinstalled in the image

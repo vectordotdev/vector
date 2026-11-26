@@ -198,7 +198,7 @@ impl GenerateConfig for LogToMetricConfig {
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(LogToMetric {
+        Ok(Transform::stateless(LogToMetric {
             metrics: self.metrics.clone().unwrap_or_default(),
             all_metrics: self.all_metrics.unwrap_or_default(),
         }))
@@ -349,7 +349,7 @@ fn render_tag_into(
         }
         Some(template) => match render_template(template, event) {
             Ok(value) => {
-                let expanded_pairs = pair_expansion(&key, &value, static_tags, dynamic_tags)
+                let expanded_pairs = pair_expansion(&key, &value, static_tags, dynamic_tags, true)
                     .map_err(|error| TransformError::PairExpansionError { key, value, error })?;
                 result.extend(expanded_pairs);
             }
@@ -856,7 +856,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
 }
 
 impl FunctionTransform for LogToMetric {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, event: Event) {
         // Metrics are "all or none" for a specific log. If a single fails, none are produced.
         let mut buffer = Vec::with_capacity(self.metrics.len());
         if self.all_metrics {

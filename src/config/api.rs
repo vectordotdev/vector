@@ -13,7 +13,6 @@ use vector_lib::configurable::configurable_component;
 pub struct Options {
     /// Whether the API is enabled for this Vector instance.
     #[serde(default = "default_enabled")]
-    #[configurable(metadata(docs::required = false))]
     pub enabled: bool,
 
     /// The network address to which the API should bind. If you're running
@@ -22,7 +21,6 @@ pub struct Options {
     #[serde(default = "default_address")]
     #[configurable(metadata(docs::examples = "0.0.0.0:8686"))]
     #[configurable(metadata(docs::examples = "127.0.0.1:1234"))]
-    #[configurable(metadata(docs::required = false))]
     pub address: Option<SocketAddr>,
 }
 
