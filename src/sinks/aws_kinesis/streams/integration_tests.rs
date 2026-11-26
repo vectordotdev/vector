@@ -24,6 +24,67 @@ fn kinesis_address() -> String {
 }
 
 #[tokio::test]
+async fn kinesis_native_aggregation_formats() {
+    for format in [
+        super::super::aggregation::Format::Newline,
+        super::super::aggregation::Format::Kpl,
+    ] {
+        let stream = gen_stream();
+        ensure_stream(stream.clone()).await;
+        let config = KinesisStreamsSinkConfig {
+            base: KinesisSinkBaseConfig {
+                stream_name: stream.clone(),
+                region: RegionOrEndpoint::with_both("us-east-1", kinesis_address()),
+                encoding: TextSerializerConfig::default().into(),
+                compression: Compression::None,
+                request: TowerRequestConfig::default(),
+                tls: None,
+                auth: AwsAuthentication::test_auth(),
+                acknowledgements: AcknowledgementsConfig::default(),
+                request_retry_partial: true,
+                partition_key_field: None,
+            },
+            batch: BatchConfig::default(),
+            aggregation: Some(super::super::newline::AggregationConfig {
+                enabled: true,
+                format,
+                max_events: 20,
+                ..Default::default()
+            }),
+        };
+        let sink = config.build(SinkContext::default()).await.unwrap().0;
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let (mut expected, events) = random_lines_with_stream(100, 100, None);
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+        sleep(Duration::from_secs(1)).await;
+        let records = fetch_records(stream, timestamp).await.unwrap();
+        assert_eq!(records.len(), 5);
+        let mut actual = records
+            .into_iter()
+            .flat_map(|record| match format {
+                super::super::aggregation::Format::Newline => {
+                    String::from_utf8(record.data.into_inner())
+                        .unwrap()
+                        .split_terminator('\n')
+                        .map(String::from)
+                        .collect::<Vec<_>>()
+                }
+                super::super::aggregation::Format::Kpl => super::super::kpl::test_support::decode(
+                    record.data.as_ref(),
+                    record.partition_key().expect("aggregate has a key"),
+                )
+                .into_iter()
+                .map(|bytes| String::from_utf8(bytes).unwrap())
+                .collect(),
+            })
+            .collect::<Vec<_>>();
+        expected.sort();
+        actual.sort();
+        assert_eq!(actual, expected);
+    }
+}
+
+#[tokio::test]
 async fn kinesis_put_records_with_partition_key() {
     let stream = gen_stream();
 
@@ -49,7 +110,11 @@ async fn kinesis_put_records_with_partition_key() {
         partition_key_field: Some(partition_key.clone()),
     };
 
-    let config = KinesisStreamsSinkConfig { base, batch };
+    let config = KinesisStreamsSinkConfig {
+        batch,
+        base,
+        aggregation: None,
+    };
 
     let cx = SinkContext::default();
 
@@ -108,7 +173,11 @@ async fn kinesis_put_records_without_partition_key() {
         partition_key_field: None,
     };
 
-    let config = KinesisStreamsSinkConfig { base, batch };
+    let config = KinesisStreamsSinkConfig {
+        batch,
+        base,
+        aggregation: None,
+    };
 
     let cx = SinkContext::default();
 
@@ -232,7 +301,11 @@ async fn kinesis_retry_failed_records_on_partial_failure() {
         partition_key_field: Some(ConfigValuePath::try_from("partition_key".to_string()).unwrap()),
     };
 
-    let config = KinesisStreamsSinkConfig { base, batch };
+    let config = KinesisStreamsSinkConfig {
+        batch,
+        base,
+        aggregation: None,
+    };
 
     let cx = SinkContext::default();
 
@@ -305,7 +378,11 @@ async fn kinesis_no_retry_failed_records_when_disabled() {
         partition_key_field: None,
     };
 
-    let config = KinesisStreamsSinkConfig { base, batch };
+    let config = KinesisStreamsSinkConfig {
+        batch,
+        base,
+        aggregation: None,
+    };
 
     let cx = SinkContext::default();
 

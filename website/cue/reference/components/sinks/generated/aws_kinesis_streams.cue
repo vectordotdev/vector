@@ -12,6 +12,56 @@ generated: components: sinks: aws_kinesis_streams: configuration: {
 		required: false
 		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
+	aggregation: {
+		description: """
+			Combine multiple logs into each Kinesis record using newline or KPL framing.
+			Separate from `batch`, which groups Kinesis records into API requests.
+			"""
+		required: false
+		type: object: options: {
+			enabled: {
+				description: "Enable aggregation. Consumers must support the selected aggregation format."
+				required:    false
+				type: bool: default: false
+			}
+			format: {
+				description: "Aggregation format. Newline preserves text/JSONL; KPL uses the standard protobuf envelope."
+				required:    false
+				type: string: {
+					default: "kpl"
+					enum: {
+						kpl:     "Standard KPL protobuf envelope, preserving individual payload boundaries."
+						newline: "Serialized text or compact JSON separated by newline characters."
+					}
+				}
+			}
+			max_bytes: {
+				description: """
+					Target data bytes per record, including delimiters or the KPL envelope.
+					Newline counts uncompressed bytes; KPL counts independently compressed user payloads.
+					Must be in 1..=1048576. Actual key bytes and compression can force smaller records.
+					"""
+				required: false
+				type: uint: default: 943718
+			}
+			max_events: {
+				description: """
+					Maximum original log events in each Kinesis record.
+					Must be positive and at most 1000 for KPL. This is separate from the API request's `batch.max_events`.
+					"""
+				required: false
+				type: uint: default: 500
+			}
+			timeout_secs: {
+				description: """
+					Maximum time to retain the first event in an aggregate, in seconds.
+					Must be finite and positive. Request batching can add further buffering time.
+					"""
+				required: false
+				type: float: default: 1.0
+			}
+		}
+	}
 	auth: {
 		description: "Configuration of the authentication strategy for interacting with AWS services."
 		required:    false

@@ -11,7 +11,7 @@ use super::{
 use crate::sinks::prelude::*;
 
 #[derive(Clone)]
-pub(super) struct KinesisStreamRecord {
+pub struct KinesisStreamRecord {
     pub record: KinesisRecord,
 }
 
