@@ -2,7 +2,7 @@ use derivative::Derivative;
 
 use super::{
     Bytes, ConfinedTemplate, Display, EventRef, FixedOffset, Hash, TemplateRenderingError,
-    confined_preview, fmt,
+    TemplateTimeZone, confined_preview, fmt,
 };
 
 #[cfg(doc)]
@@ -18,10 +18,21 @@ impl fmt::Debug for ConfinedTemplate {
 }
 
 impl ConfinedTemplate {
+    /// Apply timezone rules to each event timestamp when rendering strftime fields.
+    #[must_use]
+    pub const fn with_timezone(mut self, timezone: Option<vector_lib::TimeZone>) -> Self {
+        self.inner.time_zone = match timezone {
+            Some(vector_lib::TimeZone::Local) => Some(TemplateTimeZone::Local),
+            Some(vector_lib::TimeZone::Named(timezone)) => Some(TemplateTimeZone::Named(timezone)),
+            None => None,
+        };
+        self
+    }
+
     /// Set tz offset on the wrapped template.
     #[must_use]
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.inner.tz_offset = tz_offset;
+        self.inner.time_zone = TemplateTimeZone::from_offset(tz_offset);
         self
     }
 
@@ -105,7 +116,7 @@ impl ConfinedUriTemplate {
     /// Set tz offset on the wrapped template.
     #[must_use]
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.0.inner.tz_offset = tz_offset;
+        self.0.inner.time_zone = TemplateTimeZone::from_offset(tz_offset);
         self
     }
 
