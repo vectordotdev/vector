@@ -19,11 +19,11 @@ use std::{convert::TryFrom, fmt};
 pub use common::*;
 pub use config::*;
 pub use encoder::ElasticsearchEncoder;
-use http::{Request, uri::InvalidUri};
+use http::uri::InvalidUri;
 use snafu::Snafu;
 use vector_lib::{
     NamedInternalEvent, configurable::configurable_component, internal_event::InternalEvent,
-    sensitive_string::SensitiveString,
+    internal_event::emit, sensitive_string::SensitiveString,
 };
 
 use crate::{
@@ -212,7 +212,7 @@ impl ElasticsearchCommonMode {
                         error,
                         crate::template::TemplateRenderingError::Confined { .. }
                     ) {
-                        emit!(TemplateRenderingError {
+                        emit(TemplateRenderingError {
                             error,
                             field: Some("index"),
                             drop_event: true,
@@ -220,14 +220,14 @@ impl ElasticsearchCommonMode {
                         return Err(());
                     }
                     if let Some(fallback) = template_fallback_index {
-                        emit!(TemplateRenderingError {
+                        emit(TemplateRenderingError {
                             error,
                             field: Some("index"),
                             drop_event: false,
                         });
                         Ok(fallback.clone())
                     } else {
-                        emit!(TemplateRenderingError {
+                        emit(TemplateRenderingError {
                             error,
                             field: Some("index"),
                             drop_event: true,
@@ -248,7 +248,7 @@ impl ElasticsearchCommonMode {
             } => bulk_action_template
                 .render_string(event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("bulk_action"),
                         drop_event: true,
@@ -269,7 +269,7 @@ impl ElasticsearchCommonMode {
             } => version
                 .render_string(event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("version"),
                         drop_event: true,
@@ -280,7 +280,7 @@ impl ElasticsearchCommonMode {
                 .and_then(|value| {
                     value
                         .parse()
-                        .map_err(|_| emit!(VersionValueParseError { value }))
+                        .map_err(|_| emit(VersionValueParseError { value }))
                         .ok()
                 }),
             _ => None,
@@ -309,7 +309,10 @@ impl ElasticsearchCommonMode {
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 #[derive(Default)]
 pub enum ElasticsearchApiVersion {
-    /// Auto-detect the API version.
+    /// Automatically select the API version.
+    ///
+    /// The `opensearch` sink selects an OpenSearch-compatible API version without querying the server.
+    /// The `elasticsearch` sink detects the version from the server.
     ///
     /// If the [cluster state version endpoint][es_version] isn't reachable, a warning is logged to
     /// stdout, and the version is assumed to be V6 if the `suppress_type_name` option is set to

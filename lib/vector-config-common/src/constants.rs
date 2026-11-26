@@ -20,8 +20,6 @@ pub const DOCS_META_EXAMPLES: &str = "docs::examples";
 pub const DOCS_META_HIDDEN: &str = "docs::hidden";
 pub const DOCS_META_HUMAN_NAME: &str = "docs::human_name";
 pub const DOCS_META_NUMERIC_TYPE: &str = "docs::numeric_type";
-pub const DOCS_META_OPTIONAL: &str = "docs::optional";
-pub const DOCS_META_REQUIRED: &str = "docs::required";
 pub const DOCS_META_SYNTAX_OVERRIDE: &str = "docs::syntax_override";
 pub const DOCS_META_TEMPLATEABLE: &str = "docs::templateable";
 pub const DOCS_META_TYPE_OVERRIDE: &str = "docs::type_override";
@@ -29,6 +27,8 @@ pub const DOCS_META_TYPE_UNIT: &str = "docs::type_unit";
 pub const LOGICAL_NAME: &str = "logical_name";
 pub const METADATA: &str = "_metadata";
 pub const SERDE_ALIASES: &str = "serde::aliases";
+/// The custom deserializer requires a string; do not stringify other scalar types.
+pub const SERDE_STRING_ONLY: &str = "serde::string_only";
 pub const SERDE_VARIANT_ALIASES: &str = "serde::variant_aliases";
 
 /// Well-known component types.

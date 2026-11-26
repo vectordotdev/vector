@@ -1,4 +1,5 @@
 use std::{collections::BTreeMap, num::NonZeroU32, time::Duration};
+use vector_lib::internal_event::{emit, register};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -72,8 +73,7 @@ pub struct StaticMetricConfig {
 
     /// Key-value pairs representing tags and their values to add to the metric.
     #[configurable(metadata(
-        docs::additional_props_description = "An individual tag - value pair.",
-        docs::required = true,
+        docs::additional_props_description = "An individual tag - value pair."
     ))]
     pub tags: BTreeMap<String, String>,
 }
@@ -138,8 +138,8 @@ impl StaticMetrics {
         reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
     )]
     async fn run(mut self) -> vector_lib::source_sender::SendResult {
-        let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::STATIC));
+        let events_received = register(EventsReceived);
+        let bytes_received = register(BytesReceived::from(Protocol::STATIC));
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
 
@@ -190,7 +190,7 @@ impl StaticMetrics {
                 .map(|metric| metric.with_timestamp(Some(Utc::now())));
 
             if let Err(error) = self.out.send_batch(batch).await {
-                emit!(StreamClosedError { count });
+                emit(StreamClosedError { count });
                 return Err(error);
             }
         }
@@ -255,7 +255,7 @@ mod tests {
     async fn default_empty() {
         let events = events_from_config(StaticMetricsConfig::default()).await;
 
-        assert!(events.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
     }
 
     #[tokio::test]
@@ -266,7 +266,7 @@ mod tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         assert_eq!(event.as_metric().namespace(), Some("static"));
     }
@@ -279,7 +279,7 @@ mod tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         assert_eq!(event.as_metric().namespace(), Some("static"));
         let event = events.remove(0);
@@ -297,7 +297,7 @@ mod tests {
         };
 
         let mut events = events_from_config(config).await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
 
         assert_eq!(event.as_metric().namespace(), Some(namespace));
@@ -316,7 +316,7 @@ mod tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         let metric = event.as_metric();
 

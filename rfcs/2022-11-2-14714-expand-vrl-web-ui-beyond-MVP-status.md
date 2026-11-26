@@ -2,7 +2,7 @@
 
 [The current MVP](https://playground.vrl.dev/) for the VRL web
 playground utilizes WASM and runs the majority of the VRL stdlib,
-[except for six functions](https://github.com/vectordotdev/vector/issues?q=wasm+compatible+label%3A%22vrl%3A+playground%22+is%3Aopen).
+[except for six functions](https://github.com/vectordotdev/vector/issues?q=wasm+compatible+label%3A%22vrl%3Aplayground%22+is%3Aopen).
 Users can run VRL programs, share their programs online, and try
 sample event inputs. However, we would like to expand the MVP
 features which would require more planning and decision making.

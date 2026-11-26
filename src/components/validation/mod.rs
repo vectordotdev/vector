@@ -309,7 +309,7 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
         let mut runner = Runner::from_configuration(
             configuration,
             test_case_data_path,
-            crate::extra_context::ExtraContext::default(),
+            vector_lib::extra_context::ExtraContext::default(),
         );
         runner.add_validator(StandardValidators::ComponentSpec);
 
@@ -365,17 +365,15 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                     }
                 }
 
-                if had_failures {
-                    panic!(
-                        "Failed to validate component '{component_name}':\n{}",
-                        details.join("")
-                    );
-                } else {
-                    info!(
-                        "Successfully validated component '{component_name}':\n{}",
-                        details.join("")
-                    );
-                }
+                assert!(
+                    !had_failures,
+                    "Failed to validate component '{component_name}':\n{}",
+                    details.join("")
+                );
+                info!(
+                    "Successfully validated component '{component_name}':\n{}",
+                    details.join("")
+                );
             }
             Err(e) => {
                 panic!("Failed to complete validation run for component '{component_name}': {e}")
@@ -441,9 +439,14 @@ fn get_validation_configuration_from_test_case_path(
     ))
 }
 
+/// Runs component validation for the test case data file at the given path.
+///
+/// # Panics
+///
+/// Panics if the path does not exist, if the path does not map to a validatable component (it
+/// must end in `<sources|transforms|sinks>/<component name>.yaml`), if the Tokio runtime cannot be
+/// built, if the validation run returns an error, or if any validator reports a failure.
 #[cfg(feature = "component-validation-runner")]
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn validate_component(test_case_data_path: std::path::PathBuf) {
     assert!(
         test_case_data_path.exists(),
@@ -460,7 +463,7 @@ pub fn validate_component(test_case_data_path: std::path::PathBuf) {
 #[cfg(all(test, feature = "component-validation-tests"))]
 mod tests {
     #[test_generator::test_resources("tests/validation/components/**/*.yaml")]
-    pub fn validate_component(test_case_data_path: &str) {
+    pub(super) fn validate_component(test_case_data_path: &str) {
         crate::test_util::trace_init();
 
         let test_case_data_path = std::path::PathBuf::from(test_case_data_path.to_string());

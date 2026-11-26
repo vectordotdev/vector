@@ -1,14 +1,17 @@
 use std::{collections::HashMap, convert::Infallible};
+use vector_lib::internal_event::{emit, register};
 
 use bytes::{Buf, Bytes};
 use chrono::Utc;
-use http::header::HeaderValue;
 use snafu::ResultExt;
 use vector_lib::{
     config::LogNamespace,
     internal_event::{BytesReceived, Protocol},
 };
-use warp::{Filter, http::StatusCode};
+use warp::{
+    Filter,
+    http::{HeaderValue, StatusCode},
+};
 
 use super::{
     Compression,
@@ -26,7 +29,7 @@ use crate::{
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 #[allow(clippy::too_many_arguments)]
-pub fn firehose(
+pub(super) fn firehose(
     access_keys: Vec<String>,
     store_access_key: bool,
     record_compression: Compression,
@@ -36,7 +39,7 @@ pub fn firehose(
     log_namespace: LogNamespace,
     common_attributes: Vec<HttpConfigParamKind>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Infallible> + Clone {
-    let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
     let context = handlers::Context {
         compression: record_compression,
         store_access_key,
@@ -159,7 +162,7 @@ fn emit_received() -> impl Filter<Extract = (), Error = warp::reject::Rejection>
         .and(warp::header::optional("X-Amz-Firehose-Request-Id"))
         .and(warp::header::optional("X-Amz-Firehose-Source-Arn"))
         .map(|request_id: Option<String>, source_arn: Option<String>| {
-            emit!(AwsKinesisFirehoseRequestReceived {
+            emit(AwsKinesisFirehoseRequestReceived {
                 request_id: request_id.as_deref(),
                 source_arn: source_arn.as_deref(),
             });
@@ -223,10 +226,10 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
         request_id = None;
     }
 
-    emit!(AwsKinesisFirehoseRequestError::new(
+    emit(AwsKinesisFirehoseRequestError::new(
         code,
         message.as_str(),
-        request_id
+        request_id,
     ));
 
     let json = warp::reply::json(&FirehoseResponse {

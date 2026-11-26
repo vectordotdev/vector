@@ -8,6 +8,7 @@ sinks:
     encoding:
       codec: json
     endpoint: http://localhost:3100
+    expanded_key_case: lowercase
     labels:
       event_{{ event_field }}: value_{{ some_other_event_field }}
       pod_labels_*: "{{ kubernetes.pod_labels }}"

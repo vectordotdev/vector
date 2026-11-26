@@ -1,6 +1,7 @@
+use vector_lib::extra_context::ExtraContext;
+
 use crate::{
     config::Config,
-    extra_context::ExtraContext,
     test_util::{
         mock::{basic_sink, basic_source, basic_transform, tripwire_source},
         start_topology, trace_init,

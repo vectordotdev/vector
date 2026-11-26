@@ -1,4 +1,5 @@
 use std::fmt;
+use vector_lib::internal_event::emit;
 
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::path::PathPrefix;
@@ -64,6 +65,10 @@ where
     ///
     /// # Errors
     /// Returns an error if the service fails while waiting to become ready.
+    #[expect(
+        clippy::result_unit_err,
+        reason = "The sink only reports whether service readiness failed"
+    )]
     pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mode = self.mode;
         let id_key_field = self.id_key_field.as_ref();
@@ -94,7 +99,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),

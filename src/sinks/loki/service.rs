@@ -1,9 +1,10 @@
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use http::StatusCode;
+use http::{Request, StatusCode};
 use snafu::Snafu;
 use tracing::Instrument;
+use vector_http::full_body;
 
 use crate::{
     http::{Auth, HttpClient},
@@ -11,7 +12,7 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct LokiRetryLogic;
+pub(super) struct LokiRetryLogic;
 
 impl RetryLogic for LokiRetryLogic {
     type Error = LokiError;
@@ -32,15 +33,15 @@ impl RetryLogic for LokiRetryLogic {
 }
 
 #[derive(Debug, Snafu)]
-pub enum LokiError {
+pub(super) enum LokiError {
     #[snafu(display("Server responded with an error: {}", code))]
     ServerError { code: StatusCode },
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
-    HttpError { error: crate::http::HttpError },
+    HttpError { error: vector_http::HttpError },
 }
 
 #[derive(Debug, Snafu)]
-pub struct LokiResponse {
+pub(super) struct LokiResponse {
     metadata: RequestMetadata,
 }
 
@@ -59,7 +60,7 @@ impl DriverResponse for LokiResponse {
 }
 
 #[derive(Clone)]
-pub struct LokiRequest {
+pub(super) struct LokiRequest {
     pub compression: Compression,
     pub finalizers: EventFinalizers,
     pub payload: Bytes,
@@ -84,14 +85,18 @@ impl MetaDescriptive for LokiRequest {
 }
 
 #[derive(Debug, Clone)]
-pub struct LokiService {
+pub(super) struct LokiService {
     endpoint: HttpEndpoint,
     client: HttpClient,
     auth: Option<Auth>,
 }
 
 impl LokiService {
-    pub const fn new(client: HttpClient, endpoint: HttpEndpoint, auth: Option<Auth>) -> Self {
+    pub(super) const fn new(
+        client: HttpClient,
+        endpoint: HttpEndpoint,
+        auth: Option<Auth>,
+    ) -> Self {
         Self {
             endpoint,
             client,
@@ -115,7 +120,7 @@ impl Service<LokiRequest> for LokiService {
             _ => "application/json",
         };
         let mut req =
-            http::Request::post(self.endpoint.as_uri()).header("Content-Type", content_type);
+            Request::post(self.endpoint.as_uri().clone()).header("Content-Type", content_type);
 
         let metadata = request.get_metadata().clone();
 
@@ -127,17 +132,16 @@ impl Service<LokiRequest> for LokiService {
             req = req.header("Content-Encoding", ce);
         }
 
-        let body = hyper::Body::from(request.payload);
-        let mut req = req.body(body).unwrap();
+        let mut req = req.body(request.payload).unwrap();
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut req);
         }
 
-        let mut client = self.client.clone();
+        let client = self.client.clone();
 
         Box::pin(async move {
-            match client.call(req).in_current_span().await {
+            match client.send(req.map(full_body)).in_current_span().await {
                 Ok(response) => {
                     let status = response.status();
 

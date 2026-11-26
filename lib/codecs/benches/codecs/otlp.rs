@@ -88,7 +88,7 @@ fn aggregated_histogram() -> Event {
                 },
             ],
             count: 100,
-            sum: 1.75,
+            sum: Some(1.75),
         },
     )
     .with_tags(Some(metric_tags!(

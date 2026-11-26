@@ -33,7 +33,7 @@ assign either a single value or an array of values to a tag.
 
 For example:
 
-```coffee
+```vrl
 .tags.host = "localhost" # Assign a single string value
 .tags.bare = null # Create a single-valued bare tag
 .tags.complex = ["remotehost", null, "otherhost"] # Creates three tag values

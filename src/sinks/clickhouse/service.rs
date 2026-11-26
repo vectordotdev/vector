@@ -3,24 +3,23 @@
 use std::fmt::Write as _;
 
 use bytes::Bytes;
-use http::{StatusCode, Uri};
-use http_1::{
-    Request,
+use http::{
+    Request, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
 use tracing::debug;
+use vector_http::HttpError;
 
 use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
-    http::{Auth, client_v1::HttpError},
+    http::Auth,
     sinks::{
         UriParseSnafu,
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpResponse, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpResponse, HttpServiceRequestBuilder, RetryStrategy},
             retries::RetryAction,
         },
     },
@@ -39,8 +38,7 @@ impl RetryLogic for ClickhouseRetryLogic {
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        let status = StatusCode::from_u16(response.response.status().as_u16())
-            .expect("HTTP status codes are valid u16 values");
+        let status = response.response.status();
 
         if !status.is_success() {
             debug!(
@@ -122,7 +120,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
         }
         let mut request = builder.body(payload).map_err(crate::Error::from)?;
         if let Some(auth) = &self.auth {
-            auth.apply_v1(&mut request);
+            auth.apply(&mut request);
         }
 
         Ok(request)

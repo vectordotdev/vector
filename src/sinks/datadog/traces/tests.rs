@@ -3,12 +3,15 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use hyper::StatusCode;
+use http::StatusCode;
 use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;
 use rmp_serde;
-use vector_lib::event::{BatchNotifier, BatchStatus, Event};
+use vector_lib::{
+    event::{BatchNotifier, BatchStatus, Event},
+    extra_context::ExtraContext,
+};
 use vrl::event_path;
 
 use super::{DatadogTracesConfig, apm_stats::StatsPayload, dd_proto, ddsketch_full};
@@ -16,7 +19,6 @@ use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
     event::{ObjectMap, TraceEvent, Value},
-    extra_context::ExtraContext,
     sinks::util::test::{build_test_server_status, load_sink, load_sink_with_context},
     test_util::{
         addr::next_addr,
@@ -31,6 +33,16 @@ async fn start_test(
     http_status_code: StatusCode,
     events: Vec<Event>,
 ) -> Receiver<(http::request::Parts, Bytes)> {
+    start_test_with_config("", batch_status, http_status_code, events).await
+}
+
+/// Submit traces to a dummy http server, with `extra_config` appended to the sink configuration.
+async fn start_test_with_config(
+    extra_config: &str,
+    batch_status: BatchStatus,
+    http_status_code: StatusCode,
+    events: Vec<Event>,
+) -> Receiver<(http::request::Parts, Bytes)> {
     assert_sink_compliance(&SINK_TAGS, async {
         let (_guard, addr) = next_addr();
         let config = format!(
@@ -38,8 +50,9 @@ async fn start_test(
             default_api_key = "atoken"
             compression = "none"
             endpoint = "http://{}"
+            {}
         "#},
-            addr
+            addr, extra_config
         );
         let (config, cx) = load_sink::<DatadogTracesConfig>(&config).unwrap();
         let (sink, _) = config.build(cx).await.unwrap();
@@ -90,7 +103,7 @@ fn simple_span(resource: String) -> ObjectMap {
     ])
 }
 
-pub fn simple_trace_event(resource: String) -> TraceEvent {
+pub(super) fn simple_trace_event(resource: String) -> TraceEvent {
     let mut t = TraceEvent::default();
     t.insert(event_path!("language"), "a_language");
     t.insert(event_path!("agent_version"), "1.23456");
@@ -400,4 +413,25 @@ async fn override_global_options() {
         keys.iter()
             .all(|value| value.to_str().unwrap() == "local-key")
     );
+}
+
+#[tokio::test]
+async fn disable_apm_stats_sends_no_stats_payload() {
+    let mut t = simple_trace_event("a_resource".to_string());
+    t.metadata_mut().set_datadog_api_key(Arc::from("a_key"));
+    let events = vec![Event::Trace(t)];
+    let rx = start_test_with_config(
+        "disable_apm_stats = true",
+        BatchStatus::Delivered,
+        StatusCode::OK,
+        events,
+    )
+    .await;
+
+    // The test server is shut down once the sink has run, so the stream ends after the
+    // requests it received.
+    let output = rx.collect::<Vec<_>>().await;
+    assert_eq!(output.len(), 1);
+    let (trace_parts, _) = &output[0];
+    assert_eq!(trace_parts.uri.path(), "/api/v0.2/traces");
 }

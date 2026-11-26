@@ -10,13 +10,13 @@ use http::{
     Request, StatusCode, Uri,
     header::{self, HeaderName, HeaderValue},
 };
-use hyper::Body;
 use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
+use vector_http::{HttpError, empty_body, full_body};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{AcknowledgementsConfig, Input, telemetry},
@@ -42,7 +42,7 @@ use crate::{
             sink::ChronicleSink,
         },
         gcs_common::{
-            config::{GcsRetryLogic, healthcheck_response},
+            config::{GcsRetryLogic, healthcheck_status},
             service::GcsResponse,
         },
         util::{
@@ -284,11 +284,11 @@ pub fn build_healthcheck(
     let uri = base_url.parse::<Uri>()?;
 
     let healthcheck = async move {
-        let mut request = http::Request::get(&uri).body(Body::empty())?;
+        let mut request = Request::get(&uri).body(empty_body())?;
         auth.apply(&mut request);
 
         let response = client.send(request).await?;
-        healthcheck_response(&response, GcsHealthcheckError::NotFound.into())
+        healthcheck_status(response.status(), GcsHealthcheckError::NotFound.into())
     };
 
     Ok(Box::pin(healthcheck))
@@ -353,7 +353,7 @@ impl ValidatedSink for ChronicleUnstructuredConfig {
         let creds = self.auth.build(Scope::MalachiteIngestion).await?;
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
+        let client = HttpClient::new(tls.into(), cx.proxy())?;
 
         let healthcheck = build_healthcheck(client.clone(), healthcheck_endpoint, creds.clone())?;
         creds.spawn_regenerate_token();
@@ -667,7 +667,7 @@ pub enum ChronicleResponseError {
     #[snafu(display("Server responded with an error: {}", code))]
     ServerError { code: StatusCode },
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
-    HttpError { error: crate::http::HttpError },
+    HttpError { error: HttpError },
 }
 
 impl Service<ChronicleRequest> for ChronicleService {
@@ -688,12 +688,13 @@ impl Service<ChronicleRequest> for ChronicleService {
             headers.insert(name, value);
         }
 
-        let mut http_request = builder.body(Body::from(request.body)).unwrap();
+        let mut http_request = builder.body(request.body).unwrap();
         self.creds.apply(&mut http_request);
+        let http_request = http_request.map(full_body);
 
-        let mut client = self.client.clone();
+        let client = self.client.clone();
         Box::pin(async move {
-            match client.call(http_request).await {
+            match client.send(http_request).await {
                 Ok(response) => {
                     let status = response.status();
                     if status.is_success() {

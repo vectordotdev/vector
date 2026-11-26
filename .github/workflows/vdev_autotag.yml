@@ -8,10 +8,11 @@ on:
       - "vdev/Cargo.toml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   tag:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Generate token via GitHub App

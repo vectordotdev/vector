@@ -271,7 +271,12 @@ async fn test_spawn_reader_thread() {
     spawn_reader_thread(reader, decoder, STDOUT, sender);
 
     let mut counter = 0;
-    if let Some(((events, byte_size), origin)) = receiver.recv().await {
+    if let Some(ReaderMessage {
+        events,
+        byte_size,
+        stream: origin,
+    }) = receiver.recv().await
+    {
         assert_eq!(byte_size, 11);
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();
@@ -283,7 +288,12 @@ async fn test_spawn_reader_thread() {
         counter += 1;
     }
 
-    if let Some(((events, byte_size), origin)) = receiver.recv().await {
+    if let Some(ReaderMessage {
+        events,
+        byte_size,
+        stream: origin,
+    }) = receiver.recv().await
+    {
         assert_eq!(byte_size, 17);
         assert_eq!(events.len(), 1);
         let log = events[0].as_log();

@@ -142,7 +142,6 @@ fn validate_rejects_unconfined_template() {
 }
 
 #[test]
-#[expect(clippy::float_cmp, reason = "Verify the exact value.")]
 fn test_process_metric() {
     let sourcetype = Template::try_from("{{ tags.template_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ tags.template_source }}".to_string()).ok();
@@ -409,7 +408,14 @@ async fn splunk_passthrough_token() {
 
     let mut tokens = rx
         .take(3)
-        .map(|r| r.0.headers.get("Authorization").unwrap().clone())
+        .map(|r| {
+            r.0.headers
+                .get("Authorization")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_owned()
+        })
         .collect::<Vec<_>>()
         .await;
 

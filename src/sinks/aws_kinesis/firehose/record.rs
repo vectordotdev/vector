@@ -8,7 +8,7 @@ use super::{KinesisClient, KinesisError, KinesisRecord, KinesisResponse, Record,
 use crate::sinks::prelude::*;
 
 #[derive(Clone)]
-pub struct KinesisFirehoseRecord {
+pub(super) struct KinesisFirehoseRecord {
     pub record: KinesisRecord,
 }
 
@@ -36,7 +36,7 @@ impl Record for KinesisFirehoseRecord {
 }
 
 #[derive(Clone)]
-pub struct KinesisFirehoseClient {
+pub(super) struct KinesisFirehoseClient {
     pub client: KinesisClient,
 }
 

@@ -10,7 +10,7 @@ services:
 
   otel-collector-source:
     container_name: otel-collector-source
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
+    image: &collector_image otel/opentelemetry-collector-contrib:0.159.0@sha256:1f2c54a30e713fac6b3ae77a1ec84010c2007e29ced8ec666214fc2f6739c1cc
     init: true
     depends_on:
       prepare-output:
@@ -53,8 +53,7 @@ services:
           --rate=0
 
   # A detached `compose up` waits for all dependency conditions before starting this service.
-  # This keeps the test runner behind generator completion, exporter readiness, and a
-  # post-ingestion internal metrics scrape.
+  # This keeps the test runner behind generator completion and complete captures.
   traces-ready:
     image: alpine:3.20
     depends_on:
@@ -70,7 +69,7 @@ services:
       context: ../../../..
       dockerfile: ./tests/e2e/opentelemetry-common/collector.Dockerfile
       args:
-        CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
+        COLLECTOR_IMAGE: *collector_image
     init: true
     depends_on:
       prepare-output:
@@ -79,13 +78,12 @@ services:
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
     healthcheck:
       test:
-        - CMD-SHELL
-        - >-
-          source_spans=$$(grep -o '"spanId"' /output/opentelemetry-traces/collector-source-file-exporter.log 2>/dev/null | wc -l);
-          sink_spans=$$(grep -o '"spanId"' /output/opentelemetry-traces/collector-file-exporter.log 2>/dev/null | wc -l);
-          metrics_ready=$$(grep '"name":"component_received_events_total"' /output/opentelemetry-traces/vector-internal-metrics-sink.log 2>/dev/null | grep '"component_id":"source0"' | grep -Ec '"value":400(\.0)?');
-          echo "source=$$source_spans sink=$$sink_spans metrics_ready=$$metrics_ready";
-          [ "$$source_spans" -ge 200 ] && [ "$$sink_spans" -ge 400 ] && [ "$$metrics_ready" -ge 1 ]
+        - CMD
+        - sh
+        - /capture_ready.sh
+        - /output/opentelemetry-traces
+        - count:collector-source-file-exporter.log:spanId:200
+        - count:collector-file-exporter.log:spanId:400
       interval: 500ms
       timeout: 1s
       retries: 240
@@ -93,6 +91,10 @@ services:
       - type: bind
         source: ../data/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+      - type: bind
+        source: ../../opentelemetry-common/capture_ready.sh
+        target: /capture_ready.sh
         read_only: true
       - type: volume
         source: vector_target

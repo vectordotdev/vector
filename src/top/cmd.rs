@@ -33,7 +33,8 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     };
     let mut client = Client::new(uri.clone());
 
-    if client.connect().await.is_err() || client.health().await.is_err() {
+    // `connect` opens no connection, so the health RPC is what detects an unreachable API.
+    if client.connect().is_err() || client.health().await.is_err() {
         eprintln!(
             indoc::indoc! {"
             Vector API server isn't reachable ({}).
@@ -108,10 +109,18 @@ async fn subscription(
     shutdown_tx: oneshot::Sender<()>,
 ) {
     loop {
+        // Each attempt gets a new client, so a reconnect opens a new connection. `connect` opens
+        // no connection: the RPCs of `init_components` do, and fail while the API is unreachable.
+        let mut client = Client::new(uri.clone());
+        if client.connect().is_err() {
+            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
+            continue;
+        }
+
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let Ok(state) = metrics::init_components(uri.clone(), &opts.components).await else {
+        let Ok(state) = metrics::init_components(&mut client, &opts.components).await else {
             tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
             continue;
         };
@@ -122,19 +131,15 @@ async fn subscription(
             .collect();
         _ = tx.send(EventType::InitializeState(state)).await;
 
-        // Subscribe to updated metrics via gRPC streaming
-        let Ok(handles) = metrics::subscribe(
-            uri.clone(),
+        // Subscribe to updated metrics via gRPC streaming, over the connection that
+        // `init_components` opened.
+        let handles = metrics::subscribe(
+            client,
             tx.clone(),
             i64::from(opts.interval),
             opts.components.clone(),
             initial_components,
-        )
-        .await
-        else {
-            tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
-            continue;
-        };
+        );
 
         _ = tx
             .send(EventType::ConnectionUpdated(ConnectionStatus::Connected(

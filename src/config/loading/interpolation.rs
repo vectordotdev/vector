@@ -6,12 +6,16 @@ use serde_json::Value;
 use super::representation::ConfigMap;
 
 /// Interpolates environment variables in string leaves without changing keys or value types.
+///
+/// # Errors
+///
+/// Returns an error message for each referenced variable in a string leaf that contains LF or
+/// CR, is unset without a default, or is empty when referenced with `:?`.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
     reason = "Preserve collection type and API bounds"
 )]
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn interpolate_config_map_with_env_vars(
     map: &ConfigMap,
     vars: &HashMap<String, String>,
@@ -79,12 +83,16 @@ pub static ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX: LazyLock<Regex> = LazyLock:
 });
 
 /// Result<interpolated config, errors>
+///
+/// # Errors
+///
+/// Returns an error message for each referenced variable that contains LF or CR, is unset
+/// without a default, or is empty when referenced with `:?`.
 // https://github.com/vectordotdev/vector/issues/23659
 #[allow(
     clippy::implicit_hasher,
     reason = "Preserve collection type and API bounds"
 )]
-#[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
 pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
 
@@ -96,17 +104,9 @@ pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String
                 .or_else(|| caps.get(2))
                 .map(|m| m.as_str())
                 .map_or("$", |name| {
-                    // Get the value and check for newlines (LF or CR)
-                    let val = vars.get(name).and_then(|v| {
-                        if v.contains(['\n', '\r']) {
-                            errors.push(format!(
-                                "Environment variable contains newline character. name = {name:?}",
-                            ));
-                            None
-                        } else {
-                            Some(v.as_str())
-                        }
-                    });
+                    // Parsing has already fixed the configuration's structure. Newlines and
+                    // other syntax characters remain part of this string value.
+                    let val = vars.get(name).map(String::as_str);
 
                     match flags {
                         ":-" => match val {
@@ -236,8 +236,8 @@ mod test {
     }
 
     #[test]
-    fn test_multiline_expansion_prevented() {
-        let vars = vec![
+    fn multiline_values_cannot_change_the_parsed_structure() {
+        let vars: HashMap<String, String> = vec![
             ("SAFE_VAR".into(), "single line value".into()),
             ("MULTILINE_VAR".into(), "line1\nline2\nline3".into()),
             ("WITH_NEWLINE".into(), "before\nafter".into()),
@@ -247,30 +247,14 @@ mod test {
         .into_iter()
         .collect();
 
-        // Test that multiline values are treated as missing
-        let result = interpolate("$MULTILINE_VAR", &vars);
-        assert!(result.is_err(), "Multiline var should be rejected");
-
-        let result = interpolate("$WITH_NEWLINE", &vars);
-        assert!(result.is_err(), "Newline var should be rejected");
-
-        let result = interpolate("$WITH_CR", &vars);
-        assert!(result.is_err(), "CR var should be rejected");
-
-        let result = interpolate("$WITH_CRLF", &vars);
-        assert!(result.is_err(), "CRLF var should be rejected");
-
-        // Test that safe values still work
-        let result = interpolate("$SAFE_VAR", &vars).unwrap();
-        assert_eq!("single line value", result);
-
-        // Test with default values - multiline vars should still error
-        let result = interpolate("${MULTILINE_VAR:-safe default}", &vars);
-        assert!(result.is_err(), "Should error even with default");
-
-        // Verify error messages are helpful
-        let err = interpolate("$MULTILINE_VAR", &vars).unwrap_err();
-        assert!(err.iter().any(|e| e.contains("newline character")));
-        assert!(err.iter().any(|e| e.contains("MULTILINE_VAR")));
+        for (name, value) in &vars {
+            let input = serde_json::json!({"key": format!("${{{name}:-default}}")});
+            let result =
+                interpolate_config_map_with_env_vars(input.as_object().unwrap(), &vars).unwrap();
+            assert_eq!(
+                serde_json::Value::Object(result),
+                serde_json::json!({"key": value})
+            );
+        }
     }
 }

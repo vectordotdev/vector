@@ -166,11 +166,10 @@ impl AvroSerializerConfig {
     }
 
     /// Build the `AvroSerializer` from this configuration.
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the schema cannot be parsed or its named schemas cannot be resolved.
     pub fn build(&self) -> Result<AvroSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
             .map_err(|error| format!("Failed building Avro serializer: {error}"))?;
@@ -258,13 +257,13 @@ mod tests {
     use bytes::BytesMut;
     use indoc::indoc;
     use vector_core::event::{LogEvent, Value};
-    use vrl::btreemap;
+    use vrl::objectmap;
 
     use super::*;
 
     #[test]
     fn serialize_avro() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "foo" => Value::from("bar")
         }));
         let schema = indoc! {r#"
@@ -291,7 +290,7 @@ mod tests {
 
     #[test]
     fn serialize_avro_preserves_resolvable_union_branch() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "x" => Value::Array(vec![Value::from(65), Value::from(66)]),
             "y" => Value::from(123)
         }));

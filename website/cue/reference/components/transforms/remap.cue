@@ -103,19 +103,66 @@ components: transforms: "remap": {
 				With [metric events](\(urls.vector_metric)), VRL is much more restrictive. Below is a field-by-field
 				breakdown of VRL's access to metrics:
 
-				Field | Access | Specific restrictions (if any)
+				Field | Access | Details
 				:-----|:-------|:------------------------------
-				`type` | Read only |
+				`type` | Read/write | You can set `type` to either `counter` or `gauge`, but only on a metric that is currently a counter or a gauge. The value and kind are kept.
 				`kind` | Read/write | You can set `kind` to either `incremental` or `absolute` but not to an arbitrary value.
 				`name` | Read/write |
 				`timestamp` | Read/write/delete | You can only assign a valid [VRL timestamp](\(urls.vrl_expressions)/#timestamp) value, not a [VRL string](\(urls.vrl_expressions)/#string).
 				`interval_ms` | Read/write/delete | You can assign it a non zero 32 byte unsigned interval
 				`namespace` | Read/write/delete |
 				`tags` | Read/write/delete | The `tags` field must be a [VRL object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
+				`counter`, `gauge` | Read | The whole object that holds the value of the metric's current type.
+				`counter.value`, `gauge.value` | Read/write | You can assign an integer or a float, but only under the metric's current type.
+				`set` | Read | `.set.values`, an array of strings.
+				`distribution` | Read | `.distribution.samples`, an array of `{value, rate}` objects, and `.distribution.statistic`, either `histogram` or `summary`.
+				`aggregated_histogram` | Read | `.aggregated_histogram.buckets`, an array of `{upper_limit, count}` objects, plus `.aggregated_histogram.count` and `.aggregated_histogram.sum`. `sum` is left out when it isn't set, so it reads as `null` and `exists(.aggregated_histogram.sum)` is `false`.
+				`aggregated_summary` | Read | `.aggregated_summary.quantiles`, an array of `{quantile, value}` objects, plus `.aggregated_summary.count` and `.aggregated_summary.sum`.
+				`sketch` | Read | Summary statistics only: `.sketch.count`, `.sketch.min`, `.sketch.max`, `.sketch.sum`, and `.sketch.avg`.
 
 				It's important to note that if you try to perform a disallowed action, such as deleting the `type`
 				field using `del(.type)`, Vector doesn't abort the VRL program or throw an error. Instead, it ignores
 				the disallowed action.
+				"""
+		}
+		metric_values: {
+			title: "Metric Values"
+			body: """
+				A metric's value is available only under the field for its current type. For example, `.gauge.value`
+				holds the value of a gauge, and `.counter` is `null` for a gauge. Reading the whole event with `.` also
+				includes the value field.
+
+				The field names in the Event Data Model table match the JSON encoding of metrics that `vector tap`
+				shows. For some metric types, these names differ from the value of `type`. For example, an aggregated
+				histogram reports `aggregated histogram` in `.type` but exposes its count at
+				`.aggregated_histogram.count`.
+
+				You can assign an integer or a float to `.counter.value` or `.gauge.value` when it matches the metric's
+				current type, for example, `.gauge.value = 100`. The value is stored as a float, so it reads back as
+				`100.0`, and integers larger than `9007199254740992` (2^53) in absolute value might be rounded.
+				Assigning anything else, such as a string, the field of another type, or a whole object like `.gauge`,
+				leaves the value unchanged and the program keeps running. The other value fields are read-only, and
+				`del()` on any value field returns `null` and leaves the value unchanged. To convert between counters
+				and gauges, set `type`.
+
+				Two kinds of numbers need special handling in VRL:
+
+				* VRL floats can't represent NaN, so a NaN value reads as the string `"NaN"`. Infinities read as
+				  floats, but `encode_json` writes them as `null`.
+				* VRL integers are signed 64-bit, so a count larger than `9223372036854775807` reads as a string with
+				  the exact decimal value.
+
+				The type of a metric's value is known only at runtime, so use `float!` to assert that it's a float before
+				using it in arithmetic, for example, `float!(.gauge.value) * 100`. `float!` fails on a NaN value because
+				NaN reads as the string `"NaN"`.
+
+				`unnest` copies the rest of the event into each row. On a metric event, the rest of the event includes the
+				value. With `metric_tag_values: full`, `.tags.region` is an array, so on a distribution
+				`unnest!(.tags.region)` copies every sample into every row. If the program only needs the tags, unnest a
+				local copy instead, for example, `tag_view = {"tags": .tags}; rows = unnest!(tag_view.tags.region)`.
+
+				Counter, gauge, and sample values are floats. The `==` operator treats `123` and `123.0` as equal, but
+				`assert_eq!` doesn't, so use float literals in assertions, for example, `assert_eq!(.gauge.value, 123.0)`.
 				"""
 		}
 		lazy_event_mutation: {
