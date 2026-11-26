@@ -42,7 +42,10 @@ impl<T, F> AfterRead<T, F> {
         &self.inner
     }
 
-    #[cfg(all(unix, feature = "sources-utils-net-unix"))]
+    #[cfg(any(
+        feature = "sources-utils-net-tcp",
+        all(unix, feature = "sources-utils-net-unix")
+    ))]
     pub const fn get_mut_ref(&mut self) -> &mut T {
         &mut self.inner
     }
@@ -177,6 +180,23 @@ where
     pub fn get_mut(&mut self) -> &mut T {
         self.inner.get_mut()
     }
+
+    /// Converts an error from reading the underlying stream the way the stream does. Returns
+    /// `None` for a reset that leaves no partial frame, which ends the stream.
+    #[cfg(feature = "sources-utils-net-tcp")]
+    pub fn read_error(&self, error: io::Error) -> Option<D::Error> {
+        lenient_read_error(error, self.inner.read_buffer())
+    }
+}
+
+/// A reset with no partial frame in the buffer is a clean close, so it ends the stream (`None`).
+/// Any other error, including a reset that cuts a frame, is returned.
+fn lenient_read_error<E: From<io::Error>>(error: io::Error, buffer: &BytesMut) -> Option<E> {
+    if error.kind() == io::ErrorKind::ConnectionReset && buffer.is_empty() {
+        None
+    } else {
+        Some(E::from(error))
+    }
 }
 
 impl<T, D> Stream for LenientFramedRead<T, D>
@@ -189,18 +209,8 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         match this.inner.as_mut().poll_next(cx) {
-            Poll::Ready(Some(Err(DecoderError::IO(e))))
-                if e.kind() == io::ErrorKind::ConnectionReset =>
-            {
-                let buffer = this.inner.read_buffer();
-
-                if buffer.is_empty() {
-                    // Clean RST - no partial data, treat as EOF
-                    Poll::Ready(None)
-                } else {
-                    // Partial frame in buffer
-                    Poll::Ready(Some(Err(D::Error::from(e))))
-                }
+            Poll::Ready(Some(Err(DecoderError::IO(error)))) => {
+                Poll::Ready(lenient_read_error(error, this.inner.read_buffer()).map(Err))
             }
             other => other.map_err(DecoderError::into_inner),
         }
