@@ -71,25 +71,24 @@ pub fn possible_definitions(
         if let Some(inputs) = config.transform_inputs(key) {
             let input_definitions = possible_definitions(inputs, config, enrichment_tables, cache)?;
 
-            let mut transform_definition = input.with_definitions(
-                config
-                    .transform_output_for_port(
-                        key,
-                        &input.port,
-                        enrichment_tables.clone(),
-                        &input_definitions,
+            let mut transform_definition = config
+                .transform_output_for_port(
+                    key,
+                    &input.port,
+                    enrichment_tables.clone(),
+                    &input_definitions,
+                )
+                .expect("transform must exist - already found inputs")
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "transform output misconfigured - output for port {:?} missing",
+                        &input.port
                     )
-                    .expect("transform must exist - already found inputs")
-                    .unwrap_or_else(|| {
-                        unreachable!(
-                            "transform output misconfigured - output for port {:?} missing",
-                            &input.port
-                        )
-                    })
-                    .schema_definitions(config.schema_enabled())
-                    .values()
-                    .cloned(),
-            );
+                })
+                .schema_definitions(config.schema_enabled())
+                .into_iter()
+                .map(|(origin, definition)| (origin.schema_route(input), definition))
+                .collect::<Vec<_>>();
 
             if contains_never(&transform_definition) {
                 return Err(Error::ContainsNever);
@@ -183,12 +182,13 @@ pub(super) fn expanded_definitions(
                 .find_map(|output| {
                     if output.port == input.port {
                         Some(
-                            input.with_definitions(
-                                output
-                                    .schema_definitions(config.schema_enabled())
-                                    .values()
-                                    .cloned(),
-                            ),
+                            output
+                                .schema_definitions(config.schema_enabled())
+                                .into_iter()
+                                .map(|(origin, definition)| {
+                                    (origin.schema_route(input), definition)
+                                })
+                                .collect::<Vec<_>>(),
                         )
                     } else {
                         None
@@ -269,25 +269,24 @@ pub(crate) fn input_definitions(
                 return Err(Error::ContainsNever);
             }
 
-            let mut transform_definitions = input.with_definitions(
-                config
-                    .transform_output_for_port(
-                        key,
-                        &input.port,
-                        enrichment_tables.clone(),
-                        &transform_definitions,
+            let mut transform_definitions = config
+                .transform_output_for_port(
+                    key,
+                    &input.port,
+                    enrichment_tables.clone(),
+                    &transform_definitions,
+                )
+                .expect("transform must exist")
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "transform output misconfigured - output for port {:?} missing",
+                        &input.port
                     )
-                    .expect("transform must exist")
-                    .unwrap_or_else(|| {
-                        unreachable!(
-                            "transform output misconfigured - output for port {:?} missing",
-                            &input.port
-                        )
-                    })
-                    .schema_definitions(config.schema_enabled())
-                    .values()
-                    .cloned(),
-            );
+                })
+                .schema_definitions(config.schema_enabled())
+                .into_iter()
+                .map(|(origin, definition)| (origin.schema_route(input), definition))
+                .collect::<Vec<_>>();
 
             if contains_never(&transform_definitions) {
                 return Err(Error::ContainsNever);
@@ -545,6 +544,13 @@ mod tests {
         }
     }
 
+    /// Expected schema lineage after a succession of output hops.
+    fn lineage(source: &str, outputs: &[&str]) -> OutputId {
+        outputs.iter().fold(OutputId::from(source), |id, output| {
+            id.schema_route(&OutputId::from(*output))
+        })
+    }
+
     type DefinitionWalker = fn(
         &[OutputId],
         &Config,
@@ -591,8 +597,14 @@ mod tests {
                 assert_eq!(
                     definitions,
                     vec![
-                        ("left".into(), Definition::default_legacy_namespace()),
-                        ("right".into(), Definition::default_legacy_namespace()),
+                        (
+                            lineage("source", &["shared", "left"]),
+                            Definition::default_legacy_namespace()
+                        ),
+                        (
+                            lineage("source", &["shared", "right"]),
+                            Definition::default_legacy_namespace()
+                        ),
                     ]
                 );
 
@@ -600,6 +612,104 @@ mod tests {
                 assert_eq!(repeated, definitions);
                 assert_eq!(calls.load(Ordering::Relaxed), 1);
             }
+        }
+    }
+
+    #[test]
+    fn diamond_branches_keep_distinct_schema_lineages() {
+        for walk in DEFINITION_WALKERS {
+            let (config, _) = diamond_config(true);
+            let definitions = walk(
+                &["left".into(), "right".into()],
+                &config,
+                &TableRegistry::default(),
+                &mut HashMap::new(),
+            )
+            .unwrap();
+            let lineages: std::collections::HashSet<_> =
+                definitions.iter().map(|(id, _)| id).collect();
+            assert_eq!(definitions.len(), 2);
+            assert_eq!(
+                lineages.len(),
+                2,
+                "branches from one source must retain different runtime schema keys"
+            );
+        }
+    }
+
+    #[test]
+    fn fan_in_schema_identities_survive_multiple_transforms() {
+        for walk in DEFINITION_WALKERS {
+            let mut builder = Config::builder();
+            builder.schema.enabled = true;
+            builder.add_source("src_a", basic_source().1);
+            builder.add_source("src_b", basic_source().1);
+            builder.add_transform("fan_in", &["src_a", "src_b"], basic_transform("", 0.0));
+            builder.add_transform("second_hop", &["fan_in"], basic_transform("", 0.0));
+            builder.add_sink("sink", &["second_hop"], basic_sink(1).1);
+            let config = builder.build().unwrap();
+            let definitions = walk(
+                &["second_hop".into()],
+                &config,
+                &TableRegistry::default(),
+                &mut HashMap::default(),
+            )
+            .unwrap();
+
+            let origins: std::collections::HashSet<_> =
+                definitions.into_iter().map(|(id, _)| id).collect();
+            assert_eq!(
+                origins,
+                std::collections::HashSet::from([
+                    lineage("src_a", &["fan_in", "second_hop"]),
+                    lineage("src_b", &["fan_in", "second_hop"]),
+                ]),
+                "the second transform must not collapse two source definitions"
+            );
+        }
+    }
+
+    #[cfg(feature = "sources-internal_logs")]
+    #[test]
+    fn conflicting_host_meanings_survive_two_transform_hops_with_tracking_disabled() {
+        use crate::sources::internal_logs::InternalLogsConfig;
+
+        for schema_enabled in [false, true] {
+            let mut builder = Config::builder();
+            builder.schema.enabled = schema_enabled;
+
+            let src_a: InternalLogsConfig = serde_yaml::from_str("host_key: host_a").unwrap();
+            let src_b: InternalLogsConfig = serde_yaml::from_str("host_key: host_b").unwrap();
+            builder.add_source("src_a", src_a);
+            builder.add_source("src_b", src_b);
+            builder.add_transform("fan_in", &["src_a", "src_b"], basic_transform("", 0.0));
+            builder.add_transform("second_hop", &["fan_in"], basic_transform("", 0.0));
+            builder.add_sink("sink", &["second_hop"], basic_sink(1).1);
+
+            let config = builder.build().unwrap();
+            let definitions = input_definitions(
+                &["second_hop".into()],
+                &config,
+                &TableRegistry::default(),
+                &mut HashMap::default(),
+            )
+            .unwrap()
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+
+            assert_eq!(definitions.len(), 2);
+            assert_eq!(
+                definitions[&lineage("src_a", &["fan_in", "second_hop"])].meaning_path("host"),
+                Some(&vector_lib::lookup::OwnedTargetPath::event(
+                    owned_value_path!("host_a")
+                )),
+            );
+            assert_eq!(
+                definitions[&lineage("src_b", &["fan_in", "second_hop"])].meaning_path("host"),
+                Some(&vector_lib::lookup::OwnedTargetPath::event(
+                    owned_value_path!("host_b")
+                )),
+            );
         }
     }
 
@@ -628,7 +738,7 @@ mod tests {
             assert_eq!(calls.load(Ordering::Relaxed), 2);
 
             let ordered = walk(
-                &[alternate.clone(), default, alternate],
+                &[alternate.clone(), default, alternate.clone()],
                 &config,
                 &tables,
                 &mut cache,
@@ -640,7 +750,7 @@ mod tests {
             );
 
             config.schema.enabled = false;
-            let disabled = walk(&[alternates[0].0.clone()], &config, &tables, &mut cache).unwrap();
+            let disabled = walk(&[alternate], &config, &tables, &mut cache).unwrap();
             assert_ne!(disabled[0].1, alternates[0].1);
         }
     }
@@ -858,7 +968,7 @@ mod tests {
                             ),
                         ),
                         (
-                            "transform-baz".into(),
+                            lineage("source-foo", &["transform-baz"]),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("baz"),
                                 Kind::regex(),
@@ -999,7 +1109,7 @@ mod tests {
                     want: vec![
                         // Pipeline 1
                         (
-                            "Transform 1".into(),
+                            lineage("Source 1", &["Transform 1"]),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("transform-1"),
                                 Kind::regex(),
@@ -1008,7 +1118,7 @@ mod tests {
                         ),
                         // Pipeline 2
                         (
-                            "Transform 2".into(),
+                            lineage("Source 2", &["Transform 2"]),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("transform-2"),
                                 Kind::float().or_null(),
@@ -1017,7 +1127,7 @@ mod tests {
                         ),
                         // Pipeline 3
                         (
-                            "Transform 5".into(),
+                            lineage("Transform 3", &["Transform 5"]),
                             Definition::empty_legacy_namespace().with_event_field(
                                 &owned_value_path!("transform-5"),
                                 Kind::boolean(),

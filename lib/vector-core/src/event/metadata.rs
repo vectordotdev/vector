@@ -101,13 +101,21 @@ pub(super) struct Inner {
     /// in a source, and there is currently no use-case for reading the value in a sink.
     pub(crate) upstream_id: Option<Arc<OutputId>>,
 
+    /// Stable schema lineage for this event's current route.
+    /// Each transform advances it deterministically from the previous lineage,
+    /// allowing multiple branches of one source to reconverge without aliasing.
+    #[derivative(PartialEq = "ignore")]
+    #[serde(default, skip)]
+    pub(crate) schema_origin: Option<Arc<OutputId>>,
+
     /// An identifier for a globally registered schema definition which provides information about
     /// the event shape (type information, and semantic meaning of fields).
     /// This definition is only currently valid for logs, and shouldn't be used for other event types.
     /// `None` stands for the shared default definition, so creating an event allocates nothing
     /// for it.
     ///
-    /// TODO(Jean): must not skip serialization to track schemas across restarts.
+    /// The full type definition is not serialized; protobuf disk records carry
+    /// a snapshot of semantic meanings for correct sink normalization after reload.
     #[derivative(PartialEq(compare_with = "schema_definition_eq"))]
     #[serde(default, skip)]
     pub(crate) schema_definition: Option<Arc<schema::Definition>>,
@@ -259,7 +267,18 @@ impl EventMetadata {
         self.inner.upstream_id.as_deref()
     }
 
-    /// Sets the `source_id` in the metadata to the provided value.
+    /// Returns the output that originally defined this event's schema.
+    #[must_use]
+    pub fn schema_origin(&self) -> Option<&OutputId> {
+        self.inner.schema_origin.as_deref()
+    }
+
+    /// Record the source output defining this event's schema across transforms.
+    pub fn set_schema_origin(&mut self, output_id: Arc<OutputId>) {
+        self.get_mut().schema_origin = Some(output_id);
+    }
+
+    /// Sets the source ID in the metadata to the provided value.
     pub fn set_source_id(&mut self, source_id: Arc<ComponentKey>) {
         self.get_mut().source_id = Some(source_id);
     }
@@ -374,6 +393,7 @@ impl Default for Inner {
             source_id: None,
             source_type: None,
             upstream_id: None,
+            schema_origin: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
             datadog_metric_unit: None,
@@ -569,6 +589,13 @@ impl EventMetadata {
     /// Get the schema definition.
     pub fn schema_definition(&self) -> &Arc<schema::Definition> {
         resolve_schema_definition(self.inner.schema_definition.as_ref())
+    }
+
+    /// Whether this event carries a runtime schema rather than the shared
+    /// fallback. Disk records with snapshotted meanings also set this bit.
+    #[must_use]
+    pub fn has_explicit_schema_definition(&self) -> bool {
+        self.inner.schema_definition.is_some()
     }
 
     /// Set the schema definition.

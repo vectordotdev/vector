@@ -42,6 +42,7 @@ quanta = { version = "0.13.0", default-features = false }
 regex = { version = "1.12.3", default-features = false, features = ["std", "perf"] }
 rustls.workspace = true
 zmij = { version = "1", default-features = false }
+sha2 = { version = "0.10.9", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
 serde_with.workspace = true
