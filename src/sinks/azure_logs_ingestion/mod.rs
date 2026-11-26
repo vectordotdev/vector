@@ -4,6 +4,7 @@
 //! taking a stream of [`vector_lib::event::Event`] instances and forwarding them to the Azure
 //! Logs Ingestion API.
 
+mod compression;
 mod config;
 mod service;
 mod sink;

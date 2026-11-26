@@ -213,9 +213,18 @@ fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
 
 #[tokio::test]
 async fn correct_request() {
+    assert_correct_request(Compression::None).await;
+}
+
+#[tokio::test]
+async fn correct_gzip_request() {
+    assert_correct_request(Compression::gzip_default()).await;
+}
+
+async fn assert_correct_request(compression: Compression) {
     let credential = std::sync::Arc::new(create_mock_credential());
 
-    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+    let mut config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
             endpoint: "http://localhost:9001"
             dcr_immutable_id: dcr-00000000000000000000000000000000
             stream_name: Custom-UnitTest
@@ -226,6 +235,8 @@ async fn correct_request() {
               azure_client_secret: mock-client-secret
         "#})
     .unwrap();
+
+    config.compression = compression.try_into().unwrap();
 
     let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
     let (_timestamp_key1, timestamp_value1) = insert_timestamp_kv(&mut log1);
@@ -274,7 +285,7 @@ async fn correct_request() {
         .await
         .expect("failed to collect body")
         .to_bytes();
-    let body_json: serde_json::Value = serde_json::from_slice(&body_bytes[..]).unwrap();
+    let body_json = decode_request_body(&parts.headers, &body_bytes, compression);
     let expected_json = serde_json::json!([
         {
             "TimeGenerated": timestamp_value1,
@@ -288,6 +299,21 @@ async fn correct_request() {
     assert_eq!(body_json, expected_json);
 
     healthcheck.await.expect("Healthcheck failed");
+    let healthcheck_request = endpoint_rx.recv().await.unwrap();
+    assert!(
+        !healthcheck_request
+            .headers()
+            .contains_key("Content-Encoding")
+    );
+    assert_eq!(
+        healthcheck_request
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes(),
+        "[]"
+    );
 
     let headers = parts.headers;
     let authorization = headers.get("Authorization").unwrap();
@@ -297,6 +323,34 @@ async fn correct_request() {
         &parts.uri.path_and_query().unwrap().to_string(),
         "/dataCollectionRules/dcr-00000000000000000000000000000000/streams/Custom-UnitTest?api-version=2023-01-01"
     );
+}
+
+fn decode_request_body(
+    headers: &http::HeaderMap,
+    body_bytes: &[u8],
+    compression: Compression,
+) -> serde_json::Value {
+    assert_eq!(headers.get("Content-Type").unwrap(), "application/json");
+    assert_eq!(
+        headers
+            .get("Content-Length")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap(),
+        body_bytes.len()
+    );
+    let decoded = if compression.is_compressed() {
+        assert_eq!(headers.get("Content-Encoding").unwrap(), "gzip");
+        vector_common::decompression::CappedDecoder::gzip(body_bytes)
+            .decompress()
+            .unwrap()
+    } else {
+        assert!(!headers.contains_key("Content-Encoding"));
+        body_bytes.to_vec()
+    };
+    serde_json::from_slice(&decoded).unwrap()
 }
 
 #[tokio::test]

@@ -22,6 +22,25 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 		required:    false
 		type:        _schemaDefinitions["vector::sinks::util::batch::BatchConfig<vector::sinks::util::batch::RealtimeSizeBasedDefaultBatchSettings>"]
 	}
+	compression: {
+		description: """
+			Compression to apply to log batches before sending them to Azure.
+
+			Only `none` and `gzip` are supported.
+			"""
+		required: false
+		type: string: {
+			default: "none"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+			}
+		}
+	}
 	dcr_immutable_id: {
 		description: """
 			The [Data collection rule immutable ID][dcr_immutable_id] for the Data collection endpoint.
