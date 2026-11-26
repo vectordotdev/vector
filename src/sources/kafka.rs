@@ -356,7 +356,27 @@ impl SourceConfig for KafkaSourceConfig {
             );
         }
 
-        let (consumer, callback_rx) = create_consumer(self, acknowledgements)?;
+        // Validate the client/auth config (TLS requirement, conflicting `librdkafka_options`,
+        // unsupported-feature) up front, so a misconfiguration fails fast rather than after the
+        // potentially-slow MSK IAM credential load below.
+        {
+            let mut probe = ClientConfig::new();
+            self.auth.apply(&mut probe)?;
+            #[cfg(feature = "aws-core")]
+            if let Some(options) = &self.librdkafka_options {
+                self.auth.validate_librdkafka_overrides(options.iter())?;
+            }
+        }
+
+        #[cfg(feature = "aws-core")]
+        let msk_iam = self.auth.msk_iam_credentials(&cx.proxy).await?;
+
+        let (consumer, callback_rx) = create_consumer(
+            self,
+            acknowledgements,
+            #[cfg(feature = "aws-core")]
+            msk_iam,
+        )?;
 
         Ok(Box::pin(kafka_source(
             self.clone(),
@@ -1242,6 +1262,7 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
 fn create_consumer(
     config: &KafkaSourceConfig,
     acknowledgements: bool,
+    #[cfg(feature = "aws-core")] msk_iam: Option<kafka::MskIamCredentials>,
 ) -> crate::Result<(
     StreamConsumer<KafkaSourceContext>,
     UnboundedReceiver<KafkaCallback>,
@@ -1276,6 +1297,12 @@ fn create_consumer(
     config.auth.apply(&mut client_config)?;
 
     if let Some(librdkafka_options) = &config.librdkafka_options {
+        // `librdkafka_options` override values set by `auth.apply`; reject any that would clobber the
+        // MSK IAM security/mechanism settings.
+        #[cfg(feature = "aws-core")]
+        config
+            .auth
+            .validate_librdkafka_overrides(librdkafka_options.iter())?;
         for (key, value) in librdkafka_options {
             client_config.set(key.as_str(), value.as_str());
         }
@@ -1288,6 +1315,8 @@ fn create_consumer(
             acknowledgements,
             callbacks,
             Span::current(),
+            #[cfg(feature = "aws-core")]
+            msk_iam,
         ))
         .context(CreateSnafu)?;
 
@@ -1328,12 +1357,13 @@ impl KafkaSourceContext {
         acknowledgements: bool,
         callbacks: UnboundedSender<KafkaCallback>,
         span: Span,
+        #[cfg(feature = "aws-core")] msk_iam: Option<kafka::MskIamCredentials>,
     ) -> Self {
         Self {
-            stats: kafka::KafkaStatisticsContext {
-                expose_lag_metrics,
-                span,
-            },
+            #[cfg(feature = "aws-core")]
+            stats: kafka::KafkaStatisticsContext::new(expose_lag_metrics, span, msk_iam),
+            #[cfg(not(feature = "aws-core"))]
+            stats: kafka::KafkaStatisticsContext::new(expose_lag_metrics, span),
             acknowledgements,
             consumer: OnceLock::default(),
             callbacks,
@@ -1414,8 +1444,23 @@ impl KafkaSourceContext {
 }
 
 impl ClientContext for KafkaSourceContext {
+    // librdkafka calls into this (the consumer's) context, so the OAUTHBEARER refresh must be
+    // enabled and forwarded here — not just on the inner `KafkaStatisticsContext` (which only the
+    // sink uses directly). Without this, MSK IAM sources are configured with
+    // `sasl.mechanism=OAUTHBEARER` but never get a token provider.
+    #[cfg(feature = "aws-core")]
+    const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
+
     fn stats(&self, statistics: Statistics) {
         self.stats.stats(statistics);
+    }
+
+    #[cfg(feature = "aws-core")]
+    fn generate_oauth_token(
+        &self,
+        oauthbearer_config: Option<&str>,
+    ) -> Result<rdkafka::client::OAuthToken, Box<dyn std::error::Error>> {
+        self.stats.generate_oauth_token(oauthbearer_config)
     }
 }
 
@@ -1457,6 +1502,36 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<KafkaSourceConfig>();
+    }
+
+    // Regression: the consumer's rdkafka context is `KafkaSourceContext`, not the inner
+    // `KafkaStatisticsContext`. It must enable and forward the OAUTHBEARER refresh callback, or MSK
+    // IAM sources get `sasl.mechanism=OAUTHBEARER` with no token provider and fail to authenticate.
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn source_context_enables_and_forwards_oauth_refresh() {
+        use rdkafka::ClientContext;
+
+        const {
+            assert!(
+                <KafkaSourceContext as ClientContext>::ENABLE_REFRESH_OAUTH_TOKEN,
+                "source context must enable the OAUTHBEARER refresh callback"
+            );
+        }
+
+        // With no MSK creds, the call must surface OUR error (proving it delegates to the inner
+        // KafkaStatisticsContext) rather than rdkafka's default "must be overridden" error.
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let ctx = KafkaSourceContext::new(false, false, tx, Span::none(), None);
+        // `OAuthToken` is not `Debug`, so match instead of `expect_err`.
+        let err = match ctx.generate_oauth_token(None) {
+            Ok(_) => panic!("should error without MSK creds"),
+            Err(e) => e.to_string(),
+        };
+        assert!(
+            err.contains("MSK IAM is not configured"),
+            "expected delegated MSK error, got: {err}"
+        );
     }
 
     #[test]
@@ -1611,7 +1686,15 @@ mod test {
     #[tokio::test]
     async fn consumer_create_ok() {
         let config = make_config("topic", "group", LogNamespace::Legacy, None);
-        assert!(create_consumer(&config, true).is_ok());
+        assert!(
+            create_consumer(
+                &config,
+                true,
+                #[cfg(feature = "aws-core")]
+                None
+            )
+            .is_ok()
+        );
     }
 
     #[tokio::test]
@@ -1620,7 +1703,15 @@ mod test {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config("topic", "group", LogNamespace::Legacy, None)
         };
-        assert!(create_consumer(&config, true).is_err());
+        assert!(
+            create_consumer(
+                &config,
+                true,
+                #[cfg(feature = "aws-core")]
+                None
+            )
+            .is_err()
+        );
     }
 }
 
@@ -2080,7 +2171,13 @@ mod integration_test {
             .transpose()
             .unwrap();
 
-        let (consumer, callback_rx) = create_consumer(&config, acknowledgements).unwrap();
+        let (consumer, callback_rx) = create_consumer(
+            &config,
+            acknowledgements,
+            #[cfg(feature = "aws-core")]
+            None,
+        )
+        .unwrap();
 
         tokio::spawn(kafka_source(
             config,

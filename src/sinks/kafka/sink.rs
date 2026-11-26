@@ -4,7 +4,7 @@ use vector_lib::internal_event::emit;
 use rdkafka::{
     ClientConfig,
     error::KafkaError,
-    producer::{BaseProducer, FutureProducer, Producer},
+    producer::{FutureProducer, Producer},
 };
 use snafu::{ResultExt, Snafu};
 use tower::limit::RateLimit;
@@ -39,20 +39,30 @@ pub(crate) struct KafkaSink {
 
 pub(crate) fn create_producer(
     client_config: &ClientConfig,
+    #[cfg(feature = "aws-core")] msk_iam: Option<crate::kafka::MskIamCredentials>,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
+    #[cfg(feature = "aws-core")]
+    let context = KafkaStatisticsContext::new(false, Span::current(), msk_iam);
+    #[cfg(not(feature = "aws-core"))]
+    let context = KafkaStatisticsContext::new(false, Span::current());
     let producer = client_config
-        .create_with_context(KafkaStatisticsContext {
-            expose_lag_metrics: false,
-            span: Span::current(),
-        })
+        .create_with_context(context)
         .context(KafkaCreateFailedSnafu)?;
     Ok(producer)
 }
 
 impl KafkaSink {
-    pub(crate) fn new(config: KafkaSinkConfig, topic: ConfinedTemplate) -> crate::Result<Self> {
+    pub(crate) fn new(
+        config: KafkaSinkConfig,
+        topic: ConfinedTemplate,
+        #[cfg(feature = "aws-core")] msk_iam: Option<crate::kafka::MskIamCredentials>,
+    ) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka()?;
-        let producer = create_producer(&producer_config)?;
+        let producer = create_producer(
+            &producer_config,
+            #[cfg(feature = "aws-core")]
+            msk_iam,
+        )?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -117,9 +127,10 @@ pub(crate) async fn healthcheck(
     config: KafkaSinkConfig,
     topic_template: ConfinedTemplate,
     healthcheck_options: SinkHealthcheckOptions,
+    #[cfg(feature = "aws-core")] msk_iam: Option<crate::kafka::MskIamCredentials>,
 ) -> crate::Result<()> {
     trace!("Healthcheck started.");
-    let client_config = config.to_rdkafka().unwrap();
+    let client_config = healthcheck_client_config(&config).unwrap();
     let topic: Option<String> = match config.healthcheck_topic {
         Some(topic) => Some(topic),
         _ => match topic_template.render_string(&LogEvent::from_str_legacy("")) {
@@ -134,8 +145,17 @@ pub(crate) async fn healthcheck(
         },
     };
 
+    // Build the client context here, then move it into the blocking task.
+    #[cfg(feature = "aws-core")]
+    let context = KafkaStatisticsContext::new(false, Span::current(), msk_iam);
+    #[cfg(not(feature = "aws-core"))]
+    let context = KafkaStatisticsContext::new(false, Span::current());
+
     tokio::task::spawn_blocking(move || {
-        let producer: BaseProducer = client_config.create().unwrap();
+        // A `FutureProducer` runs its own background poll thread, which serves the OAUTHBEARER token
+        // refresh event; a `BaseProducer` would need an explicit `poll()` and the MSK IAM token
+        // would never be installed before `fetch_metadata`.
+        let producer: FutureProducer<_> = client_config.create_with_context(context).unwrap();
         let topic = topic.as_deref();
 
         producer
@@ -148,9 +168,50 @@ pub(crate) async fn healthcheck(
     Ok(())
 }
 
+/// Client config for the healthcheck probe, with librdkafka statistics disabled. The probe uses a
+/// `KafkaStatisticsContext` (for the OAUTHBEARER callback) but runs outside any component span, so
+/// its statistics would be emitted as unlabelled `kafka_*` metrics.
+fn healthcheck_client_config(config: &KafkaSinkConfig) -> crate::Result<ClientConfig> {
+    let mut client_config = config.to_rdkafka()?;
+    client_config.set("statistics.interval.ms", "0");
+    Ok(client_config)
+}
+
 #[async_trait]
 impl StreamSink<Event> for KafkaSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn healthcheck_client_disables_statistics() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: "json"
+            librdkafka_options:
+                statistics.interval.ms: "5000"
+            "#,
+        )
+        .unwrap();
+        // The sink itself keeps collecting statistics...
+        assert_eq!(
+            config.to_rdkafka().unwrap().get("statistics.interval.ms"),
+            Some("5000")
+        );
+        // ...but the healthcheck probe never does, even when overridden.
+        assert_eq!(
+            healthcheck_client_config(&config)
+                .unwrap()
+                .get("statistics.interval.ms"),
+            Some("0")
+        );
     }
 }
