@@ -718,7 +718,7 @@ mod tests {
 
     use futures::{StreamExt, sink::SinkExt};
     use tempfile::TempDir;
-    use tokio::{net::TcpListener, time::Duration};
+    use tokio::{net::TcpListener, task::JoinHandle, time::Duration};
     use tokio_tungstenite::{
         accept_async, accept_hdr_async,
         tungstenite::{
@@ -1010,12 +1010,12 @@ mod tests {
         run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
     }
 
-    async fn start_ack_supported_server() -> String {
+    async fn start_ack_supported_server() -> (String, JoinHandle<()>) {
         let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             // First connection
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
@@ -1039,12 +1039,12 @@ mod tests {
             assert_eq!(ack, "message2");
         });
 
-        server_addr
+        (server_addr, handle)
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn websocket_source_can_send_acks() {
-        let server_addr = start_ack_supported_server().await;
+        let (server_addr, server_handle) = start_ack_supported_server().await;
         let mut config = make_config(&server_addr);
         config.replay = Some(MessageReplayConfig {
             message_id_path: ".".into(),
@@ -1061,6 +1061,7 @@ mod tests {
             run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
 
         assert!(!events.is_empty(), "No events received from source");
+        assert!(server_handle.await.is_ok());
     }
 
     async fn start_reconnect_server_with_last_received() -> String {
