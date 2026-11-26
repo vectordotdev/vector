@@ -52,6 +52,18 @@ pub enum FingerprintStrategy {
     DevInode,
 }
 
+/// Outcome of attempting to fingerprint a discovered path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FingerprintOutcome {
+    /// File was fingerprinted successfully.
+    Found(FileFingerprint),
+    /// Path is a directory, disappeared (`NotFound`), or is too small (`UnexpectedEof`).
+    Skipped,
+    /// Path encountered a transient I/O error (e.g. `PermissionDenied`, `EIO`) and
+    /// should not be treated as deleted if already watched.
+    TransientError,
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, Ord, PartialOrd)]
 #[serde(rename_all = "snake_case")]
 pub enum FileFingerprint {
@@ -209,6 +221,21 @@ impl Fingerprinter {
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
+        match self
+            .fingerprint_or_emit_outcome(path, known_small_files, emitter)
+            .await
+        {
+            FingerprintOutcome::Found(fp) => Some(fp),
+            FingerprintOutcome::Skipped | FingerprintOutcome::TransientError => None,
+        }
+    }
+
+    pub async fn fingerprint_or_emit_outcome(
+        &mut self,
+        path: &Path,
+        known_small_files: &mut HashMap<PathBuf, time::Instant>,
+        emitter: &impl FileSourceInternalEvents,
+    ) -> FingerprintOutcome {
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
                 if metadata.is_dir() {
@@ -220,34 +247,38 @@ impl Fingerprinter {
             Err(e) => Err(e),
         };
 
-        metadata
-            .inspect(|_| {
+        match metadata {
+            Ok(Some(fp)) => {
                 // Drop the path from the small files map if we've got enough data to fingerprint it.
                 known_small_files.remove(&path.to_path_buf());
-            })
-            .map_err(|error| {
-                match error.kind() {
-                    ErrorKind::UnexpectedEof => {
-                        if !known_small_files.contains_key(path) {
-                            emitter.emit_file_checksum_failed(path);
-                            known_small_files.insert(path.to_path_buf(), time::Instant::now());
-                        }
-                        return;
+                FingerprintOutcome::Found(fp)
+            }
+            Ok(None) => {
+                known_small_files.remove(&path.to_path_buf());
+                FingerprintOutcome::Skipped
+            }
+            Err(error) => match error.kind() {
+                ErrorKind::UnexpectedEof => {
+                    if !known_small_files.contains_key(path) {
+                        emitter.emit_file_checksum_failed(path);
+                        known_small_files.insert(path.to_path_buf(), time::Instant::now());
                     }
-                    ErrorKind::NotFound => {
-                        if !self.ignore_not_found {
-                            emitter.emit_file_fingerprint_read_error(path, error);
-                        }
-                    }
-                    _ => {
+                    FingerprintOutcome::Skipped
+                }
+                ErrorKind::NotFound => {
+                    if !self.ignore_not_found {
                         emitter.emit_file_fingerprint_read_error(path, error);
                     }
+                    known_small_files.remove(&path.to_path_buf());
+                    FingerprintOutcome::Skipped
                 }
-                // For scenarios other than UnexpectedEOF, remove the path from the small files map.
-                known_small_files.remove(&path.to_path_buf());
-            })
-            .ok()
-            .flatten()
+                _ => {
+                    emitter.emit_file_fingerprint_read_error(path, error);
+                    known_small_files.remove(&path.to_path_buf());
+                    FingerprintOutcome::TransientError
+                }
+            },
+        }
     }
 }
 
