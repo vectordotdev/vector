@@ -24,7 +24,10 @@ use vector_lib::{
     stream::batcher::limiter::ItemBatchSize as _,
 };
 
-use vrl::event_path;
+use vrl::{
+    event_path,
+    value::{KeyString, ObjectMap},
+};
 
 use super::{
     batch::HttpBatchSizer,
@@ -201,6 +204,52 @@ fn http_native_json_batch_sizing_does_not_report_dropped_events() {
         let metric = metrics.iter().find(|metric| metric.name() == name).unwrap();
         assert_eq!(metric.value(), &MetricValue::Counter { value: 1.0 });
     }
+}
+
+/// A failing event aborts the whole batch, so the events that were already
+/// encoded must be reported as dropped too.
+#[test]
+fn http_encode_failure_counts_every_discarded_event() {
+    init_test();
+    let controller = Controller::get().unwrap();
+    controller.reset();
+
+    let config = indoc::indoc! {r#"
+        uri: "http://127.0.0.1:8080"
+        encoding:
+          codec: native_json
+        framing:
+          method: newline_delimited
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
+    let encoder = HttpEncoder::new(
+        config.build_encoder().unwrap(),
+        config.encoding.transformer(),
+        String::new(),
+        String::new(),
+    );
+
+    // Nesting past the serializer's limit makes the third event fail to encode.
+    let too_deep = (0..41).fold(Value::from("leaf"), |value, _| Value::Array(vec![value]));
+    let input = vec![
+        Event::Log(LogEvent::from("first")),
+        Event::Log(LogEvent::from("second")),
+        Event::Log(LogEvent::from(ObjectMap::from([(
+            KeyString::from("bad"),
+            too_deep,
+        )]))),
+    ];
+
+    assert!(encoder.encode_input(input, &mut Vec::new()).is_err());
+
+    let metrics = controller.capture_metrics();
+    let discarded = metrics
+        .iter()
+        .find(|metric| metric.name() == "component_discarded_events_total")
+        .expect("the discarded events counter must be incremented");
+    // All three events are lost: the codec reports the failing one and the
+    // encoder reports the other two.
+    assert_eq!(discarded.value(), &MetricValue::Counter { value: 3.0 });
 }
 
 #[test]

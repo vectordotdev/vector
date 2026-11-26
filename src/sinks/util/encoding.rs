@@ -7,7 +7,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{Transformer, encoding::Framer, internal_events::EncoderWriteError},
     config::telemetry,
-    internal_event::emit,
+    internal_event::{ComponentEventsDropped, UNINTENTIONAL, emit},
     request_metadata::GroupedCountByteSize,
 };
 
@@ -34,7 +34,8 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) 
     ) -> io::Result<(usize, GroupedCountByteSize)> {
         let mut encoder = self.1.clone();
         let mut bytes_written = 0;
-        let mut n_events_pending = events.len();
+        let n_events = events.len();
+        let mut n_events_pending = n_events;
         let is_empty = events.is_empty();
         let batch_prefix = encoder.batch_prefix();
         write_all(writer, n_events_pending, batch_prefix)?;
@@ -50,19 +51,21 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) 
             byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
             let mut bytes = BytesMut::new();
-            match (position, encoder.framer()) {
+            let result = match (position, encoder.framer()) {
                 (position, Framer::CharacterDelimited(_) | Framer::NewlineDelimited(_))
                     if position.is_last() =>
                 {
-                    encoder
-                        .serialize(event, &mut bytes)
-                        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                    encoder.serialize(event, &mut bytes)
                 }
-                _ => {
-                    encoder
-                        .encode(event, &mut bytes)
-                        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-                }
+                _ => encoder.encode(event, &mut bytes),
+            };
+            if let Err(error) = result {
+                // Returning the error discards the whole batch, so every event in it is
+                // lost, not just the one that failed. The codec reports that one; report
+                // the rest here, otherwise they are counted in neither
+                // `component_sent_events_total` nor `component_discarded_events_total`.
+                emit_dropped(n_events - 1);
+                return Err(io::Error::new(io::ErrorKind::InvalidData, error));
             }
             write_all(writer, n_events_pending, &bytes)?;
             bytes_written += bytes.len();
@@ -164,6 +167,20 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::EncoderKind) {
     }
 }
 
+/// Emits an `EventsDropped` event for events that are neither sent nor reported
+/// by the codec that failed.
+///
+/// A batch encode abort drops every event in the batch, but the codec only
+/// reports the single event whose encode call returned the error.
+pub fn emit_dropped(count: usize) {
+    if count > 0 {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
+            count,
+            reason: "Failed to encode events in batch.",
+        });
+    }
+}
+
 /// Write the buffer to the writer. If the operation fails, emit an internal event which complies with the
 /// instrumentation spec- as this necessitates both an error and an `EventsDropped` event.
 ///
@@ -234,7 +251,7 @@ mod tests {
             NewlineDelimitedEncoder, TextSerializerConfig,
             encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions},
         },
-        event::LogEvent,
+        event::{LogEvent, MetricValue},
         internal_event::CountByteSize,
         json_size::JsonSize,
     };
@@ -625,5 +642,52 @@ mod tests {
             .expect("EncoderRecordBatchError should be emitted on ArrowJsonDecode failure");
         contains_name_once("ComponentEventsDropped")
             .expect("ComponentEventsDropped should be emitted by the wrapper");
+    }
+
+    /// A failing event aborts the whole batch, so the events that were already
+    /// encoded must be reported as dropped too.
+    #[test]
+    fn test_encode_batch_failure_counts_every_discarded_event() {
+        use vector_lib::metrics::Controller;
+
+        crate::test_util::trace_init();
+        vector_lib::metrics::init_test();
+        let controller = Controller::get().unwrap();
+        controller.reset();
+
+        let encoding = (
+            Transformer::default(),
+            vector_lib::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::default().into(),
+                vector_lib::codecs::NativeJsonSerializerConfig
+                    .build()
+                    .into(),
+            ),
+        );
+
+        // Nesting past the native JSON serializer's limit makes this event fail
+        // to encode.
+        let too_deep = (0..41).fold(Value::from("leaf"), |value, _| Value::Array(vec![value]));
+        let input = vec![
+            Event::Log(LogEvent::from("first")),
+            Event::Log(LogEvent::from("second")),
+            Event::Log(LogEvent::from(ObjectMap::from([(
+                KeyString::from("bad"),
+                too_deep,
+            )]))),
+        ];
+
+        let mut writer = Vec::new();
+        let result = encoding.encode_input(input, &mut writer);
+        assert!(result.is_err(), "the batch must fail to encode");
+
+        let metrics = controller.capture_metrics();
+        let discarded = metrics
+            .iter()
+            .find(|metric| metric.name() == "component_discarded_events_total")
+            .expect("the discarded events counter must be incremented");
+        // All three events are lost: the codec reports the failing one and this
+        // wrapper reports the other two.
+        assert_eq!(discarded.value(), &MetricValue::Counter { value: 3.0 });
     }
 }
