@@ -1155,6 +1155,86 @@ async fn test_acknowledgements_checkpoint_after_delivery() {
     );
 }
 
+#[tokio::test]
+async fn test_acknowledgements_checkpoint_uses_subscription_channel() {
+    let data_dir = temp_data_dir();
+    let config = test_config("VT_ackchannel", data_dir.path());
+    let checkpointer = Arc::new(Checkpointer::new(data_dir.path()).await.unwrap());
+    let subscription = EventLogSubscription::new(&config, Arc::clone(&checkpointer), true)
+        .await
+        .unwrap();
+
+    emit_event(
+        "VT_ackchannel",
+        "INFORMATION",
+        1000,
+        "forwarded checkpoint test",
+    );
+    let (subscription, mut events) = with_subscription_blocking(subscription, |mut sub| {
+        assert!(matches!(
+            sub.wait_for_events_blocking(5000),
+            WaitResult::EventsAvailable
+        ));
+        let events = sub.pull_events(1).unwrap();
+        (sub, events)
+    })
+    .await
+    .unwrap();
+    assert_eq!(events.len(), 1);
+
+    // Emulate forwarding without requiring a WEF collector: retain the real
+    // subscription bookmark, but give the event a different origin channel.
+    events[0].event.channel = "System".to_owned();
+
+    let parser = EventLogParser::new(&config, LogNamespace::Legacy);
+    let (_shutdown_trigger, shutdown, _shutdown_complete) = ShutdownSignal::new_wired();
+    let finalizer = Finalizer::new(true, Arc::clone(&checkpointer), shutdown);
+    let (mut tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+    let events_received = register(EventsReceived);
+    let bytes_received = register(BytesReceived::from(Protocol::from("windows_event_log")));
+
+    assert!(
+        !process_event_batch(
+            events,
+            &parser,
+            LogNamespace::Legacy,
+            true,
+            &subscription,
+            &mut tx,
+            &finalizer,
+            &events_received,
+            &bytes_received,
+        )
+        .await
+    );
+    assert!(checkpointer.get("Application").await.is_none());
+
+    let event = tokio::time::timeout(Duration::from_secs(5), rx.next())
+        .await
+        .expect("event should be emitted")
+        .expect("stream should be open");
+    assert_eq!(
+        event
+            .as_log()
+            .get(event_path!("channel"))
+            .unwrap()
+            .to_string_lossy(),
+        "System"
+    );
+    drop(event);
+
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while checkpointer.get("Application").await.is_none() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the acknowledged event should checkpoint its subscription");
+    let persisted = Checkpointer::new(data_dir.path()).await.unwrap();
+    assert!(persisted.get("Application").await.is_some());
+    assert!(persisted.get("System").await.is_none());
+}
+
 // ---------------------------------------------------------------------------
 // Checkpoint corruption recovery
 // ---------------------------------------------------------------------------

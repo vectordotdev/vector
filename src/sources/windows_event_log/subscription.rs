@@ -31,6 +31,11 @@ use super::{
 
 use crate::internal_events::WindowsEventLogBookmarkError;
 
+pub(super) struct SubscribedEvent {
+    pub(super) event: xml_parser::WindowsEvent,
+    pub(super) subscription_channel: String,
+}
+
 /// Test-only hook called inside the `pull_events` drain loop after each
 /// `EvtNext` invocation. Used by the lost-wakeup regression test
 /// (see `test_pull_events_preserves_setevent_during_drain`) to race a
@@ -481,7 +486,7 @@ impl EventLogSubscription {
     pub(super) fn pull_events(
         &mut self,
         max_events: usize,
-    ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
+    ) -> Result<Vec<SubscribedEvent>, WindowsEventLogError> {
         self.pull_events_inner(max_events, true)
     }
 
@@ -495,7 +500,7 @@ impl EventLogSubscription {
     pub(super) fn pull_events_speculative(
         &mut self,
         max_events: usize,
-    ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
+    ) -> Result<Vec<SubscribedEvent>, WindowsEventLogError> {
         self.pull_events_inner(max_events, false)
     }
 
@@ -511,7 +516,7 @@ impl EventLogSubscription {
         &mut self,
         max_events: usize,
         update_records_for_empty_channels: bool,
-    ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
+    ) -> Result<Vec<SubscribedEvent>, WindowsEventLogError> {
         let mut all_events = Vec::with_capacity(max_events.min(1000));
         let num_channels = self.channels.len().max(1);
         let per_channel_budget = (max_events / num_channels).max(1);
@@ -772,7 +777,10 @@ impl EventLogSubscription {
                                     }
                                     break 'drain;
                                 }
-                                all_events.push(event);
+                                all_events.push(SubscribedEvent {
+                                    event,
+                                    subscription_channel: channel_sub.channel.clone(),
+                                });
                                 channel_count += 1;
                             }
                         }
@@ -1367,7 +1375,8 @@ mod tests {
         let tolerance = chrono::Duration::seconds(5);
         let earliest_allowed = subscription_start_time - tolerance;
 
-        for event in &events {
+        for subscribed_event in &events {
+            let event = &subscribed_event.event;
             assert!(
                 event.time_created >= earliest_allowed,
                 "Event timestamp {} is before subscription start time {subscription_start_time} (minus tolerance). \
