@@ -26,6 +26,15 @@ generated: components: sinks: websocket: configuration: {
 		required: true
 		type:     _schemaDefinitions["codecs::encoding::config::EncodingConfig"]
 	}
+	headers: {
+		description: """
+			Headers to apply to the connection request.
+
+			One or more values for the same header can be provided.
+			"""
+		required: false
+		type:     _schemaDefinitions["derived::46bb095c824810f857f5c4c8"]
+	}
 	ping_interval: {
 		description: """
 			The interval, in seconds, between sending [Ping][ping]s to the remote peer.
