@@ -1,5 +1,21 @@
 use std::{collections::HashSet, env, fs::File, io::Write, path::Path, process::Command};
 
+#[cfg(feature = "protobuf-build")]
+struct GrpcServiceGenerator;
+
+#[cfg(feature = "protobuf-build")]
+impl prost_build::ServiceGenerator for GrpcServiceGenerator {
+    fn generate(&mut self, service: prost_build::Service, buf: &mut String) {
+        let mut builder = tonic_prost_build::configure();
+        if service.package == "vector" && service.name == "Vector" {
+            builder = builder.codec_path("crate::proto::vector::CopyingProstCodec");
+        }
+        let mut generator = builder.service_generator();
+        generator.generate(service, buf);
+        generator.finalize(buf);
+    }
+}
+
 struct TrackedEnv {
     tracked: HashSet<String>,
 }
@@ -141,6 +157,8 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
         println!("cargo:rerun-if-changed=proto/vector/observability.proto");
+        println!("cargo:rerun-if-changed=proto");
+        println!("cargo:rerun-if-changed=lib/vector-core/proto");
 
         // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
         // Used for gRPC reflection of Vector's own observability/API protos.
@@ -154,10 +172,10 @@ fn main() {
             .file_descriptor_set_path(protobuf_fds_path)
             .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
-        tonic_prost_build::configure()
+        prost_build
+            .service_generator(Box::new(GrpcServiceGenerator))
             .protoc_arg("--experimental_allow_proto3_optional")
-            .compile_with_config(
-                prost_build,
+            .compile_protos(
                 &[
                     "lib/vector-core/proto/event.proto",
                     "proto/vector/ddsketch_full.proto",
