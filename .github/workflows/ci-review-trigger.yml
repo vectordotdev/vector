@@ -33,6 +33,8 @@
 #                                 /ci-run-regression
 #                                 /ci-run-regression origin/master
 #                                 /ci-run-regression v0.55.0
+# /ci-run-regression-logs     : runs the log experiments. Accepts the same optional baseline ref.
+# /ci-run-regression-metrics  : runs the metric experiments. Accepts the same optional baseline ref.
 #                               Not included in `/ci-run-all` because it is expensive.
 
 name: CI Review Trigger
@@ -209,9 +211,7 @@ jobs:
       ref: ${{ github.event.review.commit_id }}
     secrets: inherit
 
-  # Parse an optional baseline ref from a `/ci-run-regression <ref>` comment line.
-  # The captured ref is passed to the regression workflow; an empty value lets it
-  # fall back to its default (the SHA from 7 days ago).
+  # Parse the experiment suite and an optional baseline ref from a regression command.
   regression-parse:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-regression')
@@ -219,17 +219,29 @@ jobs:
     timeout-minutes: 5
     outputs:
       baseline-sha: ${{ steps.parse.outputs.baseline }}
+      suite: ${{ steps.parse.outputs.suite }}
     steps:
       - name: Parse baseline ref from review body
         id: parse
         env:
           REVIEW_BODY: ${{ github.event.review.body }}
         run: |
-          # The body starts with `/ci-run-regression`; take the second whitespace-
-          # delimited token on the first line as the optional baseline ref.
-          read -r _ BASELINE _ <<< "${REVIEW_BODY}"
+          read -r COMMAND BASELINE _ <<< "${REVIEW_BODY}"
+
+          case "${COMMAND}" in
+            /ci-run-regression) SUITE=all ;;
+            /ci-run-regression-logs) SUITE=logs ;;
+            /ci-run-regression-metrics) SUITE=metrics ;;
+            *)
+              echo "Invalid regression command: '${COMMAND}'."
+              exit 1
+              ;;
+          esac
+
+          echo "Selected experiment suite: '${SUITE}'"
           echo "Parsed baseline ref: '${BASELINE}'"
           echo "baseline=${BASELINE}" >> "$GITHUB_OUTPUT"
+          echo "suite=${SUITE}" >> "$GITHUB_OUTPUT"
 
   regression:
     needs: [validate, regression-parse]
@@ -241,6 +253,7 @@ jobs:
     with:
       baseline-sha: ${{ needs.regression-parse.outputs.baseline-sha }}
       comparison-sha: ${{ github.event.review.commit_id }}
+      suite: ${{ needs.regression-parse.outputs.suite }}
     secrets: inherit
 
   coverage:
