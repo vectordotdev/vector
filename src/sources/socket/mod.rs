@@ -656,6 +656,60 @@ mod test {
         .await;
     }
 
+    fn compress_zlib(payload: &[u8]) -> Vec<u8> {
+        let mut encoder =
+            flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+        std::io::Write::write_all(&mut encoder, payload).unwrap();
+        encoder.finish().unwrap()
+    }
+
+    /// A zlib-compressed GELF frame received over NUL-delimited TCP decodes into an event.
+    #[tokio::test]
+    async fn tcp_gelf_decodes_compressed_frame() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let (guard, addr) = next_addr();
+
+            // The default GELF stream framing splits on NUL, so use a payload whose compressed
+            // form contains none.
+            let (message, compressed) = (0..100)
+                .map(|i| {
+                    let message = format!("compressed {i}");
+                    let compressed = compress_zlib(get_gelf_payload(&message).as_bytes());
+                    (message, compressed)
+                })
+                .find(|(_, compressed)| !compressed.contains(&0))
+                .expect("some payload must compress without NUL bytes");
+
+            let mut config = TcpConfig::from_address(addr.into());
+            config.decoding = GelfDeserializerConfig::default().into();
+            let server = SocketConfig::from(config)
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+
+            wait_for_tcp_and_release(guard, addr).await;
+
+            let mut stream = TcpStream::connect(addr).await.unwrap();
+            tokio::io::AsyncWriteExt::write_all(&mut stream, &compressed)
+                .await
+                .unwrap();
+            tokio::io::AsyncWriteExt::write_all(&mut stream, &[0])
+                .await
+                .unwrap();
+
+            let events = timeout(Duration::from_secs(10), collect_n(rx, 1))
+                .await
+                .expect("compressed GELF frame must decode");
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+                message.into()
+            );
+        })
+        .await;
+    }
+
     #[tokio::test]
     async fn tcp_it_includes_source_type() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
