@@ -208,6 +208,35 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct SocketReceiveTaskFailed<E> {
+    pub mode: SocketMode,
+    pub error: E,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SocketReceiveTaskFailed<E> {
+    fn emit(self) {
+        let mode = self.mode.as_str();
+        let reason = "Socket receive task failed.";
+        error!(
+            message = reason,
+            error = %self.error,
+            error_code = "socket_receive_task_failed",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+            %mode,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "socket_receive_task_failed",
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+            "mode" => mode,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketSendError<E> {
     pub mode: SocketMode,
     pub error: E,

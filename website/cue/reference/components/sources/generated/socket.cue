@@ -168,6 +168,19 @@ generated: components: sources: socket: configuration: {
 		required:      false
 		type: uint: unit: "bytes"
 	}
+	receive_concurrency: {
+		description: """
+			Number of concurrent socket readers.
+
+			A single reader caps throughput at one CPU core per socket; multiple readers
+			parallelize datagram decoding. With more than one reader, events from different
+			datagrams can arrive out of order. Every reader wakes up for each datagram, so a
+			few readers are usually enough.
+			"""
+		relevant_when: "mode = \"udp\""
+		required:      false
+		type: uint: default: 1
+	}
 	shutdown_timeout_secs: {
 		description:   "The timeout before a connection is forcefully closed during shutdown."
 		relevant_when: "mode = \"tcp\""
