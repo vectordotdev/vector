@@ -2,7 +2,7 @@ use std::{fmt, time::Duration};
 use vector_lib::internal_event::emit;
 
 use http::{
-    HeaderValue, Request, Response,
+    HeaderValue, Request, Response, StatusCode,
     header::{ACCEPT_ENCODING, USER_AGENT},
 };
 use hyper::body::Incoming;
@@ -11,7 +11,10 @@ use vector_http::{ConnectionOptions, HttpError, RequestBody, TlsReloadHandle};
 
 use crate::{
     config::ProxyConfig,
-    internal_events::http_client::{AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning},
+    http::OAuth2Extension,
+    internal_events::http_client::{
+        AboutToSendHttpRequest, AuthExtensionError, GotHttpResponse, GotHttpWarning,
+    },
     tls::MaybeTlsSettings,
 };
 
@@ -36,6 +39,9 @@ pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(65);
 pub struct HttpClient {
     client: vector_http::HttpClient,
     user_agent: HeaderValue,
+    /// The OAuth 2.0 credentials that Vector applies to each request. `None` selects a plain
+    /// client.
+    oauth2: Option<OAuth2Extension>,
 }
 
 impl fmt::Debug for HttpClient {
@@ -75,7 +81,17 @@ impl HttpClient {
         Ok(Self {
             client: vector_http::HttpClient::new_with_options(tls, proxy, options)?,
             user_agent: default_user_agent(),
+            oauth2: None,
         })
+    }
+
+    /// Returns this client with `oauth2` applied to each request before it is sent.
+    ///
+    /// Clones share the token cache. Thus one access token serves all their requests.
+    #[must_use]
+    pub fn with_oauth2(mut self, oauth2: OAuth2Extension) -> Self {
+        self.oauth2 = Some(oauth2);
+        self
     }
 
     /// Returns a handle that replaces the TLS settings of this client and of every clone of it,
@@ -101,6 +117,23 @@ impl HttpClient {
 
             self.client.add_proxy_authorization(&mut request)?;
 
+            let oauth2_token = if let Some(oauth2) = &self.oauth2 {
+                match oauth2.apply(&mut request).await {
+                    Ok(token) => Some(token),
+                    Err(error) => {
+                        emit(AuthExtensionError { error: &error });
+                        return Err(if error.is_retriable() {
+                            HttpError::new(error)
+                        } else {
+                            let source: Box<dyn std::error::Error + Send + Sync> = Box::new(error);
+                            HttpError::from(source)
+                        });
+                    }
+                }
+            } else {
+                None
+            };
+
             emit(AboutToSendHttpRequest { request: &request });
 
             let before = std::time::Instant::now();
@@ -113,6 +146,21 @@ impl HttpClient {
                         response: &response,
                         roundtrip,
                     });
+
+                    // The resource server can reject an access token that the authorization
+                    // server already revoked, or that expired before the lifetime it announced.
+                    // Vector discards the cached token. A `401` response alone would be rejected
+                    // without a retry, so this reports a retriable error instead and the sink
+                    // retries the request with a new access token.
+                    if response.status() == StatusCode::UNAUTHORIZED
+                        && let (Some(oauth2), Some(token)) = (&self.oauth2, &oauth2_token)
+                    {
+                        oauth2.invalidate(token);
+                        return Err(HttpError::new(RejectedAccessToken {
+                            status: response.status(),
+                        }));
+                    }
+
                     Ok(response)
                 }
                 Err(error) => {
@@ -128,6 +176,28 @@ impl HttpClient {
         .await
     }
 }
+
+/// The resource server rejected the OAuth 2.0 access token.
+///
+/// [`HttpClient::send`] reports this as a retriable error, so the sink sends the request again
+/// with the access token that it fetches next.
+#[derive(Debug)]
+struct RejectedAccessToken {
+    status: StatusCode,
+}
+
+impl fmt::Display for RejectedAccessToken {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "the resource server rejected the OAuth 2.0 access token with {}. Vector discarded the \
+             cached token and retries the request.",
+            self.status
+        )
+    }
+}
+
+impl std::error::Error for RejectedAccessToken {}
 
 fn default_user_agent() -> HeaderValue {
     HeaderValue::from_str(&format!(

@@ -54,7 +54,7 @@ use crate::{
             run_and_assert_sink_error_with_events,
         },
         create_events_batch_with_fn,
-        http::spawn_authenticated_http_proxy,
+        http::{spawn_authenticated_http_proxy, spawn_blackhole_http_server},
         random_lines_with_stream,
     },
 };
@@ -1189,6 +1189,34 @@ async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::
 
     let (sink, _) = config.build(cx).await.unwrap();
     (in_addr, sink)
+}
+
+/// The sink applies the OAuth 2.0 access token that it fetches from `token_endpoint`.
+#[tokio::test]
+async fn http_oauth2_applies_the_fetched_access_token() {
+    let token_uri = spawn_blackhole_http_server(|_| async {
+        Ok::<_, std::convert::Infallible>(Response::new(Full::new(Bytes::from_static(
+            br#"{"access_token":"oauth2-access-token","expires_in":3600}"#,
+        ))))
+    })
+    .await;
+
+    run_sink(
+        &indoc::formatdoc! {r#"
+            auth:
+              strategy: oauth2
+              client_id: my-client
+              client_secret: my-secret
+              token_endpoint: "{token_uri}oauth/token"
+            "#},
+        |parts| {
+            assert_eq!(
+                parts.headers.get(http::header::AUTHORIZATION).unwrap(),
+                "Bearer oauth2-access-token"
+            );
+        },
+    )
+    .await;
 }
 
 /// Events should be delivered through the configured authenticated HTTP proxy,

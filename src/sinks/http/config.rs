@@ -27,7 +27,7 @@ use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     config::ValidatedSink,
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, HttpSinkAuth, MaybeAuth, OAuth2Extension},
     sinks::{
         prelude::*,
         util::{
@@ -57,7 +57,16 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub method: HttpMethod,
 
-    pub auth: Option<Auth>,
+    /// The authorization for outbound requests.
+    ///
+    /// HTTP authentication should be used with HTTPS only, as the authentication credentials are
+    /// passed as an HTTP header without any additional encryption beyond what is provided by the
+    /// transport itself.
+    ///
+    /// The sink applies the `basic`, `bearer`, `custom` and `aws` strategies. The `oauth2`
+    /// strategy fetches an access token from `token_endpoint`. Vector caches the access token and
+    /// refreshes it before it expires. Vector applies the access token as a bearer token.
+    pub auth: Option<HttpSinkAuth>,
 
     #[serde(default)]
     pub compression: Compression,
@@ -156,9 +165,63 @@ impl From<HttpMethod> for Method {
 }
 
 impl HttpSinkConfig {
+    /// Builds the HTTP client. Adds the OAuth 2.0 credentials when they are configured.
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        HttpClient::new(tls.into(), cx.proxy())
+        let client = HttpClient::new(tls.into(), cx.proxy())?;
+
+        Ok(match &self.auth {
+            Some(HttpSinkAuth::OAuth2(config)) => client.with_oauth2(OAuth2Extension::new(
+                config.clone(),
+                self.tls.as_ref(),
+                cx.proxy(),
+            )?),
+            _ => client,
+        })
+    }
+
+    /// Returns the credentials that the request builder applies synchronously.
+    ///
+    /// This function does not return OAuth 2.0. [`HttpClient`] applies OAuth 2.0 asynchronously.
+    fn effective_auth(&self) -> Option<Auth> {
+        self.auth.as_ref().and_then(HttpSinkAuth::to_auth)
+    }
+
+    /// Rejects authorization configurations that are invalid or cannot be combined.
+    fn validate_authorization(&self, request: &RequestConfig) -> crate::Result<()> {
+        validate_headers(&request.headers, self.auth.is_some())?;
+
+        if let Some(HttpSinkAuth::OAuth2(config)) = &self.auth {
+            config.validate()?;
+
+            // Without a client secret and without a client certificate, the token endpoint
+            // cannot authenticate the client, and each request fails at runtime.
+            if config.client_secret.is_none() && !self.has_client_certificate() {
+                return Err(
+                    "`auth.client_secret` is required unless a client certificate is set in \
+                     `auth.tls` or `tls`"
+                        .into(),
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns `true` when a client certificate is configured for the token endpoint.
+    ///
+    /// `auth.tls` replaces `tls` for the token endpoint. It does not merge with it. Thus a set
+    /// `auth.tls` decides alone whether the token endpoint sees a client certificate.
+    fn has_client_certificate(&self) -> bool {
+        let Some(HttpSinkAuth::OAuth2(config)) = &self.auth else {
+            return false;
+        };
+
+        config
+            .tls
+            .as_ref()
+            .or(self.tls.as_ref())
+            .is_some_and(|tls| tls.crt_file.is_some())
     }
 
     #[cfg(test)]
@@ -279,8 +342,15 @@ impl SinkConfig for HttpSinkConfig {
     }
 
     fn files_to_watch(&self) -> Vec<&PathBuf> {
+        let token_tls = match &self.auth {
+            Some(HttpSinkAuth::OAuth2(config)) => config.tls.as_ref(),
+            _ => None,
+        };
+
         let mut files = Vec::new();
-        if let Some(tls) = &self.tls {
+        // Vector watches the sink TLS files and the token endpoint TLS files. A change to either
+        // file can invalidate a connection.
+        for tls in [self.tls.as_ref(), token_tls].into_iter().flatten() {
             if let Some(crt_file) = &tls.crt_file {
                 files.push(crt_file);
             }
@@ -323,8 +393,7 @@ impl ValidatedSink for HttpSinkConfig {
         let transformer = self.encoding.transformer();
 
         let request = self.request.clone();
-
-        validate_headers(&request.headers, self.auth.is_some())?;
+        self.validate_authorization(&request)?;
         let (static_headers, template_headers) = request.split_headers();
 
         // Pure confinement checks for the URI and templated headers. The actual
@@ -361,7 +430,12 @@ impl ValidatedSink for HttpSinkConfig {
         // front; dynamic URIs are only validated at render time.
         if !self.uri.is_dynamic() {
             let uri_serde: UriSerde = self.uri.get_ref().parse()?;
-            self.auth.choose_one(&uri_serde.auth)?;
+            // `choose_one` checks the static strategies. OAuth 2.0 is not part of `Auth`, so it
+            // needs its own check.
+            self.effective_auth().choose_one(&uri_serde.auth)?;
+            if matches!(&self.auth, Some(HttpSinkAuth::OAuth2(_))) && uri_serde.auth.is_some() {
+                return Err("URI credentials can not be used with `auth`".into());
+            }
             if uri_serde.uri.scheme().is_none() || uri_serde.uri.authority().is_none() {
                 return Err(format!(
                     "uri must include a scheme and host, e.g. `https://example.com/endpoint`; got `{}`",
@@ -449,6 +523,7 @@ impl HttpSinkConfig {
         not(feature = "aws-core"),
         expect(
             clippy::unused_async,
+            clippy::unused_async_trait_impl,
             reason = "AWS credential resolution requires await when aws-core is enabled."
         )
     )]
@@ -471,10 +546,11 @@ impl HttpSinkConfig {
         } = validated;
 
         let client = self.build_http_client(&cx)?;
+        let auth = self.effective_auth();
 
         let healthcheck = match cx.healthcheck.uri {
             Some(healthcheck_uri) => {
-                healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
+                healthcheck(healthcheck_uri, auth.clone(), client.clone()).boxed()
             }
             None => future::ok(()).boxed(),
         };
@@ -494,13 +570,13 @@ impl HttpSinkConfig {
 
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
             self.method,
-            self.auth.clone(),
+            auth.clone(),
             converted_static_headers.clone(),
             content_type.clone(),
             content_encoding.clone(),
         );
 
-        let service = match &self.auth {
+        let service = match &auth {
             #[cfg(feature = "aws-core")]
             Some(Auth::Aws { auth, service }) => {
                 let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)?
@@ -574,6 +650,168 @@ mod tests {
     use super::*;
     use crate::components::validation::prelude::*;
     use crate::template::{ConfinementConfig, UriTemplate};
+
+    fn parse_config(yaml: &str) -> HttpSinkConfig {
+        serde_yaml::from_str(yaml).expect("the test config must be valid")
+    }
+
+    const CONFIG_WITHOUT_AUTH: &str = r"
+uri: http://127.0.0.1:9000/endpoint
+encoding:
+  codec: json
+";
+
+    fn oauth2_config(prefix: &str) -> String {
+        format!(
+            "{prefix}auth:
+  strategy: oauth2
+  client_id: my-client
+  client_secret: my-secret
+  token_endpoint: https://auth.example.com/oauth/token
+"
+        )
+    }
+
+    #[test]
+    fn validate_rejects_oauth2_without_a_client_credential() {
+        let config = parse_config(&format!(
+            "{CONFIG_WITHOUT_AUTH}auth:
+  strategy: oauth2
+  client_id: my-client
+  token_endpoint: https://auth.example.com/oauth/token
+"
+        ));
+
+        let error = config
+            .validate()
+            .expect_err("a client with no credential must be rejected")
+            .to_string();
+        assert!(error.contains("client_secret"), "{error}");
+    }
+
+    #[test]
+    fn validate_accepts_oauth2_with_a_token_endpoint_certificate() {
+        let config = parse_config(&format!(
+            "{CONFIG_WITHOUT_AUTH}auth:
+  strategy: oauth2
+  client_id: my-client
+  token_endpoint: https://auth.example.com/oauth/token
+  tls:
+    crt_file: /etc/ssl/client.pem
+    key_file: /etc/ssl/client.key
+"
+        ));
+
+        config
+            .validate()
+            .expect("a client certificate must replace the client secret");
+    }
+
+    #[test]
+    fn validate_accepts_oauth2_with_a_fallback_certificate() {
+        let config = parse_config(&format!(
+            "{CONFIG_WITHOUT_AUTH}tls:
+  crt_file: /etc/ssl/client.pem
+  key_file: /etc/ssl/client.key
+auth:
+  strategy: oauth2
+  client_id: my-client
+  token_endpoint: https://auth.example.com/oauth/token
+"
+        ));
+
+        config
+            .validate()
+            .expect("the sink TLS certificate must replace the client secret");
+    }
+
+    #[test]
+    fn validate_rejects_oauth2_when_auth_tls_hides_the_sink_certificate() {
+        let config = parse_config(&format!(
+            "{CONFIG_WITHOUT_AUTH}tls:
+  crt_file: /etc/ssl/client.pem
+  key_file: /etc/ssl/client.key
+auth:
+  strategy: oauth2
+  client_id: my-client
+  token_endpoint: https://auth.example.com/oauth/token
+  tls:
+    ca_file: /etc/ssl/ca.pem
+"
+        ));
+
+        let error = config
+            .validate()
+            .expect_err("`auth.tls` replaces `tls`. The sink certificate does not apply.")
+            .to_string();
+        assert!(error.contains("client_secret"), "{error}");
+    }
+
+    #[test]
+    fn validate_accepts_the_static_strategies() {
+        let config = parse_config(&format!(
+            "{CONFIG_WITHOUT_AUTH}auth:
+  strategy: bearer
+  token: my-token
+"
+        ));
+        config
+            .validate()
+            .expect("a bearer token must still validate");
+    }
+
+    #[test]
+    fn validate_rejects_authorization_header_with_oauth2() {
+        let config = parse_config(&oauth2_config(&format!(
+            "{CONFIG_WITHOUT_AUTH}request:
+  headers:
+    Authorization: my-token
+"
+        )));
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_uri_credentials_with_oauth2() {
+        let config = parse_config(&oauth2_config(
+            r"
+uri: http://user:pass@127.0.0.1:9000/endpoint
+encoding:
+  codec: json
+",
+        ));
+
+        let error = config
+            .validate()
+            .expect_err("URI credentials must be rejected")
+            .to_string();
+        assert!(error.contains("URI credentials"), "{error}");
+    }
+
+    #[test]
+    fn validate_rejects_relative_oauth2_token_endpoint() {
+        let config = parse_config(&format!(
+            "{CONFIG_WITHOUT_AUTH}auth:
+  strategy: oauth2
+  client_id: my-client
+  token_endpoint: auth/token
+"
+        ));
+
+        let error = config
+            .validate()
+            .expect_err("a relative token endpoint must be rejected")
+            .to_string();
+        assert!(error.contains("token_endpoint"), "{error}");
+    }
+
+    #[test]
+    fn validate_accepts_oauth2_auth() {
+        parse_config(&oauth2_config(CONFIG_WITHOUT_AUTH))
+            .validate()
+            .expect("an OAuth 2.0 config must be valid");
+    }
 
     impl ValidatableComponent for HttpSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {

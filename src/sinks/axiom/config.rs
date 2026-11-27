@@ -13,7 +13,7 @@ use crate::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         ValidatedSink,
     },
-    http::Auth as HttpAuthConfig,
+    http::HttpSinkAuth as HttpAuthConfig,
     sinks::{
         Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig, ValidatedHttp},

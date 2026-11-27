@@ -17,13 +17,18 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 		}
 		auth: {
 			description: """
-				Configuration of the authentication strategy for HTTP requests.
+				The authorization for outbound requests.
 
-				HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
-				HTTP header without any additional encryption beyond what is provided by the transport itself.
+				HTTP authentication should be used with HTTPS only, as the authentication credentials are
+				passed as an HTTP header without any additional encryption beyond what is provided by the
+				transport itself.
+
+				The sink applies the `basic`, `bearer`, `custom` and `aws` strategies. The `oauth2`
+				strategy fetches an access token from `token_endpoint`. Vector caches the access token and
+				refreshes it before it expires. Vector applies the access token as a bearer token.
 				"""
 			required: false
-			type:     _schemaDefinitions["core::option::Option<vector::http::Auth>"]
+			type:     _schemaDefinitions["core::option::Option<vector::http::HttpSinkAuth>"]
 		}
 		batch: {
 			description: "Event batching behavior."

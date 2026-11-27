@@ -1,0 +1,5 @@
+The `http` sink now supports OAuth 2.0 client credentials. `auth.strategy` accepts `oauth2` in addition to `basic`, `bearer`, `custom` and `aws`. Vector requests an access token from `token_endpoint`, caches it, and refreshes it before it expires or after a `401` response. Vector sends the access token as a bearer token. `auth.client_secret` authenticates to the token endpoint with HTTP Basic. `auth.scope`, `auth.audience` and `auth.resource` set the optional `scope`, `audience` and `resource` parameters of the token request. `auth.expiry_buffer_secs` sets how many seconds before the access token expires Vector refreshes it, and `auth.timeout_secs` limits each token request. A client certificate in `auth.tls` selects mutual TLS for the token endpoint ([RFC 8705][rfc8705]). Vector rejects the configuration when it has no client secret and no client certificate. The existing strategies are unchanged. The `http` protocol of the `opentelemetry` sink accepts the same settings.
+
+[rfc8705]: https://datatracker.ietf.org/doc/html/rfc8705
+
+authors: andyqvo

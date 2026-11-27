@@ -143,6 +143,26 @@ impl InternalEvent for GotHttpWarning<'_> {
     }
 }
 
+/// An authentication step failed. Vector did not send the request.
+#[derive(Debug, NamedInternalEvent)]
+pub struct AuthExtensionError<'a> {
+    pub error: &'a dyn std::error::Error,
+}
+
+impl InternalEvent for AuthExtensionError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed to authenticate the HTTP request.",
+            error = %self.error,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        // The label is static. The error message can contain text from the authorization server.
+        // That text must not go into a metric label.
+        counter!(CounterName::HttpClientErrorsTotal, "error_kind" => "oauth2_token").increment(1);
+    }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 impl<T: Body> HttpRequestTelemetry for Request<T> {
