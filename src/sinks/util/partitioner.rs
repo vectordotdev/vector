@@ -1,6 +1,9 @@
-#![warn(clippy::pedantic)]
-
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{
+    event::Event,
+    internal_event::emit,
+    partition::{PartitionDecision, Partitioner},
+    sink::PreparationError,
+};
 
 use crate::{
     internal_events::{KeyOutsideBasePrefixError, TemplateRenderingError},
@@ -9,46 +12,64 @@ use crate::{
 
 /// Render `template` against `event` and apply standard key-prefix error handling.
 ///
-/// Three outcomes:
-/// - `Ok` → `Some(rendered_key)`
-/// - `Confined` error → emit [`KeyOutsideBasePrefixError`], return `None` (intentional drop)
-/// - Other render error → emit [`TemplateRenderingError`]:
-///   - with `dead_letter` set: return `Some(dead_letter)` (warning, no drop)
-///   - without `dead_letter`:  return `None` (error, drop)
+/// Routes to the rendered key or the configured fallback. Confinement violations are
+/// intentional discards. A render failure without a fallback is a permanent failure.
 pub(crate) fn render_key_with_fallback(
     template: &ConfinedTemplate,
     event: &Event,
     dead_letter: Option<&str>,
-) -> Option<String> {
+) -> Result<PartitionDecision<String>, PreparationError<TplRenderError>> {
     match template.render_string(event) {
-        Ok(key) => Some(key),
+        Ok(key) => Ok(PartitionDecision::Route(key)),
         Err(TplRenderError::Confined {
             rendered_preview,
             rendered_len,
             message,
         }) => {
-            emit!(KeyOutsideBasePrefixError {
+            emit(KeyOutsideBasePrefixError {
                 key_preview: &rendered_preview,
                 key_len: rendered_len,
                 message: &message,
             });
-            None
+            Ok(PartitionDecision::Discard)
         }
         Err(error) => {
             if let Some(fallback) = dead_letter {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("key_prefix"),
                     drop_event: false,
                 });
-                Some(fallback.to_owned())
+                Ok(PartitionDecision::Route(fallback.to_owned()))
             } else {
-                emit!(TemplateRenderingError {
+                render_partition_value(Err(error), "key_prefix")
+            }
+        }
+    }
+}
+
+/// Reports a required routing field's render error. Confinement failures discard the event.
+pub(crate) fn render_partition_value<T>(
+    result: Result<T, TplRenderError>,
+    field: &'static str,
+) -> Result<PartitionDecision<T>, PreparationError<TplRenderError>> {
+    match result {
+        Ok(value) => Ok(PartitionDecision::Route(value)),
+        Err(error) => {
+            if matches!(error, TplRenderError::Confined { .. }) {
+                emit(TemplateRenderingError {
                     error,
-                    field: Some("key_prefix"),
+                    field: Some(field),
                     drop_event: true,
                 });
-                None
+                Ok(PartitionDecision::Discard)
+            } else {
+                emit(TemplateRenderingError {
+                    error: error.clone(),
+                    field: Some(field),
+                    drop_event: true,
+                });
+                Err(PreparationError::Permanent(error))
             }
         }
     }
@@ -79,9 +100,13 @@ impl KeyPartitioner {
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = Option<String>;
+    type Key = String;
+    type Error = TplRenderError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
         render_key_with_fallback(
             &self.key_prefix_template,
             item,

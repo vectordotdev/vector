@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::time::SystemTime;
 
 use chrono::prelude::*;

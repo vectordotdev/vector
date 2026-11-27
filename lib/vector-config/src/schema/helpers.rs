@@ -343,14 +343,10 @@ pub(crate) fn generate_optional_schema(
     //     type already uses that mechanism
     //   - create our own `oneOf` schema to map between either the "null" schema or the real schema
 
-    // Generate the inner schema for the inner type. We'll add some override metadata, too, so that
-    // we can mark this resulting schema as "optional". This is only consequential to documentation
-    // generation so that some of the more complex code for parsing enum schemas can correctly
-    // differentiate a `oneOf` schema that represents a Rust enum versus one that simply represents
-    // our "null or X" wrapped schema.
-    let mut overrides = Metadata::default();
-    overrides.add_custom_attribute(CustomAttribute::flag(constants::DOCS_META_OPTIONAL));
-    let mut schema = get_or_generate_schema(config, generator, Some(overrides))?;
+    // Generate the inner schema for the inner type. Passing empty override metadata (rather than
+    // `None`) applies the inner type's base title/description at this use site, which the wrapper
+    // then inherits below.
+    let mut schema = get_or_generate_schema(config, generator, Some(Metadata::default()))?;
 
     // Take the metadata and extensions of the original schema.
     //
@@ -497,11 +493,10 @@ pub fn generate_flattened_optional_schema(
         ..Default::default()
     };
 
-    // Match `generate_optional_schema`: mark the wrapper optional for docs, and apply field
-    // metadata to this site. `optional` is transparent, so a flatten field without its own
-    // description does not inherit the inner enum's docs.
-    let mut metadata = overrides.unwrap_or_default();
-    metadata.add_custom_attribute(CustomAttribute::flag(constants::DOCS_META_OPTIONAL));
+    // Match `generate_optional_schema`: apply field metadata to this site. `optional` is
+    // transparent, so a flatten field without its own description does not inherit the inner
+    // enum's docs.
+    let metadata = overrides.unwrap_or_default();
     optional.validate_metadata(&metadata)?;
     apply_configurable_metadata(optional, &mut schema, metadata);
 
@@ -798,7 +793,9 @@ pub fn generate_bool_or_struct_schema(
             .definitions_mut()
             .insert(name.clone(), Schema::Bool(false));
         let object = get_or_generate_schema(config, generator, None)?;
-        let mut schema = generate_one_of_schema(&[generate_bool_schema(), object]);
+        let mut boolean = generate_bool_schema();
+        boolean.metadata().deprecated = true;
+        let mut schema = generate_one_of_schema(&[boolean, object]);
         let mut metadata = config.make_metadata();
         metadata.add_custom_attribute(CustomAttribute::kv(
             constants::DOCS_META_ENUM_TAGGING,

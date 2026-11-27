@@ -11,8 +11,9 @@ use tower::Service;
 use tracing::Instrument;
 use vector_lib::{
     event::{Event, Metric, MetricValue},
-    partition::Partitioner,
-    sink::StreamSink,
+    internal_event::emit,
+    partition::{PartitionDecision, Partitioner},
+    sink::{PreparationError, StreamSink},
     stream::{BatcherSettings, DriverResponse},
 };
 
@@ -43,8 +44,12 @@ struct DatadogMetricsTypePartitioner {
 impl Partitioner for DatadogMetricsTypePartitioner {
     type Item = Metric;
     type Key = (Option<Arc<str>>, DatadogMetricsEndpoint);
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
         let series = DatadogMetricsEndpoint::Series(self.series_api_version);
         let endpoint = match item.data().value() {
             MetricValue::Counter { .. }
@@ -56,7 +61,10 @@ impl Partitioner for DatadogMetricsTypePartitioner {
             | MetricValue::AggregatedHistogram { .. }
             | MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
         };
-        (item.metadata().datadog_api_key(), endpoint)
+        Ok(PartitionDecision::Route((
+            item.metadata().datadog_api_key(),
+            endpoint,
+        )))
     }
 }
 
@@ -77,7 +85,7 @@ where
     S::Response: DriverResponse,
 {
     /// Creates a new `DatadogMetricsSink`.
-    pub const fn new(
+    pub(super) const fn new(
         service: S,
         request_builder: DatadogMetricsRequestBuilder,
         series_batch_settings: BatcherSettings,
@@ -134,6 +142,7 @@ where
                     }
                 },
             )
+            .unwrap_infallible()
             // Aggregate counters with identical timestamps, otherwise identical counters (same
             // series and same timestamp, when rounded to whole seconds) will be dropped in a
             // last-write-wins situation when they hit the DD metrics intake.
@@ -168,7 +177,7 @@ where
                 match request {
                     Err(e) => {
                         let (reason, error_code, dropped_events) = e.into_parts();
-                        emit!(DatadogMetricsEncodingError {
+                        emit(DatadogMetricsEncodingError {
                             reason: reason.as_str(),
                             error_code,
                             dropped_events: dropped_events as usize,

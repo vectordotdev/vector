@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! `redis` sink.
 //!
 //! Writes data to [redis](https://redis.io/).

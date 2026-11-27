@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{Metric, MetricValue},
+    event::{Finalizable, Metric, MetricValue},
     request_metadata::GroupedCountByteSize,
 };
 
@@ -23,10 +23,11 @@ use protobuf::{CodedOutputStream, rt::WireType};
 use super::{
     config::DatadogMetricsEndpoint,
     encoder::{
-        EncoderError, FinishError, ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE, SeriesTags,
-        generate_origin_metadata, split_series_tags,
+        EncoderError, FinishError, MetricEncodeError, ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE,
+        SeriesTags, generate_origin_metadata, split_series_tags,
     },
 };
+use crate::common::datadog::DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX;
 use crate::sinks::util::{
     Compression, Compressor, encode_namespace, request_builder::EncodeResult,
 };
@@ -48,7 +49,7 @@ pub(super) struct DatadogMetricsV3Encoder {
 }
 
 impl DatadogMetricsV3Encoder {
-    pub fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
+    pub(super) fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
         let limits = endpoint.payload_limits();
         Self {
             default_namespace: default_namespace.map(Arc::from),
@@ -67,7 +68,7 @@ impl DatadogMetricsV3Encoder {
     /// Only available in tests; production code always uses the API-defined limits via `new`.
     /// Mirrors `DatadogMetricsEncoder::with_payload_limits`.
     #[cfg(test)]
-    pub fn with_payload_limits(
+    pub(super) fn with_payload_limits(
         default_namespace: Option<String>,
         uncompressed_limit: usize,
         compressed_limit: usize,
@@ -86,7 +87,10 @@ impl DatadogMetricsV3Encoder {
     ///
     /// Always returns `Ok(None)` — the V3 encoder cannot detect payload overflow
     /// until `finish()` time.  Caller must respect the batch event-count cap.
-    pub fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    pub(super) fn try_encode(
+        &mut self,
+        mut metric: Metric,
+    ) -> Result<Option<Metric>, MetricEncodeError> {
         self.byte_size
             .add_event(&metric, metric.estimated_json_encoded_size_of());
         encode_metric_to_v3(
@@ -95,7 +99,8 @@ impl DatadogMetricsV3Encoder {
             &self.default_namespace,
             self.log_schema,
             self.origin_product_value,
-        )?;
+        )
+        .map_err(|error| (error, metric.take_finalizers()))?;
         self.pending.push(metric);
         Ok(None)
     }
@@ -109,9 +114,9 @@ impl DatadogMetricsV3Encoder {
         clippy::cast_possible_truncation,
         reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
     )]
-    pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
+    pub(super) fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         let writer = mem::replace(&mut self.writer, V3Writer::new());
-        let metrics = mem::take(&mut self.pending);
+        let mut metrics = mem::take(&mut self.pending);
         let byte_size = mem::replace(
             &mut self.byte_size,
             telemetry().create_request_count_byte_size(),
@@ -125,34 +130,43 @@ impl DatadogMetricsV3Encoder {
             ));
         }
 
-        let metric_data = writer.finalize()?.payload;
+        let metric_data = writer
+            .finalize()
+            .map_err(|error| FinishError::V3EncodingFailed {
+                source: error.into_inner(),
+                finalizers: metrics.take_finalizers(),
+            })?
+            .payload;
 
         // The wire payload isn't the bare `MetricData` message — the intake API expects it
         // wrapped as field 3 (`metricData`) of the outer `Payload` message (see
         // `intake_v3.proto`). Without this envelope the backend can't parse the bytes at all.
         let mut header_buf = [0u8; 16];
-        let header_len = {
+        let header_len = (|| {
             let mut header_writer = CodedOutputStream::bytes(&mut header_buf);
             header_writer.write_tag(3, WireType::LengthDelimited)?;
             header_writer.write_uint64_no_tag(metric_data.len() as u64)?;
             header_writer.flush()?;
-            header_writer.total_bytes_written() as usize
-        };
+            Ok::<_, protobuf::Error>(header_writer.total_bytes_written() as usize)
+        })()
+        .map_err(|source| FinishError::V3EncodingFailed {
+            source,
+            finalizers: metrics.take_finalizers(),
+        })?;
 
         let uncompressed_size = header_len + metric_data.len();
 
         // Note, V3 only supports zstd.
         let mut compressor: Compressor = Compression::zstd_default().into();
 
-        compressor
-            .write_all(&header_buf[..header_len])
-            .map_err(|source| FinishError::CompressionFailed { source })?;
-        compressor
-            .write_all(&metric_data)
-            .map_err(|source| FinishError::CompressionFailed { source })?;
         let compressed = compressor
-            .finish()
-            .map_err(|source| FinishError::CompressionFailed { source })?
+            .write_all(&header_buf[..header_len])
+            .and_then(|()| compressor.write_all(&metric_data))
+            .and_then(|()| compressor.finish())
+            .map_err(|source| FinishError::CompressionFailed {
+                source,
+                finalizers: metrics.take_finalizers(),
+            })?
             .freeze();
 
         // Both limits are inclusive: the intake accepts a payload whose encoded size is exactly
@@ -234,8 +248,6 @@ fn encode_metric_to_v3(
     // `resource.<type>` tags that the `datadog_agent` source produces from an upstream V2
     // payload's resources back into structured resources.
     //
-    // `unit` is intentionally never set: V2 always sends it empty (`unit: "".to_string()` in
-    // `series_to_proto_message`), so a `dd.internal.unit` tag stays an ordinary tag here too.
     let SeriesTags {
         tags,
         resources,
@@ -270,7 +282,8 @@ fn encode_metric_to_v3(
         let product = origin.product().unwrap_or(origin_product_value);
         let category = origin.category().unwrap_or(ORIGIN_CATEGORY_VALUE);
         let service = origin.service().unwrap_or(0);
-        builder.set_origin(product, category, service, false);
+        let no_index = origin.metric_type() == Some(DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX);
+        builder.set_origin(product, category, service, no_index);
     }
 
     // Interval — matches V2, which always stamps the interval field on the message
@@ -279,8 +292,9 @@ fn encode_metric_to_v3(
         builder.set_interval(interval.into());
     }
 
-    // Note: `unit` is intentionally never set — V2 always sends it empty (see
-    // `series_to_proto_message`'s `unit: "".to_string()`).
+    if let Some(unit) = event_metadata.datadog_metric_unit() {
+        builder.set_unit(unit);
+    }
 
     // ── Data points ─────────────────────────────────────────────────────────
     let timestamp = encode_timestamp(metric.timestamp());
@@ -324,8 +338,13 @@ mod tests {
 
     use super::super::config::SeriesApiVersion;
     use super::*;
+    use datadog_proto::metrics_v3::MetricData;
+    use prost::Message;
     use vector_lib::{
-        event::{MetricKind, MetricValue, metric::MetricSketch},
+        event::{
+            DatadogMetricOriginMetadata, EventMetadata, MetricKind, MetricValue,
+            metric::MetricSketch,
+        },
         metrics::AgentDDSketch,
     };
 
@@ -374,7 +393,7 @@ mod tests {
         );
         let (result, metrics) = enc.finish().unwrap();
         assert!(result.into_payload().is_empty());
-        assert!(metrics.is_empty());
+        assert_eq!(metrics, [] as [vector_lib::event::Metric; 0]);
     }
 
     /// Encodes one gauge and reports `(uncompressed_size, compressed_size)` for it.
@@ -589,7 +608,7 @@ mod tests {
                     count: 1,
                 }],
                 count: 1,
-                sum: 1.0,
+                sum: Some(1.0),
             },
         );
         assert!(enc.try_encode(histogram).is_err());
@@ -631,13 +650,50 @@ mod tests {
         )
         .unwrap();
         let encoded = writer.finalize().unwrap();
-        assert!(!encoded.payload.is_empty());
+        assert_ne!(encoded.payload, [] as [u8; 0]);
 
         // `host_metrics` maps to OriginService 211 in V2's `source_type_to_service` table;
         // V3 reuses that same mapping via the shared `generate_origin_metadata` function.
         let origin = generate_origin_metadata(None, Some("host_metrics"), *ORIGIN_PRODUCT_VALUE)
             .expect("host_metrics should get synthesized origin metadata");
         assert_eq!(origin.service(), Some(211));
+    }
+
+    #[test]
+    fn v3_preserves_unit_and_no_index_metadata() {
+        const FLAG_NO_INDEX: u64 = 0x100;
+        const FLAG_HAS_UNIT: u64 = 0x200;
+
+        let metadata = EventMetadata::default()
+            .with_origin_metadata(
+                DatadogMetricOriginMetadata::new(Some(10), Some(11), Some(42))
+                    .with_metric_type(Some(DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX)),
+            )
+            .with_datadog_metric_unit("byte".to_string());
+        let metric = Metric::new_with_metadata(
+            "preserved.metadata",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+            metadata,
+        );
+
+        let mut writer = V3Writer::new();
+        encode_metric_to_v3(
+            &mut writer,
+            &metric,
+            &None,
+            log_schema(),
+            *ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+        let encoded = writer.finalize().unwrap();
+        let data = MetricData::decode(encoded.payload.as_slice()).unwrap();
+
+        assert_eq!(data.types.len(), 1);
+        assert_eq!(data.types[0] & FLAG_NO_INDEX, FLAG_NO_INDEX);
+        assert_eq!(data.types[0] & FLAG_HAS_UNIT, FLAG_HAS_UNIT);
+        assert_eq!(data.dict_unit_str, b"\x04byte");
+        assert_eq!(data.unit_refs, vec![1]);
     }
 
     #[test]

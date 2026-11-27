@@ -121,7 +121,9 @@ impl Histogram {
         MetricValue::AggregatedHistogram {
             buckets: self.buckets(),
             count: self.count(),
-            sum: self.sum(),
+            // Vector's own histograms accumulate their sum as observations arrive, so it is always
+            // known.
+            sum: Some(self.sum()),
         }
     }
 }

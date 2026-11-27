@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{any::Any, sync::Arc};
 
 use enum_dispatch::enum_dispatch;
@@ -87,6 +85,7 @@ where
                     healthcheck: Default::default(),
                     buffer: Default::default(),
                     proxy: Default::default(),
+                    measure_cpu_usage: false,
                     inner: sink,
                     validated: self.validated.clone(),
                 },

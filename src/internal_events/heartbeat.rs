@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use vector_lib::{
     NamedInternalEvent, gauge,
-    internal_event::{GaugeName, InternalEvent},
+    internal_event::{GaugeName, InternalEvent, LossyF64},
 };
 
 use crate::built_info;
@@ -13,11 +13,10 @@ pub struct Heartbeat {
 }
 
 impl InternalEvent for Heartbeat {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::cast_precision_loss, reason = "Metrics use f64")]
     fn emit(self) {
-        trace!(target: "vector", message = "Beep.");
-        gauge!(GaugeName::UptimeSeconds).set(self.since.elapsed().as_secs() as f64);
+        // Periodic by design (1 Hz); a 1-minute window avoids rate-limiter chatter.
+        trace!(target: "vector", message = "Beep.", internal_log_rate_secs = 60);
+        gauge!(GaugeName::UptimeSeconds).set(LossyF64(self.since.elapsed().as_secs()));
         gauge!(
             GaugeName::BuildInfo,
             "debug" => built_info::DEBUG,

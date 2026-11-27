@@ -375,7 +375,7 @@ impl SourceConfig for MemoryConfig {
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(Box::pin(
+        Ok(crate::sources::opaque_source(
             memory.as_source(cx.shutdown, cx.out, log_namespace).run(),
         ))
     }

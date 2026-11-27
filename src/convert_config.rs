@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -32,7 +31,7 @@ pub struct Opts {
 )]
 fn check_paths(opts: &Opts) -> Result<(), String> {
     let in_metadata = fs::metadata(&opts.input_path)
-        .unwrap_or_else(|_| panic!("Failed to get metadata for: {:?}", &opts.input_path));
+        .unwrap_or_else(|_| panic!("Failed to get metadata for: {:?}", opts.input_path));
 
     if opts.output_path.exists() {
         return Err(format!(
@@ -77,7 +76,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
             && !base_dir.exists()
         {
             fs::create_dir_all(base_dir).unwrap_or_else(|_| {
-                panic!("Failed to create output dir(s): {:?}", &opts.output_path)
+                panic!("Failed to create output dir(s): {:?}", opts.output_path)
             });
         }
 
@@ -302,21 +301,20 @@ mod tests {
     #[test]
     fn convert_all_from_dir() {
         let input_path = test_data_dir();
-        let output_dir = tempdir()
-            .expect("Unable to create tempdir for config")
-            .keep();
-        walk_dir_and_convert(&input_path, &output_dir, Format::Yaml).unwrap();
+        let output_dir = tempdir().expect("Unable to create tempdir for config");
+        walk_dir_and_convert(&input_path, output_dir.path(), Format::Yaml).unwrap();
 
         let mut count: usize = 0;
         let original_config = convert_file_to_config_string(&test_data_dir().join("config_1.yaml"));
-        for entry in fs::read_dir(&output_dir).unwrap() {
+        for entry in fs::read_dir(output_dir.path()).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
             if path.is_file() {
                 let extension = path.extension().unwrap().to_str().unwrap();
                 if extension == Format::Yaml.to_string() {
                     // Note that here we read the converted string directly.
-                    let converted_config = fs::read_to_string(output_dir.join(&path)).unwrap();
+                    let converted_config =
+                        fs::read_to_string(output_dir.path().join(&path)).unwrap();
                     assert_eq!(converted_config, original_config);
                     count += 1;
                 }

@@ -1,4 +1,3 @@
-#![warn(clippy::pedantic)]
 #![allow(missing_docs)]
 
 use std::collections::HashSet;
@@ -60,6 +59,20 @@ pub enum ShutdownError {
     TransformAborted { key: ComponentKey, error: String },
     #[snafu(display(r#"The task for sink "{key}" died during execution: {error}"#))]
     SinkAborted { key: ComponentKey, error: String },
+}
+
+impl ShutdownError {
+    /// Low-cardinality label for this error, used as the `reason` tag of `stopped_total`.
+    #[must_use]
+    pub const fn reason(&self) -> &'static str {
+        match self {
+            Self::ApiFailed { .. } => "api_failed",
+            Self::ReloadFailedToRestore => "reload_failed_to_restore",
+            Self::SourceAborted { .. } => "source_aborted",
+            Self::TransformAborted { .. } => "transform_aborted",
+            Self::SinkAborted { .. } => "sink_aborted",
+        }
+    }
 }
 
 /// Convenience struct for app setup handling.

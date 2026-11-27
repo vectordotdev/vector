@@ -8,9 +8,7 @@ test_filter: "opentelemetry::traces::"
 runner:
   needs_docker_socket: true
 
-matrix:
-  # Determines which `otel/opentelemetry-collector-contrib` version to use
-  collector_version: ["0.157.0"]
+matrix: {}
 
 # Only trigger this integration test if relevant OTEL source/sink files change
 paths:

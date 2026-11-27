@@ -1,20 +1,21 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
 #[cfg(feature = "sources-prometheus_scrape")]
 use std::borrow::Cow;
 
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+use vector_lib::internal_event::{GaugeName, LossyF64};
 #[cfg(feature = "sources-prometheus_scrape")]
 use vector_lib::prometheus::parser::ParserError;
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+        error_type,
     },
 };
 
 #[cfg(feature = "sources-prometheus_scrape")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusParseError<'a> {
+pub(crate) struct PrometheusParseError<'a> {
     pub error: ParserError,
     pub url: http::Uri,
     pub body: Cow<'a, str>,
@@ -44,11 +45,13 @@ impl InternalEvent for PrometheusParseError<'_> {
     }
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusRemoteWriteParseError {
+pub(crate) struct PrometheusRemoteWriteParseError {
     pub error: prost::DecodeError,
 }
 
+#[cfg(feature = "sources-prometheus_remote_write")]
 impl InternalEvent for PrometheusRemoteWriteParseError {
     fn emit(self) {
         error!(
@@ -67,7 +70,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct PrometheusInvalidMetricError;
+pub(crate) struct PrometheusInvalidMetricError;
 
 impl InternalEvent for PrometheusInvalidMetricError {
     fn emit(self) {
@@ -83,6 +86,76 @@ impl InternalEvent for PrometheusInvalidMetricError {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+    }
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct PrometheusKubernetesServiceDiscoveryTargetsDiscovered {
+    pub count: usize,
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+impl InternalEvent for PrometheusKubernetesServiceDiscoveryTargetsDiscovered {
+    fn emit(self) {
+        debug!(
+            message = "Prometheus Kubernetes service discovery found targets.",
+            count = self.count,
+        );
+        vector_lib::gauge!(GaugeName::PrometheusKubernetesServiceDiscoveryTargetsDiscovered)
+            .set(LossyF64(self.count));
+    }
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct PrometheusKubernetesServiceDiscoveryAnnotationParseError<'a> {
+    pub pod: &'a str,
+    pub namespace: &'a str,
+    pub error: &'a str,
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+impl InternalEvent for PrometheusKubernetesServiceDiscoveryAnnotationParseError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed to parse prometheus.io annotations on pod.",
+            pod = %self.pod,
+            namespace = %self.namespace,
+            error = %self.error,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct PrometheusKubernetesServiceDiscoveryWatcherError<'a> {
+    pub error: &'a kube::runtime::watcher::Error,
+}
+
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
+impl InternalEvent for PrometheusKubernetesServiceDiscoveryWatcherError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Kubernetes Pod watcher received an error. Retrying.",
+            error = %self.error,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
     }
 }

@@ -12,7 +12,11 @@ use pin_project::pin_project;
 use tokio_util::time::{DelayQueue, delay_queue::Key};
 use twox_hash::XxHash64;
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_core::{partition::Partitioner, time::KeyedTimer};
+use vector_core::{
+    event::Finalizable,
+    partition::{PartitionDecision, Partitioner},
+    time::KeyedTimer,
+};
 
 use crate::batcher::{
     BatchConfig,
@@ -35,6 +39,7 @@ impl<K> ExpirationQueue<K> {
     /// Creates a new `ExpirationQueue`.
     ///
     /// `timeout` is used for all insertions and resets.
+    #[must_use]
     pub fn new(timeout: Duration) -> Self {
         Self {
             timeout,
@@ -47,11 +52,13 @@ impl<K> ExpirationQueue<K> {
     ///
     /// Includes subtimers which have expired but have not yet been removed via
     /// calls to `poll_expired`.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.expirations.len()
     }
 
     /// Returns `true` if the queue has a length of 0.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -118,6 +125,7 @@ pub struct BatcherSettings {
 }
 
 impl BatcherSettings {
+    #[must_use]
     pub const fn new(
         timeout: Duration,
         size_limit: NonZeroUsize,
@@ -132,6 +140,7 @@ impl BatcherSettings {
 
     /// A batcher config using the `ByteSizeOf` trait to determine batch sizes.
     /// The output is a  `Vec<T>`.
+    #[must_use]
     pub fn as_byte_size_config<T: ByteSizeOf>(
         &self,
     ) -> BatchConfigParts<SizeLimit<ByteSizeOfItemSize>, Vec<T>> {
@@ -252,22 +261,28 @@ where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
-    Prt::Item: ByteSizeOf,
+    Prt::Item: ByteSizeOf + Finalizable,
     KT: KeyedTimer<Prt::Key>,
     C: BatchConfig<Prt::Item, Batch = B>,
     F: Fn(&Prt::Key) -> C + Send,
 {
-    type Item = (Prt::Key, B);
+    type Item = Result<(Prt::Key, B), Prt::Error>;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.stream.size_hint()
+        let upper = self
+            .stream
+            .size_hint()
+            .1
+            .and_then(|remaining| remaining.checked_add(self.batches.len()))
+            .and_then(|remaining| remaining.checked_add(self.closed_batches.len()));
+        (0, upper)
     }
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         loop {
             if !this.closed_batches.is_empty() {
-                return Poll::Ready(this.closed_batches.pop());
+                return Poll::Ready(this.closed_batches.pop().map(Ok));
             }
             match this.stream.as_mut().poll_next(cx) {
                 Poll::Pending => match this.timer.poll_expired(cx) {
@@ -299,8 +314,23 @@ where
                     }
                     return Poll::Ready(None);
                 }
-                Poll::Ready(Some(item)) => {
-                    let item_key = this.partitioner.partition(&item);
+                Poll::Ready(Some(mut item)) => {
+                    let item_key = match this.partitioner.partition(&item) {
+                        Ok(PartitionDecision::Route(key)) => key,
+                        Ok(PartitionDecision::Discard) => {
+                            // Discarding a ready input may produce no output indefinitely.
+                            if let Poll::Ready(budget) = tokio::task::coop::poll_proceed(cx) {
+                                budget.made_progress();
+                                continue;
+                            }
+                            return Poll::Pending;
+                        }
+                        Err(error) => {
+                            return Poll::Ready(Some(Err(
+                                error.record_failure(&item.take_finalizers())
+                            )));
+                        }
+                    };
 
                     // Get the batch for this partition, or create a new one.
                     let batch = if let Some(batch) = this.batches.get_mut(&item_key) {
@@ -349,17 +379,25 @@ where
 mod test {
     use std::{
         collections::{HashMap, HashSet},
+        convert::Infallible,
+        io,
         num::{NonZeroU8, NonZeroUsize},
         pin::Pin,
         task::{Context, Poll},
         time::Duration,
     };
 
-    use futures::{Stream, stream};
+    use futures::{Stream, StreamExt, stream};
     use pin_project::pin_project;
     use proptest::prelude::*;
     use tokio::time::advance;
-    use vector_core::{partition::Partitioner, time::KeyedTimer};
+    use vector_common::byte_size_of::ByteSizeOf;
+    use vector_core::{
+        event::{BatchNotifier, BatchStatus, Event, EventFinalizers, Finalizable, LogEvent, Value},
+        partition::{PartitionDecision, Partitioner},
+        sink::PreparationError,
+        time::KeyedTimer,
+    };
 
     use crate::{
         BatcherSettings,
@@ -442,14 +480,32 @@ mod test {
         key_space: NonZeroU8,
     }
 
+    struct TestItem(u64);
+
+    impl ByteSizeOf for TestItem {
+        fn allocated_bytes(&self) -> usize {
+            0
+        }
+    }
+
+    impl Finalizable for TestItem {
+        fn take_finalizers(&mut self) -> EventFinalizers {
+            EventFinalizers::default()
+        }
+    }
+
     impl Partitioner for TestPartitioner {
-        type Item = u64;
+        type Item = TestItem;
         type Key = u8;
+        type Error = Infallible;
 
         #[allow(clippy::cast_possible_truncation)]
-        fn partition(&self, item: &Self::Item) -> Self::Key {
-            let key = *item % u64::from(self.key_space.get());
-            key as Self::Key
+        fn partition(
+            &self,
+            item: &Self::Item,
+        ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+            let key = item.0 % u64::from(self.key_space.get());
+            Ok(PartitionDecision::Route(key as Self::Key))
         }
     }
 
@@ -461,27 +517,24 @@ mod test {
 
     proptest! {
         #[test]
-        fn size_hint_eq(stream: Vec<u64>,
+        fn initial_size_hint(stream: Vec<u64>,
                         item_limit in 1..u16::MAX,
                         allocation_limit in 8..128,
                         partitioner in arb_partitioner(),
                         timer in arb_timer()) {
-            // Asserts that the size hint of the batcher stream is the same as
-            // that of the internal stream. In the future we may want to produce
-            // a tighter bound -- since batching will reduce some streams -- but
-            // this is the worst case where every incoming item maps to a unique
-            // key.
-            let mut stream = stream::iter(stream.into_iter());
+            // The input length bounds the number of outputs before batching starts.
+            // Batching and intentional discards can reduce that count.
+            let mut stream = stream::iter(stream.into_iter().map(TestItem));
             let stream_size_hint = stream.size_hint();
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
 
             let batcher = PartitionedBatcher::with_timer(&mut stream, partitioner, timer,
-                                              move |_: &u8| batch_settings.as_byte_size_config::<u64>());
+                                              move |_: &u8| batch_settings.as_byte_size_config::<TestItem>());
             let batcher_size_hint = batcher.size_hint();
 
-            assert_eq!(stream_size_hint, batcher_size_hint);
+            assert_eq!(batcher_size_hint, (0, stream_size_hint.1));
         }
     }
 
@@ -497,12 +550,12 @@ mod test {
             let noop_waker = futures::task::noop_waker();
             let mut cx = Context::from_waker(&noop_waker);
 
-            let mut stream = stream::iter(stream.into_iter());
+            let mut stream = stream::iter(stream.into_iter().map(TestItem));
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, move |_: &u8| batch_settings.as_byte_size_config::<u64>());
+                                                  timer, move |_: &u8| batch_settings.as_byte_size_config::<TestItem>());
             let mut batcher = Pin::new(&mut batcher);
 
             loop {
@@ -511,7 +564,8 @@ mod test {
                     Poll::Ready(None) => {
                         break;
                     }
-                    Poll::Ready(Some((_, batch))) => {
+                    Poll::Ready(Some(Err(error))) => match error {},
+                    Poll::Ready(Some(Ok((_, batch)))) => {
                         debug_assert!(
                             batch.len() <= item_limit.get(),
                             "{} < {}",
@@ -536,7 +590,10 @@ mod test {
         let mut map = stream
             .into_iter()
             .map(|item| {
-                let key = partitioner.partition(&item);
+                let PartitionDecision::Route(key) = partitioner.partition(&TestItem(item)).unwrap()
+                else {
+                    unreachable!("the test partitioner always routes")
+                };
                 (key, item)
             })
             .fold(
@@ -568,12 +625,12 @@ mod test {
 
             let mut partitions = separate_partitions(stream.clone(), &partitioner);
 
-            let mut stream = stream::iter(stream.into_iter());
+            let mut stream = stream::iter(stream.into_iter().map(TestItem));
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, move |_: &u8| batch_settings.as_byte_size_config::<u64>());
+                                                  timer, move |_: &u8| batch_settings.as_byte_size_config::<TestItem>());
             let mut batcher = Pin::new(&mut batcher);
 
             loop {
@@ -582,19 +639,20 @@ mod test {
                     Poll::Ready(None) => {
                         break;
                     }
-                    Poll::Ready(Some((key, actual_batch))) => {
+                    Poll::Ready(Some(Err(error))) => match error {},
+                    Poll::Ready(Some(Ok((key, actual_batch)))) => {
                         let expected_partition = partitions
                             .get_mut(&key)
                             .expect("impossible situation");
 
                         for item in actual_batch {
-                            assert_eq!(item, expected_partition.pop().unwrap());
+                            assert_eq!(item.0, expected_partition.pop().unwrap());
                         }
                     }
                 }
             }
             for v in partitions.values() {
-                assert!(v.is_empty());
+                assert_eq!(v.as_slice(), &[] as &[u64]);
             }
         }
     }
@@ -612,12 +670,12 @@ mod test {
             let mut cx = Context::from_waker(&noop_waker);
 
             let total_items = stream.len();
-            let mut stream = stream::iter(stream.into_iter());
+            let mut stream = stream::iter(stream.into_iter().map(TestItem));
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
             let batch_settings = BatcherSettings::new(Duration::from_secs(1), allocation_limit, item_limit);
             let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
-                                                  timer, move |_: &u8| batch_settings.as_byte_size_config::<u64>());
+                                                  timer, move |_: &u8| batch_settings.as_byte_size_config::<TestItem>());
             let mut batcher = Pin::new(&mut batcher);
 
             let mut observed_items = 0;
@@ -630,13 +688,81 @@ mod test {
                         assert_eq!(observed_items, total_items);
                         break;
                     }
-                    Poll::Ready(Some((_, batch))) => {
+                    Poll::Ready(Some(Err(error))) => match error {},
+                    Poll::Ready(Some(Ok((_, batch)))) => {
                         observed_items += batch.len();
                         assert!(observed_items <= total_items);
                     }
                 }
             }
         }
+    }
+
+    #[tokio::test]
+    async fn signals_partition_failures_and_continues_routing() {
+        struct EventPartitioner;
+
+        impl Partitioner for EventPartitioner {
+            type Item = Event;
+            type Key = Option<usize>;
+            type Error = io::Error;
+
+            fn partition(
+                &self,
+                event: &Event,
+            ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+                match event.as_log().value().to_string_lossy().as_ref() {
+                    "reject" => Err(PreparationError::Permanent(io::Error::other("rejected"))),
+                    "retry" => Err(PreparationError::Transient(io::Error::other("transient"))),
+                    "discard" => Ok(PartitionDecision::Discard),
+                    _ => Ok(PartitionDecision::Route(None)),
+                }
+            }
+        }
+
+        let event = |message| {
+            let (notifier, receiver) = BatchNotifier::new_with_receiver();
+            (
+                Event::Log(LogEvent::from(Value::from(message)).with_batch_notifier(&notifier)),
+                receiver,
+            )
+        };
+        let (rejected, rejected_status) = event("reject");
+        let (transient, transient_status) = event("retry");
+        let (discarded, discarded_status) = event("discard");
+        let (routed, mut routed_status) = event("route");
+        let settings = BatcherSettings {
+            timeout: Duration::from_secs(1),
+            size_limit: usize::MAX,
+            item_limit: 16,
+        };
+        let input = stream::iter([rejected, transient, discarded, routed]);
+        let mut batches =
+            PartitionedBatcher::new(input, EventPartitioner, settings.timeout, |_| {
+                settings.as_byte_size_config()
+            });
+
+        assert_eq!(
+            batches.next().await.unwrap().unwrap_err().to_string(),
+            "rejected"
+        );
+        assert_eq!(rejected_status.await, BatchStatus::Rejected);
+        assert_eq!(
+            batches.next().await.unwrap().unwrap_err().to_string(),
+            "transient"
+        );
+        assert_eq!(transient_status.await, BatchStatus::Errored);
+        let (key, events) = batches.next().await.unwrap().unwrap();
+        assert_eq!(key, None);
+        assert_eq!(events.len(), 1);
+        assert_eq!(discarded_status.await, BatchStatus::Delivered);
+        assert_eq!(
+            routed_status.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        );
+        drop(events);
+        assert_eq!(routed_status.await, BatchStatus::Delivered);
+        assert!(batches.next().await.is_none());
     }
 
     #[tokio::test(start_paused = true)]

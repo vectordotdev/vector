@@ -7,7 +7,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DockerLogsEventsReceived<'a> {
+pub(crate) struct DockerLogsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub container_id: &'a str,
     pub container_name: &'a str,
@@ -32,7 +32,7 @@ impl InternalEvent for DockerLogsEventsReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DockerLogsContainerEventReceived<'a> {
+pub(crate) struct DockerLogsContainerEventReceived<'a> {
     pub container_id: &'a str,
     pub action: &'a str,
 }
@@ -49,7 +49,7 @@ impl InternalEvent for DockerLogsContainerEventReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DockerLogsContainerWatch<'a> {
+pub(crate) struct DockerLogsContainerWatch<'a> {
     pub container_id: &'a str,
 }
 
@@ -64,7 +64,7 @@ impl InternalEvent for DockerLogsContainerWatch<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DockerLogsContainerUnwatch<'a> {
+pub(crate) struct DockerLogsContainerUnwatch<'a> {
     pub container_id: &'a str,
 }
 
@@ -79,7 +79,7 @@ impl InternalEvent for DockerLogsContainerUnwatch<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DockerLogsCommunicationError<'a> {
+pub(crate) struct DockerLogsCommunicationError<'a> {
     pub error: Error,
     pub container_id: Option<&'a str>,
 }
@@ -103,7 +103,7 @@ impl InternalEvent for DockerLogsCommunicationError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DockerLogsContainerMetadataFetchError<'a> {
+pub(crate) struct DockerLogsContainerMetadataFetchError<'a> {
     pub error: Error,
     pub container_id: &'a str,
 }
@@ -128,7 +128,7 @@ impl InternalEvent for DockerLogsContainerMetadataFetchError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DockerLogsTimestampParseError<'a> {
+pub(crate) struct DockerLogsTimestampParseError<'a> {
     pub error: ParseError,
     pub container_id: &'a str,
 }
@@ -153,7 +153,7 @@ impl InternalEvent for DockerLogsTimestampParseError<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct DockerLogsLoggingDriverUnsupportedError<'a> {
+pub(crate) struct DockerLogsLoggingDriverUnsupportedError<'a> {
     pub container_id: &'a str,
     pub error: Error,
 }

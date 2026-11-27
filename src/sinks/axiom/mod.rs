@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 mod config;
 #[cfg(feature = "axiom-integration-tests")]
 #[cfg(test)]

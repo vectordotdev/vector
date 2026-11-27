@@ -8,7 +8,7 @@ use vector_lib::{
     lookup,
     lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath, OptionalValuePath},
     sensitive_string::SensitiveString,
-    sink::StreamSink,
+    sink::{SinkError, StreamSink},
 };
 
 use super::{
@@ -247,9 +247,9 @@ pub struct HumioMetricsSink {
 }
 
 #[async_trait]
-impl StreamSink<EventArray> for HumioMetricsSink {
-    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), ()> {
-        let mut transform = self.transform;
+impl StreamSink<EventArray, SinkError> for HumioMetricsSink {
+    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), SinkError> {
+        let transform = self.transform;
         self.inner
             .run(input.map(move |events| {
                 let mut buf = OutputBuffer::with_capacity(events.len());

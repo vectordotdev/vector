@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use vector_lib::{
     config::{LegacyKey, LogNamespace, log_schema},
     conversion,
+    internal_event::emit,
     lookup::path,
 };
 
@@ -33,13 +34,13 @@ pub(super) struct Cri {
 }
 
 impl Cri {
-    pub const fn new(log_namespace: LogNamespace) -> Self {
+    pub(super) const fn new(log_namespace: LogNamespace) -> Self {
         Self { log_namespace }
     }
 }
 
 impl FunctionTransform for Cri {
-    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, mut event: Event) {
         let message_path = get_message_path(self.log_namespace);
 
         // Get the log field with the message, if it exists, and coerce it to bytes.
@@ -49,14 +50,14 @@ impl FunctionTransform for Cri {
             None => {
                 // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
                 // us to actually decode, so there's no event we could emit, and so we just emit the error and return.
-                emit!(ParserMissingFieldError::<DROP_EVENT> {
-                    field: &message_path.to_string()
+                emit(ParserMissingFieldError::<DROP_EVENT> {
+                    field: &message_path.to_string(),
                 });
                 return;
             }
             Some(s) => match parse_log_line(&s) {
                 None => {
-                    emit!(ParserMatchError { value: &s[..] });
+                    emit(ParserMatchError { value: &s[..] });
                     return;
                 }
                 Some(parsed_log) => {
@@ -96,10 +97,10 @@ impl FunctionTransform for Cri {
                                 log_schema().timestamp_key().map(LegacyKey::Overwrite),
                                 path!(TIMESTAMP_KEY),
                                 Value::Timestamp(dt.with_timezone(&Utc)),
-                            )
+                            );
                         }
                         Err(e) => {
-                            emit!(ParserConversionError {
+                            emit(ParserConversionError {
                                 name: TIMESTAMP_KEY,
                                 error: conversion::Error::TimestampParse {
                                     s: ds.to_string(),
@@ -181,7 +182,7 @@ fn parse_log_line(line: &[u8]) -> Option<ParsedLog<'_>> {
 }
 
 #[cfg(test)]
-pub mod tests {
+pub(super) mod tests {
     use bytes::Bytes;
     use vrl::value;
 
@@ -193,7 +194,7 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
+    pub(crate) fn valid_cases(log_namespace: LogNamespace) -> Vec<(Bytes, Vec<Event>)> {
         vec![
             (
                 Bytes::from(
@@ -283,7 +284,7 @@ pub mod tests {
     fn test_parsing_valid_vector_namespace() {
         trace_init();
         test_util::test_parser(
-            || Cri::new(LogNamespace::Vector),
+            |output, event| Cri::new(LogNamespace::Vector).transform(output, event),
             |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
@@ -293,7 +294,7 @@ pub mod tests {
     fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
-            || Cri::new(LogNamespace::Legacy),
+            |output, event| Cri::new(LogNamespace::Legacy).transform(output, event),
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );

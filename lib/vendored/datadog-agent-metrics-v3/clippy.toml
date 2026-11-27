@@ -1,0 +1,2 @@
+# Saluki Clippy configuration, so that the vendored source stays unchanged.
+too-many-arguments-threshold = 8

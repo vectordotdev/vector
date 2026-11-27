@@ -654,6 +654,28 @@ fn uri_path_field_cannot_smuggle_backslash() {
 }
 
 #[test]
+fn uri_rejects_non_ascii() {
+    // `http::Uri` accepts raw UTF-8 in the path, but servers that map
+    // Unicode look-alikes onto `.` and `/` would turn U+FF0E FULLWIDTH FULL
+    // STOP and U+FF0F FULLWIDTH SOLIDUS into a traversal. Reject at render
+    // time.
+    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
+    assert!(matches!(
+        c.confine("https://api.internal/ingest/\u{FF0E}\u{FF0E}\u{FF0F}admin")
+            .unwrap_err(),
+        ConfineError::UriParseFailed { .. }
+    ));
+
+    // A non-ASCII static prefix is rejected at build time.
+    let tpl = Template::try_from("https://api.internal/\u{00FC}/{{ tenant }}").unwrap();
+    assert!(matches!(
+        ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
+        BuildError::NoStaticUriAuthority { .. }
+    ));
+}
+
+#[test]
 fn uri_path_field_cannot_smuggle_double_encoded_traversal() {
     // `%25` is the encoded form of `%`. A proxy that decodes once turns
     // `%252e%252e%252fadmin` into `%2e%2e%2fadmin`; a second decoder

@@ -1,4 +1,5 @@
 use std::{future::ready, pin::Pin};
+use vector_lib::internal_event::emit;
 
 use futures::{Stream, StreamExt, stream};
 use mlua::FromLua;
@@ -178,8 +179,8 @@ impl Lua {
 
         self.invocations_after_gc += 1;
         if self.invocations_after_gc.is_multiple_of(GC_INTERVAL) {
-            emit!(LuaGcTriggered {
-                used_memory: self.runtime.used_memory()
+            emit(LuaGcTriggered {
+                used_memory: self.runtime.used_memory(),
             });
             self.runtime.gc_collect()?;
             self.invocations_after_gc = 0;
@@ -192,7 +193,7 @@ impl Lua {
         match self.process(event) {
             Ok(event) => event,
             Err(error) => {
-                emit!(LuaScriptError { error });
+                emit(LuaScriptError { error });
                 None
             }
         }
@@ -217,7 +218,7 @@ impl TaskTransform<Event> for Lua {
                         Some(stream::iter(output))
                     }
                     Err(error) => {
-                        emit!(LuaScriptError { error });
+                        emit(LuaScriptError { error });
                         None
                     }
                 })

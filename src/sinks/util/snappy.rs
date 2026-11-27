@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! An encoder for [Snappy] compression.
 //! Whilst there does exist a [Writer] implementation for Snappy, this compresses
 //! using the [Snappy frame format][frame], which is not quite what we want. So

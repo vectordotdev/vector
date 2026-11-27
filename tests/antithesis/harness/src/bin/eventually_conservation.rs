@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Asserts two properties:
 //!
 //! * **conservation** every id the oracle acked has come back. Peer to the

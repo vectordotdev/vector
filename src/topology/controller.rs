@@ -1,13 +1,14 @@
 use std::sync::Arc;
+use vector_lib::internal_event::emit;
 
 use futures_util::FutureExt as _;
 use tokio::sync::{Mutex, MutexGuard};
+use vector_lib::extra_context::ExtraContext;
 
 #[cfg(feature = "api")]
 use crate::api;
 use crate::{
     config,
-    extra_context::ExtraContext,
     internal_events::{VectorRecoveryError, VectorReloadError, VectorReloaded},
     signal::ShutdownError,
     topology::{ReloadError, RunningTopology},
@@ -113,8 +114,8 @@ impl TopologyController {
             .await
         {
             Ok(()) => {
-                emit!(VectorReloaded {
-                    config_paths: &self.config_paths
+                emit(VectorReloaded {
+                    config_paths: &self.config_paths,
                 });
                 ReloadOutcome::Success
             }
@@ -124,7 +125,7 @@ impl TopologyController {
                     changed_fields = %changed_fields.join(", "),
                     internal_log_rate_limit = false,
                 );
-                emit!(VectorReloadError {
+                emit(VectorReloadError {
                     reason: "global_options_changed",
                 });
                 ReloadOutcome::RolledBack
@@ -135,22 +136,22 @@ impl TopologyController {
                     error = %source,
                     internal_log_rate_limit = false,
                 );
-                emit!(VectorReloadError {
+                emit(VectorReloadError {
                     reason: "global_diff_failed",
                 });
                 ReloadOutcome::RolledBack
             }
             Err(ReloadError::TopologyBuildFailed) => {
-                emit!(VectorReloadError {
+                emit(VectorReloadError {
                     reason: "topology_build_failed",
                 });
                 ReloadOutcome::RolledBack
             }
             Err(ReloadError::FailedToRestore) => {
-                emit!(VectorReloadError {
+                emit(VectorReloadError {
                     reason: "restore_failed",
                 });
-                emit!(VectorRecoveryError);
+                emit(VectorRecoveryError);
                 ReloadOutcome::FatalError(ShutdownError::ReloadFailedToRestore)
             }
         }

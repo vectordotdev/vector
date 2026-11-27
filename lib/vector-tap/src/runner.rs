@@ -1,4 +1,8 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    io::{self, Write},
+};
 
 use bytes::Bytes;
 use colored::{ColoredString, Colorize};
@@ -164,8 +168,9 @@ impl<'a> TapRunner<'a> {
 
     /// # Errors
     ///
-    /// Returns an error if the URL is invalid, connecting or starting the stream fails,
-    /// or the stream reports an error or ends unexpectedly.
+    /// Returns an error if the URL is invalid, setting up the client or starting the stream
+    /// fails, or the stream reports an error or ends unexpectedly. The client opens its
+    /// connection with the stream RPC, so an unreachable API fails that RPC.
     pub async fn run_tap(
         &self,
         interval: i64,
@@ -179,18 +184,18 @@ impl<'a> TapRunner<'a> {
             .parse()
             .map_err(|e| TapExecutorError::Fatal(format!("Invalid URL: {e}")))?;
         let mut client = Client::new(uri);
-        client.connect().await?;
+        client.connect()?;
         self.run_tap_with_client(client, interval, limit, duration_ms, quiet)
             .await
     }
 
-    /// Run tap using a pre-connected client (avoids an extra connection round-trip when the
-    /// caller has already connected and health-checked the client).
+    /// Run tap using a connected client (reuses the connection when the caller has already
+    /// health-checked the client).
     ///
     /// # Errors
     ///
-    /// Returns an error if starting the stream fails, or the stream reports an error
-    /// or ends unexpectedly.
+    /// Returns an error if the client is not connected, starting the stream fails, or the
+    /// stream reports an error or ends unexpectedly.
     pub async fn run_tap_with_client(
         &self,
         mut client: Client,
@@ -244,7 +249,13 @@ impl<'a> TapRunner<'a> {
 
                     match &self.output_channel {
                         OutputChannel::Stdout(formatter) => {
-                            Self::output_event_stdout(&output_event, formatter);
+                            if let Err(error) = Self::output_event(
+                                &mut io::stdout().lock(),
+                                &output_event,
+                                formatter,
+                            ) {
+                                return stop_on_write_error(&error);
+                            }
                         }
                         OutputChannel::AsyncChannel(sender_tx) => {
                             if let Err(error) = sender_tx.send(vec![output_event]).await {
@@ -275,10 +286,10 @@ impl<'a> TapRunner<'a> {
         format: TapEncodingFormat,
     ) -> Result<String, String> {
         // INTENTIONAL round-trip through protobuf bytes: `vector_api_client` compiles
-        // `event.proto` independently to avoid taking a dependency on `vector_core` (a large
-        // crate with many features). Both types share the same proto schema, so encoding one
-        // and decoding the other is always safe. If the schemas ever diverge this will surface
-        // as a runtime decode error.
+        // `event.proto` itself, so its `EventWrapper` is a different Rust type from the
+        // `vector_core` one. Both types share the same proto schema, so encoding one and
+        // decoding the other is always safe. If the schemas ever diverge this will surface as a
+        // runtime decode error.
         let bytes = event_wrapper.encode_to_vec();
 
         let core_event_wrapper =
@@ -319,8 +330,11 @@ impl<'a> TapRunner<'a> {
         }
     }
 
-    #[allow(clippy::print_stdout)]
-    fn output_event_stdout(output_event: &StreamOutputEventsResponse, formatter: &EventFormatter) {
+    fn output_event(
+        writer: &mut impl Write,
+        output_event: &StreamOutputEventsResponse,
+        formatter: &EventFormatter,
+    ) -> io::Result<()> {
         use vector_api_client::proto::stream_output_events_response::Event as OutputEventType;
 
         match &output_event.event {
@@ -338,7 +352,8 @@ impl<'a> TapRunner<'a> {
                     "No event data".to_string()
                 };
 
-                println!(
+                writeln!(
+                    writer,
                     "{}",
                     formatter.format(
                         &ev.component_id,
@@ -346,7 +361,7 @@ impl<'a> TapRunner<'a> {
                         &ev.component_type,
                         &encoded_string
                     )
-                );
+                )?;
             }
             #[allow(clippy::print_stderr)]
             Some(OutputEventType::Notification(ev)) => {
@@ -356,5 +371,83 @@ impl<'a> TapRunner<'a> {
                 error!("Received StreamOutputEventsResponse with no event data");
             }
         }
+        Ok(())
+    }
+}
+
+/// Decides how tapping ends after writing an event to stdout failed.
+fn stop_on_write_error(error: &io::Error) -> Result<(), TapExecutorError> {
+    // The reader went away (e.g. `vector tap | head`), so stop tapping instead of panicking like
+    // `println!` would.
+    if error.kind() == io::ErrorKind::BrokenPipe {
+        Ok(())
+    } else {
+        Err(TapExecutorError::Fatal(format!(
+            "Failed writing to stdout: {error}"
+        )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use vector_api_client::proto::{
+        TappedEvent, stream_output_events_response::Event as OutputEventType,
+    };
+
+    use super::*;
+
+    struct BrokenPipeWriter;
+
+    impl Write for BrokenPipeWriter {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            Err(io::ErrorKind::BrokenPipe.into())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn tapped_event() -> StreamOutputEventsResponse {
+        StreamOutputEventsResponse {
+            event: Some(OutputEventType::TappedEvent(TappedEvent {
+                component_id: "in".to_string(),
+                component_type: "demo_logs".to_string(),
+                component_kind: "source".to_string(),
+                event: None,
+            })),
+        }
+    }
+
+    #[test]
+    fn output_event_writes_formatted_event() {
+        let formatter = EventFormatter::new(false, TapEncodingFormat::Json);
+        let mut out = Vec::new();
+
+        TapRunner::output_event(&mut out, &tapped_event(), &formatter).unwrap();
+
+        assert_eq!(out, b"No event data\n");
+    }
+
+    #[test]
+    fn output_event_returns_broken_pipe_instead_of_panicking() {
+        let formatter = EventFormatter::new(false, TapEncodingFormat::Json);
+
+        let error = TapRunner::output_event(&mut BrokenPipeWriter, &tapped_event(), &formatter)
+            .unwrap_err();
+
+        assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+    }
+
+    #[test]
+    fn broken_pipe_stops_tap_successfully() {
+        assert!(stop_on_write_error(&io::ErrorKind::BrokenPipe.into()).is_ok());
+    }
+
+    #[test]
+    fn other_write_errors_stop_tap_with_fatal_error() {
+        let result = stop_on_write_error(&io::ErrorKind::StorageFull.into());
+
+        assert!(matches!(result, Err(TapExecutorError::Fatal(_))));
     }
 }

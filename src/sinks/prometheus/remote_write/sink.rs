@@ -3,6 +3,7 @@ use std::fmt;
 use vector_lib::{
     byte_size_of::ByteSizeOf,
     event::Metric,
+    internal_event::emit,
     stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize},
 };
 
@@ -42,7 +43,7 @@ impl ByteSizeOf for RemoteWriteMetric {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct PrometheusRemoteWriteDefaultBatchSettings;
+pub(crate) struct PrometheusRemoteWriteDefaultBatchSettings;
 
 impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1_000);
@@ -55,11 +56,15 @@ pub(super) struct PrometheusTenantIdPartitioner;
 impl Partitioner for PrometheusTenantIdPartitioner {
     type Item = RemoteWriteMetric;
     type Key = PartitionKey;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        PartitionKey {
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        Ok(PartitionDecision::Route(PartitionKey {
             tenant_id: item.tenant_id.clone(),
-        }
+        }))
     }
 }
 
@@ -190,6 +195,7 @@ where
                         .as_reducer_config(ByteSizeOfItemSize, EventCollection::new(self.aggregate))
                 },
             )
+            .unwrap_infallible()
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -232,7 +238,7 @@ fn make_remote_write_event(
                     error,
                     crate::template::TemplateRenderingError::Confined { .. }
                 );
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some("tenant_id"),
                     drop_event: confined,

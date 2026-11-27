@@ -242,12 +242,6 @@ where
     K: ConfigurableString + Ord + ToValue + 'static,
     V: Configurable + ToValue + 'static,
 {
-    fn is_optional() -> bool {
-        // A map with required fields would be... an object.  So if you want that, make a struct
-        // instead, not a map.
-        true
-    }
-
     fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
@@ -321,12 +315,6 @@ where
     K: ConfigurableString + ToValue + Hash + Eq + 'static,
     V: Configurable + ToValue + 'static,
 {
-    fn is_optional() -> bool {
-        // A map with required fields would be... an object.  So if you want that, make a struct
-        // instead, not a map.
-        true
-    }
-
     fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }
@@ -505,11 +493,11 @@ impl Configurable for Duration {
     fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         let mut properties = IndexMap::default();
         properties.insert("secs".into(), generate_number_schema::<u64>());
-        properties.insert("nsecs".into(), generate_number_schema::<u32>());
+        properties.insert("nanos".into(), generate_number_schema::<u32>());
 
         let mut required = BTreeSet::default();
         required.insert("secs".into());
-        required.insert("nsecs".into());
+        required.insert("nanos".into());
 
         Ok(crate::schema::generate_struct_schema(
             properties, required, None,

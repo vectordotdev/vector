@@ -13,7 +13,7 @@ use http::Uri;
 use vector_lib::codecs::{Encoder, SinkType, encoding::Framer};
 
 #[derive(Debug, Clone)]
-pub struct DorisCommon {
+pub(super) struct DorisCommon {
     pub base_url: Uri,
     pub auth: Option<Auth>,
     pub request_builder: DorisRequestBuilder,
@@ -21,7 +21,7 @@ pub struct DorisCommon {
 }
 
 impl DorisCommon {
-    pub fn parse_config(config: &DorisConfig, endpoint: &UriSerde) -> crate::Result<Self> {
+    pub(super) fn parse_config(config: &DorisConfig, endpoint: &UriSerde) -> crate::Result<Self> {
         if endpoint.uri.host().is_none() {
             return Err(
                 format!("Invalid host: {}, host must include hostname", endpoint.uri).into(),
@@ -50,7 +50,7 @@ impl DorisCommon {
             tls_settings,
         })
     }
-    pub fn parse_many(config: &DorisConfig) -> crate::Result<Vec<Self>> {
+    pub(super) fn parse_many(config: &DorisConfig) -> crate::Result<Vec<Self>> {
         let mut commons = Vec::new();
         for endpoint in &config.endpoints {
             commons.push(Self::parse_config(config, endpoint)?);
@@ -58,7 +58,7 @@ impl DorisCommon {
         Ok(commons)
     }
 
-    pub async fn healthcheck(&self, client: ThreadSafeDorisSinkClient) -> crate::Result<()> {
+    pub(super) async fn healthcheck(&self, client: ThreadSafeDorisSinkClient) -> crate::Result<()> {
         client.healthcheck_fenode(&self.base_url).await
     }
 }

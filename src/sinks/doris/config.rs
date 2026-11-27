@@ -34,7 +34,6 @@ pub struct DorisConfig {
     /// The endpoint must contain an HTTP scheme, and may specify a
     /// hostname or IP address and port.
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8030"))]
-    #[configurable(metadata(docs::required = true))]
     pub endpoints: Vec<UriSerde>,
 
     /// The database that contains the table data will be inserted into.
@@ -234,7 +233,7 @@ impl ValidatedSink for DorisConfig {
         let commons = DorisCommon::parse_many(self)?;
         let common = &commons[0];
 
-        let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
+        let client = HttpClient::new(common.tls_settings.clone().into(), &cx.proxy)?;
 
         let services_futures = commons
             .iter()

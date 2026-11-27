@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io,
-    os::fd::{FromRawFd as _, IntoRawFd as _, RawFd},
+    os::fd::{FromRawFd as _, IntoRawFd, RawFd},
 };
 
 use vector_lib::{
@@ -72,9 +72,9 @@ impl GenerateConfig for FileDescriptorSourceConfig {
     fn generate_config() -> serde_json::Value {
         let fd = null_fd().unwrap();
         toml::from_str(&format!(
-            r#"
+            r"
             fd = {fd}
-            "#
+            "
         ))
         .unwrap()
     }
@@ -87,12 +87,16 @@ pub(crate) fn null_fd() -> crate::Result<RawFd> {
     const FILENAME: &str = "C:\\NUL";
     File::open(FILENAME)
         .map_err(|error| format!("Could not open dummy file at {FILENAME:?}: {error}").into())
-        .map(|file| file.into_raw_fd())
+        .map(IntoRawFd::into_raw_fd)
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "file_descriptor")]
 impl SourceConfig for FileDescriptorSourceConfig {
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         // SAFETY: The configured descriptor is open and its ownership is transferred here.
         let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });
@@ -104,7 +108,12 @@ impl SourceConfig for FileDescriptorSourceConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        outputs(log_namespace, &self.host_key, &self.decoding, Self::NAME)
+        outputs(
+            log_namespace,
+            self.host_key.as_ref(),
+            &self.decoding,
+            Self::NAME,
+        )
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -138,6 +147,10 @@ mod tests {
         crate::test_util::test_generate_config::<FileDescriptorSourceConfig>();
     }
 
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn file_descriptor_decodes_line() {
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -145,7 +158,7 @@ mod tests {
             let (read_fd, write_fd) = pipe().unwrap();
             let config = FileDescriptorSourceConfig {
                 max_length: crate::serde::default_max_length(),
-                host_key: Default::default(),
+                host_key: Option::default(),
                 framing: None,
                 decoding: default_decoding(),
                 fd: read_fd.into_raw_fd() as u32,
@@ -179,6 +192,10 @@ mod tests {
         .await;
     }
 
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric conversion semantics of this source. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn file_descriptor_decodes_line_vector_namespace() {
         assert_source_compliance(&SOURCE_TAGS, async {
@@ -186,7 +203,7 @@ mod tests {
             let (read_fd, write_fd) = pipe().unwrap();
             let config = FileDescriptorSourceConfig {
                 max_length: crate::serde::default_max_length(),
-                host_key: Default::default(),
+                host_key: Option::default(),
                 framing: None,
                 decoding: default_decoding(),
                 fd: read_fd.into_raw_fd() as u32,
@@ -229,6 +246,10 @@ mod tests {
         .await;
     }
 
+    #[allow(
+        clippy::cast_sign_loss,
+        reason = "Preserve the existing numeric representation of these protocol fixtures. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     #[tokio::test]
     async fn file_descriptor_handles_invalid_fd() {
         assert_source_error(&COMPONENT_ERROR_TAGS, async {
@@ -236,7 +257,7 @@ mod tests {
             let (_read_fd, write_fd) = pipe().unwrap();
             let config = FileDescriptorSourceConfig {
                 max_length: crate::serde::default_max_length(),
-                host_key: Default::default(),
+                host_key: Option::default(),
                 framing: None,
                 decoding: default_decoding(),
                 fd: write_fd.as_raw_fd() as u32, // intentionally giving the source a write-only fd

@@ -163,7 +163,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                     "snappy" => Ok(Compression::Snappy),
                     _ => Err(de::Error::invalid_value(
                         de::Unexpected::Str(s),
-                        &r#""none" or "gzip" or "zlib" or "zstd""#,
+                        &r#""none" or "gzip" or "zlib" or "zstd" or "snappy""#,
                     )),
                 }
             }
@@ -577,7 +577,7 @@ mod test {
             ),
             (
                 r#""b42""#,
-                r#"invalid value: string "b42", expected "none" or "gzip" or "zlib" or "zstd" at line 1 column 5"#,
+                r#"invalid value: string "b42", expected "none" or "gzip" or "zlib" or "zstd" or "snappy" at line 1 column 5"#,
             ),
             (
                 r#"{"algorithm": "b42"}"#,
@@ -589,7 +589,7 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": -1}"#,
-                r"integer could not be converted to u32: out of range integral type conversion attempted at line 1 column 33",
+                r"integer could not be converted to u32: number too small to fit in target type at line 1 column 33",
             ),
             (
                 r#"{"algorithm": "gzip", "level": "good"}"#,

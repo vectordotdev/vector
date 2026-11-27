@@ -240,11 +240,14 @@ pub struct ParquetSerializer {
 
 impl ParquetSerializer {
     /// Create a new `ParquetSerializer` from the given configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `schema_file` is not set (unless `schema_mode` is `auto_infer`),
+    /// cannot be read, is larger than 10 MB, or is not a valid Parquet schema; if the schema
+    /// contains binary columns, which the JSON-based encoder does not support; or if the
+    /// compression level is out of range for the selected codec.
     // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(
-        clippy::missing_errors_doc,
-        reason = "The codec API error documentation needs a separate audit."
-    )]
     #[allow(
         clippy::needless_pass_by_value,
         reason = "Keep the existing owned-argument API during the lint rollout."

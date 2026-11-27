@@ -12,8 +12,7 @@ runner:
     OTEL_COLLECTOR_SOURCE_HTTP_PORT: "4318"
     OTEL_COLLECTOR_SINK_HTTP_PORT: "5318"
 
-matrix:
-  collector_version: ["0.157.0"]
+matrix: {}
 
 # Only trigger this integration test if relevant OTEL source/sink files change
 paths:
@@ -22,5 +21,6 @@ paths:
   - "src/internal_events/opentelemetry_*"
   - "tests/e2e/opentelemetry/**"
   - "tests/e2e/opentelemetry-metrics-native/**"
+  - "tests/e2e/opentelemetry-common/**"
   - "lib/codecs/src/**/otlp.rs"
   - "lib/opentelemetry-proto/**"

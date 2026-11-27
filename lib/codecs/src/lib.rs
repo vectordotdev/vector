@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! A collection of codecs that can be used to transform between bytes streams /
 //! byte messages, byte frames and structured events.
 
@@ -13,6 +11,7 @@ pub mod decoding;
 pub mod encoding;
 pub mod gelf;
 pub mod internal_events;
+mod native_json;
 mod ready_frames;
 
 pub use decoder_framed_read::DecoderFramedRead;

@@ -7,12 +7,10 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
-use hyper::{Body, client::connect::Connect};
-
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
-use crate::config::ValidatedSink;
 use crate::{
     common::datadog,
+    config::ValidatedSink,
     http::HttpClient,
     schema,
     sinks::{
@@ -161,16 +159,13 @@ impl DatadogLogsConfig {
     ///
     /// Returns an error if the logs endpoint cannot be parsed or request headers
     /// are invalid.
-    pub fn build_processor<C>(
+    pub fn build_processor(
         &self,
         dd_common: &DatadogCommonConfig,
-        client: HttpClient<Body, C>,
+        client: HttpClient,
         dd_evp_origin: String,
         batch: BatcherSettings,
-    ) -> crate::Result<VectorSink>
-    where
-        C: Connect + Clone + Send + Sync + 'static,
-    {
+    ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.tower.into_settings();
 
@@ -237,7 +232,7 @@ impl DatadogLogsConfig {
             }),
             false,
         )?;
-        Ok(HttpClient::new(tls_settings, proxy)?)
+        HttpClient::new(tls_settings, proxy)
     }
 }
 

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Shared infrastructure for confining templated sink outputs to an
 //! operator-authored boundary.
 //!

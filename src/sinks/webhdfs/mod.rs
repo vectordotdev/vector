@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! `webhdfs` sink.
 //!
 //! The Hadoop Distributed File System (HDFS) is a distributed file system

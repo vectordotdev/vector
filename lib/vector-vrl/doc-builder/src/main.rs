@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use anyhow::Result;
 use std::path::PathBuf;
 use vrl::docs::{build_functions_doc, document_functions_to_dir};

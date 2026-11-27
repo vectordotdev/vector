@@ -126,7 +126,7 @@ specifically around free storage space.
 
 Look at [known bugs][disk_buffer_bugs] before deploying to production.
 
-[disk_buffer_bugs]: https://github.com/vectordotdev/vector/issues?q=sort%3Aupdated-desc+is%3Aissue+state%3Aopen+label%3A%22domain%3A+buffers%22+type%3ABug
+[disk_buffer_bugs]: https://github.com/vectordotdev/vector/issues?q=sort%3Aupdated-desc+is%3Aissue+state%3Aopen+label%3A%22domain%3Abuffers%22+type%3ABug
 {{< /warning >}}
 
 I/O errors are notoriously hard to recover from, as it can be difficult to know what data made it to

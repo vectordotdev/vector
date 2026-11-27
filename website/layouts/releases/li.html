@@ -31,8 +31,9 @@
 {{ if or $release.description $highlights }}
 <div class="border-l border-gray-100 dark:border-gray-800 pl-8 flex flex-col space-y-4 py-2">
   {{ with $release.description }}
-  <div class="prose dark:prose-invert max-w-none">
+  <div class="release-description prose dark:prose-invert max-w-none">
     {{ . | markdownify }}
+    <p><a href="{{ $.RelPermalink }}">View the full release notes.</a></p>
   </div>
   {{ end }}
 

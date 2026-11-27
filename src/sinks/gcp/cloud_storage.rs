@@ -7,6 +7,7 @@ use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use vector_common::sensitive_string::SensitiveString;
 use vector_lib::{
     TimeZone,
     codecs::encoding::Framer,
@@ -23,7 +24,7 @@ use crate::{
         ValidatedSink,
     },
     event::Event,
-    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
+    gcp::{GcpAuthenticator, GcpCredentialsConfig, Scope},
     http::{HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
@@ -38,14 +39,19 @@ use crate::{
         },
         util::{
             BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint, RequestBuilder,
-            ServiceBuilderExt, TowerRequestConfig, batch::BatchConfig,
-            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
-            request_builder::EncodeResult, service::TowerRequestConfigDefaults, timezone_to_offset,
+            ServiceBuilderExt, TowerRequestConfig,
+            batch::BatchConfig,
+            metadata::RequestMetadataBuilder,
+            partitioner::KeyPartitioner,
+            request_builder::{EncodeResult, RequestParts},
+            service::TowerRequestConfigDefaults,
+            timezone_to_offset,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
+use tracing::warn;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
@@ -194,7 +200,15 @@ pub struct GcsSinkConfig {
     request: TowerRequestConfig<GcsTowerRequestConfigDefaults>,
 
     #[serde(flatten)]
-    auth: GcpAuthConfig,
+    auth: GcpCredentialsConfig,
+
+    /// An [API key][gcp_api_key].
+    ///
+    /// [gcp_api_key]: https://cloud.google.com/docs/authentication/api-keys
+    #[configurable(
+        deprecated = "API keys are not supported by Google Cloud Storage; use `credentials_path` or default GCE credentials instead."
+    )]
+    api_key: Option<SensitiveString>,
 
     tls: Option<TlsConfig>,
 
@@ -235,7 +249,8 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         batch: BatchConfig::default(),
         endpoint: default_endpoint(),
         request: TowerRequestConfig::default(),
-        auth: GcpAuthConfig::default(),
+        auth: GcpCredentialsConfig::default(),
+        api_key: Option::default(),
         tls: Option::default(),
         acknowledgements: AcknowledgementsConfig::default(),
         timezone: Option::default(),
@@ -295,11 +310,21 @@ impl ValidatedSink for GcsSinkConfig {
         validated: &ValidatedGcsSink,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
+        if self.api_key.is_some() {
+            warn!(
+                "DEPRECATED: The `api_key` option is deprecated and not supported by Google Cloud Storage. See https://vector.dev/deprecations/#gcp_cloud_storage_api_key for migration instructions."
+            );
+        }
+
         let ValidatedGcsSink { base_url, .. } = validated;
 
-        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
+        let auth = self
+            .auth
+            .build(Scope::DevStorageReadWrite, self.api_key.as_ref())
+            .await?;
+
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls, cx.proxy())?;
+        let client = HttpClient::new(tls.into(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.bucket.clone(),
             client.clone(),
@@ -384,7 +409,7 @@ struct RequestSettings {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
-    type Metadata = (String, EventFinalizers);
+    type Metadata = String;
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -402,21 +427,26 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     fn split_input(
         &self,
         input: (String, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
 
-        ((partition_key, finalizers), builder, events)
+        RequestParts {
+            metadata: partition_key,
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        gcp_metadata: Self::Metadata,
+        key: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (key, finalizers) = gcp_metadata;
         // TODO: pull the seconds from the last event
         let filename = {
             let seconds = match self.tz_offset {
@@ -535,7 +565,7 @@ mod tests {
             JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
             encoding::FramingConfig,
         },
-        partition::Partitioner,
+        partition::{PartitionDecision, Partitioner},
         request_metadata::GroupedCountByteSize,
     };
     use vrl::event_path;
@@ -580,19 +610,19 @@ mod tests {
 
         let context = SinkContext::default();
 
-        let tls = TlsSettings::default();
-        let client =
-            HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
+        let tls = TlsSettings::from_options(None).expect("should not fail to create TLS settings");
+        let client = HttpClient::new(tls.into(), context.proxy())
+            .expect("should not fail to create HTTP client");
 
         let config = GcsSinkConfig {
-            endpoint: HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+            endpoint: HttpEndpoint::new(mock_endpoint.clone()).expect("valid mock endpoint"),
             ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
         };
         let validated = config.validate().expect("validation should succeed");
         let sink = config
             .build_sink(
                 client,
-                HttpEndpoint::parse(&mock_endpoint.to_string()).expect("valid mock endpoint"),
+                HttpEndpoint::new(mock_endpoint).expect("valid mock endpoint"),
                 GcpAuthenticator::None,
                 &context,
                 &validated,
@@ -615,11 +645,14 @@ mod tests {
             key_prefix: Some("key: {{ key }}".into()),
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
-        let key = sink_config
+        let PartitionDecision::Route(key) = sink_config
             .key_partitioner()
             .unwrap()
             .partition(&Event::Log(event))
-            .expect("key wasn't provided");
+            .expect("key wasn't provided")
+        else {
+            panic!("expected the event to route");
+        };
 
         assert_eq!(key, "key: value");
     }
@@ -645,22 +678,29 @@ mod tests {
             )
         };
         let log = LogEvent::default().into();
-        let key = sink_config
+        let PartitionDecision::Route(key) = sink_config
             .key_partitioner()
             .unwrap()
             .partition(&log)
-            .expect("key wasn't provided");
+            .expect("key wasn't provided")
+        else {
+            panic!("expected the event to route");
+        };
 
         let mut byte_size = GroupedCountByteSize::new_untagged();
         byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
         let request_settings = request_settings(&sink_config, &context);
-        let (metadata, metadata_request_builder, _events) =
-            request_settings.split_input((key, vec![log]));
+        let RequestParts {
+            metadata,
+            request_metadata_builder: metadata_request_builder,
+            finalizers,
+            ..
+        } = request_settings.split_input((key, vec![log]));
         let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
         let request_metadata = metadata_request_builder.build(&payload);
 
-        request_settings.build_request(metadata, request_metadata, payload)
+        request_settings.build_request(metadata, finalizers, request_metadata, payload)
     }
 
     #[test]

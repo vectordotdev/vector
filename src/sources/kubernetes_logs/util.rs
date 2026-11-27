@@ -15,7 +15,7 @@ use vector_lib::{
 
 /// A tiny wrapper around a [`FileServer`] that runs it as a [`spawn_blocking`]
 /// task.
-pub async fn run_file_server<PP, E, C, S>(
+pub(super) async fn run_file_server<PP, E, C, S>(
     file_server: FileServer<PP, E>,
     chans: C,
     shutdown: S,
@@ -47,7 +47,7 @@ where
     join_handle.await
 }
 
-pub async fn complete_with_deadline_on_signal<F, S>(
+pub(super) async fn complete_with_deadline_on_signal<F, S>(
     future: F,
     signal: S,
     deadline: Duration,

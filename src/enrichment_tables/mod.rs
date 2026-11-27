@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! Functionality to handle enrichment tables.
 use std::path::PathBuf;
 
@@ -42,10 +40,7 @@ pub mod mmdb;
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[enum_dispatch(EnrichmentTableConfig)]
-#[configurable(metadata(
-    docs::enum_tag_description = "enrichment table type",
-    docs::required = false,
-))]
+#[configurable(metadata(docs::enum_tag_description = "enrichment table type"))]
 pub enum EnrichmentTables {
     /// Exposes data from a static file as an enrichment table.
     File(file::FileConfig),

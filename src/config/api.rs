@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::net::{Ipv4Addr, SocketAddr};
 
 use url::Url;
@@ -15,7 +13,6 @@ use vector_lib::configurable::configurable_component;
 pub struct Options {
     /// Whether the API is enabled for this Vector instance.
     #[serde(default = "default_enabled")]
-    #[configurable(metadata(docs::required = false))]
     pub enabled: bool,
 
     /// The network address to which the API should bind. If you're running
@@ -24,7 +21,6 @@ pub struct Options {
     #[serde(default = "default_address")]
     #[configurable(metadata(docs::examples = "0.0.0.0:8686"))]
     #[configurable(metadata(docs::examples = "127.0.0.1:1234"))]
-    #[configurable(metadata(docs::required = false))]
     pub address: Option<SocketAddr>,
 }
 
@@ -52,9 +48,12 @@ pub fn default_address() -> Option<SocketAddr> {
 }
 
 /// Default gRPC API address for `vector top` and other API clients
+///
+/// # Panics
+///
+/// Panics if the default API address cannot be formatted into a valid URL, which does not
+/// happen with the built-in default.
 #[must_use]
-// https://github.com/vectordotdev/vector/issues/23659
-#[allow(clippy::missing_panics_doc, reason = "Panic documentation deferred")]
 pub fn default_grpc_url() -> Url {
     let addr = default_address().unwrap();
     Url::parse(&format!("http://{addr}"))
@@ -62,8 +61,12 @@ pub fn default_grpc_url() -> Url {
 }
 
 impl Options {
-    // https://github.com/vectordotdev/vector/issues/23659
-    #[allow(clippy::missing_errors_doc, reason = "Error documentation deferred")]
+    /// Merges `other` into these options, enabling the API if either side enables it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if both sides set different addresses and neither is the default
+    /// address.
     pub fn merge(&mut self, other: Self) -> Result<(), String> {
         // Merge options
 

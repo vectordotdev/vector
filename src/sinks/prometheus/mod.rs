@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 #[cfg(test)]
 use vector_lib::event::Metric;
 use vector_lib::sensitive_string::SensitiveString;

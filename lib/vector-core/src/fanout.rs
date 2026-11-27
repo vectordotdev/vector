@@ -56,7 +56,7 @@ impl Fanout {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
 
         let fanout = Self {
-            senders: Default::default(),
+            senders: IndexMap::default(),
             control_channel: control_rx,
             upstream_component,
         };

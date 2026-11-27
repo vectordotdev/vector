@@ -1,0 +1,5 @@
+{{- /* Hugo handles escaping and line numbers as plain text; vdev adds VRL tokens. */ -}}
+{{- $html := highlight .source "text" (.options | default (dict)) -}}
+{{- $html = replaceRE `(<code\b[^>]*\bclass=")language-text(")` "${1}language-vrl${2}" $html -}}
+{{- $html = replaceRE `(<code\b[^>]*\bdata-lang=")text(")` "${1}vrl${2}" $html -}}
+{{- return ($html | safeHTML) -}}

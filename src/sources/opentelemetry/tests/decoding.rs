@@ -7,6 +7,10 @@ use crate::config::GenerateConfig;
 use crate::sources::opentelemetry::config::OtlpDecodingConfig;
 use vector_lib::codecs::decoding::OtlpSignalType;
 
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Changing this source helper signature is deferred to keep the lint cleanup mechanical. https://github.com/vectordotdev/vector/issues/23659"
+)]
 fn parse(options: Value) -> Result<OpentelemetryConfig, serde_json::Error> {
     let mut value = json!({
         "grpc": {"address": "127.0.0.1:0"},

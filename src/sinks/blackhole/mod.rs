@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 mod config;
 mod sink;
 
@@ -30,7 +28,7 @@ mod tests {
             acknowledgements: AcknowledgementsConfig::default(),
         };
         let sink = BlackholeSink::new(config);
-        let sink = VectorSink::Stream(Box::new(sink));
+        let sink = VectorSink::from_streamsink(sink);
 
         let (_input_lines, events) = random_events_with_stream(100, 10, None);
         run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;

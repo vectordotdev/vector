@@ -21,10 +21,6 @@ impl Configurable for StatusCode {
         Some("http::StatusCode")
     }
 
-    fn is_optional() -> bool {
-        true
-    }
-
     fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("HTTP response status code");

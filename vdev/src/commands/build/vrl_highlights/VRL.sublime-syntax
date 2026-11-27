@@ -1,0 +1,77 @@
+%YAML 1.2
+---
+name: VRL
+file_extensions: [vrl]
+scope: source.vrl
+# Scopes become the website's vrl-* CSS classes.
+contexts:
+  main:
+    - match: '#[^\n]*'
+      scope: comment
+    - match: "\\br'"
+      scope: string-regexp
+      push: regexp
+    - match: "\\bs'"
+      scope: string
+      push: single-string
+    - match: "\\bt'"
+      scope: constant
+      push: timestamp
+    - match: '"'
+      scope: string
+      push: double-string
+    - match: '\b(if|else|return|abort|break)\b'
+      scope: keyword
+    - match: '\b(true|false)\b'
+      scope: boolean
+    - match: '\bnull\b'
+      scope: constant
+    - match: "([.%])([@A-Za-z_][@A-Za-z_0-9]*)"
+      captures:
+        1: variable-builtin
+        2: property
+    - match: '\b([A-Za-z_][A-Za-z_0-9]*)(!)?(?=\s*\()'
+      captures:
+        1: function
+        2: operator
+    - match: '\b[0-9][0-9_]*(?:\.[0-9_]*)?(?![@A-Za-z_0-9])'
+      scope: number
+    - match: '\b[A-Za-z_][A-Za-z_0-9]*\b'
+      scope: variable
+    - match: "[.%]"
+      scope: variable-builtin
+    - match: '[+*/=!<>?&|\-]+'
+      scope: operator
+    - match: '[()\[\]{},:;]'
+      scope: punctuation
+  double-string:
+    - meta_scope: string
+    - match: '\\.'
+      scope: string-escape
+    - match: '\{\{'
+      scope: punctuation
+      push: interpolation
+    - match: '"'
+      pop: true
+  interpolation:
+    - clear_scopes: 1
+    - match: '\}\}'
+      scope: punctuation
+      pop: true
+    - include: main
+  single-string:
+    - meta_scope: string
+    - match: '\\.'
+      scope: string-escape
+    - match: "'"
+      pop: true
+  regexp:
+    - meta_scope: string-regexp
+    - match: '\\.'
+      scope: string-escape
+    - match: "'"
+      pop: true
+  timestamp:
+    - meta_scope: constant
+    - match: "'"
+      pop: true

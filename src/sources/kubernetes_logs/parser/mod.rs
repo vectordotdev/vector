@@ -1,3 +1,4 @@
+use vector_lib::internal_event::emit;
 mod cri;
 mod docker;
 mod test_util;
@@ -11,68 +12,70 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
-#[derive(Clone, Debug)]
-enum ParserState {
+/// Runtime format detected by one parser execution.
+#[derive(Clone, Debug, Default)]
+pub(super) enum ParserState {
     /// Runtime has not yet been detected.
+    #[default]
     Uninitialized,
 
     /// Docker runtime is being used.
-    Docker(docker::Docker),
+    Docker,
 
     /// CRI is being used.
-    Cri(cri::Cri),
+    Cri,
 }
 
 #[derive(Clone, Debug)]
-pub struct Parser {
-    state: ParserState,
+pub(super) struct Parser {
     log_namespace: LogNamespace,
 }
 
 impl Parser {
-    pub const fn new(log_namespace: LogNamespace) -> Self {
-        Self {
-            state: ParserState::Uninitialized,
-            log_namespace,
-        }
+    pub(super) const fn new(log_namespace: LogNamespace) -> Self {
+        Self { log_namespace }
     }
-}
 
-impl FunctionTransform for Parser {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        match &mut self.state {
+    pub(super) fn transform(
+        &self,
+        state: &mut ParserState,
+        output: &mut OutputBuffer,
+        event: Event,
+    ) {
+        match state {
             ParserState::Uninitialized => {
                 let message_field = get_message_path(self.log_namespace);
-                let message = match event.as_log().get(&message_field) {
-                    Some(message) => message,
-                    None => {
-                        emit!(KubernetesLogsFormatPickerEdgeCase {
-                            what: "got an event without a message"
-                        });
-                        return;
-                    }
+                let Some(message) = event.as_log().get(&message_field) else {
+                    emit(KubernetesLogsFormatPickerEdgeCase {
+                        what: "got an event without a message",
+                    });
+                    return;
                 };
 
                 let bytes = match message {
                     Value::Bytes(bytes) => bytes,
                     Value::String(string) => string.as_bytes(),
                     _ => {
-                        emit!(KubernetesLogsFormatPickerEdgeCase {
-                            what: "got an event with non-bytes message"
+                        emit(KubernetesLogsFormatPickerEdgeCase {
+                            what: "got an event with non-bytes message",
                         });
                         return;
                     }
                 };
 
-                self.state = if bytes.len() > 1 && bytes[0] == b'{' {
-                    ParserState::Docker(docker::Docker::new(self.log_namespace))
+                *state = if bytes.len() > 1 && bytes[0] == b'{' {
+                    ParserState::Docker
                 } else {
-                    ParserState::Cri(cri::Cri::new(self.log_namespace))
+                    ParserState::Cri
                 };
-                self.transform(output, event)
+                self.transform(state, output, event);
             }
-            ParserState::Docker(t) => t.transform(output, event),
-            ParserState::Cri(t) => t.transform(output, event),
+            ParserState::Docker => {
+                docker::Docker::new(self.log_namespace).transform(output, event);
+            }
+            ParserState::Cri => {
+                cri::Cri::new(self.log_namespace).transform(output, event);
+            }
         }
     }
 }
@@ -104,10 +107,59 @@ mod tests {
     }
 
     #[test]
+    fn shared_parser_keeps_format_detection_in_each_state() {
+        trace_init();
+        let parser = Parser::new(LogNamespace::Legacy);
+        let mut docker_state = ParserState::default();
+        let mut cri_state = ParserState::default();
+        let (docker_input, docker_expected) = docker::tests::valid_cases(LogNamespace::Legacy)
+            .into_iter()
+            .next()
+            .unwrap();
+        let (cri_input, cri_expected) = cri::tests::valid_cases(LogNamespace::Legacy)
+            .into_iter()
+            .next()
+            .unwrap();
+        let mut output = OutputBuffer::default();
+        parser.transform(
+            &mut docker_state,
+            &mut output,
+            LogEvent::from(docker_input).into(),
+        );
+        assert!(matches!(docker_state, ParserState::Docker));
+        assert_eq!(output.into_events().collect::<Vec<_>>(), docker_expected);
+
+        let mut output = OutputBuffer::default();
+        parser.transform(
+            &mut cri_state,
+            &mut output,
+            LogEvent::from(cri_input.clone()).into(),
+        );
+        assert!(matches!(cri_state, ParserState::Cri));
+        assert_eq!(output.into_events().collect::<Vec<_>>(), cri_expected);
+
+        // Once selected, the format is retained for subsequent events.
+        let mut output = OutputBuffer::default();
+        parser.transform(
+            &mut docker_state,
+            &mut output,
+            LogEvent::from(cri_input).into(),
+        );
+        assert!(matches!(docker_state, ParserState::Docker));
+        assert!(output.is_empty());
+    }
+
+    #[test]
     fn test_parsing_valid_vector_namespace() {
         trace_init();
         test_util::test_parser(
-            || Parser::new(LogNamespace::Vector),
+            |output, event| {
+                Parser::new(LogNamespace::Vector).transform(
+                    &mut ParserState::default(),
+                    output,
+                    event,
+                );
+            },
             |bytes| Event::Log(LogEvent::from(value!(bytes))),
             valid_cases(LogNamespace::Vector),
         );
@@ -117,7 +169,13 @@ mod tests {
     fn test_parsing_valid_legacy_namespace() {
         trace_init();
         test_util::test_parser(
-            || Parser::new(LogNamespace::Legacy),
+            |output, event| {
+                Parser::new(LogNamespace::Legacy).transform(
+                    &mut ParserState::default(),
+                    output,
+                    event,
+                );
+            },
             |bytes| Event::Log(LogEvent::from(bytes)),
             valid_cases(LogNamespace::Legacy),
         );
@@ -130,10 +188,11 @@ mod tests {
         let cases = invalid_cases();
 
         for bytes in cases {
-            let mut parser = Parser::new(LogNamespace::Legacy);
+            let parser = Parser::new(LogNamespace::Legacy);
+            let mut parser_state = ParserState::default();
             let input = LogEvent::from(bytes);
             let mut output = OutputBuffer::default();
-            parser.transform(&mut output, input.into());
+            parser.transform(&mut parser_state, &mut output, input.into());
 
             assert!(output.is_empty(), "Expected no events: {output:?}");
         }
@@ -159,9 +218,10 @@ mod tests {
         ];
 
         for (input, log_namespace) in cases {
-            let mut parser = Parser::new(log_namespace);
+            let parser = Parser::new(log_namespace);
+            let mut parser_state = ParserState::default();
             let mut output = OutputBuffer::default();
-            parser.transform(&mut output, input.into());
+            parser.transform(&mut parser_state, &mut output, input.into());
 
             assert!(output.is_empty(), "Expected no events: {output:?}");
         }

@@ -4,6 +4,7 @@ use vector_lib::{
     codecs::BytesDeserializerConfig,
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
@@ -17,6 +18,9 @@ use crate::{
     shutdown::ShutdownSignal,
     trace::TraceSubscription,
 };
+
+const HOST: &str = "host";
+const PID: &str = "pid";
 
 /// Configuration for the `internal_logs` source.
 #[configurable_component(source(
@@ -50,7 +54,7 @@ pub struct InternalLogsConfig {
 }
 
 fn default_pid_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("pid"))
+    OptionalValuePath::from(owned_value_path!(PID))
 }
 
 impl_generate_config_from_default!(InternalLogsConfig);
@@ -84,14 +88,14 @@ impl InternalLogsConfig {
             .with_source_metadata(
                 InternalLogsConfig::NAME,
                 host_key,
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes().or_undefined(),
-                Some("host"),
+                Some(HOST),
             )
             .with_source_metadata(
                 InternalLogsConfig::NAME,
                 pid_key,
-                &owned_value_path!("pid"),
+                &owned_value_path!(PID),
                 Kind::integer(),
                 None,
             )
@@ -113,7 +117,7 @@ impl SourceConfig for InternalLogsConfig {
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(Box::pin(run(
+        Ok(crate::sources::source_with_error(run(
             host_key,
             pid_key,
             subscription,
@@ -145,7 +149,7 @@ async fn run(
     mut out: SourceSender,
     shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
-) -> Result<(), ()> {
+) -> vector_lib::source_sender::SendResult {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
@@ -166,8 +170,8 @@ async fn run(
         let byte_size = log.estimated_json_encoded_size_of().get();
         let json_byte_size = log.estimated_json_encoded_size_of();
         // This event doesn't emit any log
-        emit!(InternalLogsBytesReceived { byte_size });
-        emit!(InternalLogsEventsReceived {
+        emit(InternalLogsBytesReceived { byte_size });
+        emit(InternalLogsEventsReceived {
             count: 1,
             byte_size: json_byte_size,
         });
@@ -178,7 +182,7 @@ async fn run(
                 InternalLogsConfig::NAME,
                 &mut log,
                 legacy_host_key,
-                path!("host"),
+                path!(HOST),
                 hostname.to_owned(),
             );
         }
@@ -188,7 +192,7 @@ async fn run(
             InternalLogsConfig::NAME,
             &mut log,
             legacy_pid_key,
-            path!("pid"),
+            path!(PID),
             pid,
         );
 
@@ -198,10 +202,10 @@ async fn run(
             Utc::now(),
         );
 
-        if (out.send_event(Event::from(log)).await).is_err() {
+        if let Err(error) = out.send_event(Event::from(log)).await {
             // this wont trigger any infinite loop considering it stops the component
-            emit!(StreamClosedError { count: 1 });
-            return Err(());
+            emit(StreamClosedError { count: 1 });
+            return Err(error);
         }
     }
 
@@ -422,8 +426,7 @@ mod tests {
             .filter(|e| {
                 e.as_log()
                     .get(event_path!("message"))
-                    .map(|m| m.to_string_lossy() == "Repeated test message.")
-                    .unwrap_or(false)
+                    .is_some_and(|m| m.to_string_lossy() == "Repeated test message.")
             })
             .collect();
 
@@ -468,7 +471,7 @@ mod tests {
                     Some("host"),
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -502,7 +505,7 @@ mod tests {
             Some("host"),
         );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     // Verify that broadcast lag is surfaced via `component_discarded_events_total` rather

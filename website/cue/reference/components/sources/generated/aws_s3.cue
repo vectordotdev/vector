@@ -49,7 +49,7 @@ generated: components: sources: aws_s3: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::185fc3d66caef78f8b28ff32"]
 	}
 	endpoint: {
 		description: "Custom endpoint for use with AWS-compatible services."
@@ -170,11 +170,7 @@ generated: components: sources: aws_s3: configuration: {
 			[requester_pays]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/RequesterPaysBuckets.html
 			"""
 		required: false
-		type: string: enum: requester: """
-			Enables retrieving objects from [S3 Requester Pays buckets][requester_pays].
-
-			The requester accepts the S3 request and data transfer charges.
-			"""
+		type: string: enum: requester: "The requester accepts the S3 request and data transfer charges."
 	}
 	sqs: {
 		description: "Configuration options for SQS."
@@ -258,7 +254,7 @@ generated: components: sources: aws_s3: configuration: {
 					Defaults to 10
 
 					Should be set to a smaller value when the files are large to help prevent the ingestion of
-					one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
+					one file from causing the other files to exceed the `visibility_timeout`. Valid values are 1 - 10
 					"""
 				required: false
 				type: uint: {

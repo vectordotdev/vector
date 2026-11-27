@@ -16,7 +16,6 @@
           ],
           "unevaluatedProperties": false,
           "_metadata": {
-            "docs::optional": true,
             "docs::human_name": "Extra"
           }
         },
@@ -40,8 +39,7 @@
         }
       ],
       "_metadata": {
-        "docs::hidden": true,
-        "docs::optional": true
+        "docs::hidden": true
       }
     }
   ],

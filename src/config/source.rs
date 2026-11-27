@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::{cell::RefCell, collections::HashMap, time::Duration};
 
 use async_trait::async_trait;
@@ -20,7 +18,9 @@ use vector_lib::{
 use vector_vrl_metrics::MetricsStorage;
 
 use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
-use crate::{SourceSender, extra_context::ExtraContext, shutdown::ShutdownSignal};
+use vector_lib::extra_context::ExtraContext;
+
+use crate::{SourceSender, shutdown::ShutdownSignal};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
 
@@ -92,6 +92,19 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
     /// If an error occurs while building the source, an error variant explaining the issue is
     /// returned.
     async fn build(&self, cx: SourceContext) -> crate::Result<Source>;
+
+    /// Validates structural constraints on the source configuration that do not require
+    /// environment resources.
+    ///
+    /// Called during config compilation so errors are reported before the topology is built.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        Ok(())
+    }
 
     /// Gets the list of outputs exposed by this source.
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput>;
@@ -220,7 +233,6 @@ impl SourceContext {
         }
 
         config
-            .merge_default(&self.globals.acknowledgements)
             .merge_default(&self.acknowledgements.into())
             .enabled()
     }

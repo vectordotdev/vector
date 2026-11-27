@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use std::collections::HashSet;
 
 use indexmap::IndexMap;

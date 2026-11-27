@@ -1,6 +1,6 @@
 //! Service implementation for the `http` sink.
 
-use std::{collections::BTreeMap, str::FromStr};
+use std::str::FromStr;
 
 use bytes::Bytes;
 use http::{
@@ -16,7 +16,7 @@ use crate::{
         HTTPRequestBuilderSnafu,
         util::{
             UriSerde,
-            http::{HttpRequest, HttpServiceRequestBuilder, OrderedHeaderName},
+            http::{HttpRequest, HttpServiceRequestBuilder},
         },
     },
 };
@@ -25,17 +25,20 @@ use crate::{
 pub(super) struct HttpSinkRequestBuilder {
     method: HttpMethod,
     auth: Option<Auth>,
-    static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
+    static_headers: Vec<(HeaderName, HeaderValue)>,
     content_type: Option<String>,
     content_encoding: Option<String>,
 }
 
 impl HttpSinkRequestBuilder {
-    /// Creates a new `HttpSinkRequestBuilder`
+    /// Creates a new `HttpSinkRequestBuilder`.
+    ///
+    /// `static_headers` are inserted in order, so a later entry replaces an earlier one with the
+    /// same name.
     pub(super) const fn new(
         method: HttpMethod,
         auth: Option<Auth>,
-        static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
+        static_headers: Vec<(HeaderName, HeaderValue)>,
         content_type: Option<String>,
         content_encoding: Option<String>,
     ) -> Self {
@@ -56,13 +59,11 @@ impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
     ) -> Result<Request<Bytes>, crate::Error> {
         let metadata = request.get_additional_metadata();
         let uri_serde = UriSerde::from_str(&metadata.uri)?;
-        let uri_auth = uri_serde.auth;
-        let uri = uri_serde.uri;
 
-        let auth = self.auth.choose_one(&uri_auth)?;
+        let auth = self.auth.choose_one(&uri_serde.auth)?;
 
         let method: Method = self.method.into();
-        let mut builder = Request::builder().method(method).uri(uri);
+        let mut builder = Request::builder().method(method).uri(uri_serde.uri);
 
         if let Some(content_type) = &self.content_type {
             builder = builder.header(CONTENT_TYPE, content_type);
@@ -79,7 +80,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
 
         // Static headers from config
         for (header_name, header_value) in &self.static_headers {
-            headers.insert(header_name.inner(), header_value.clone());
+            headers.insert(header_name.clone(), header_value.clone());
         }
 
         // Template headers from the partition key

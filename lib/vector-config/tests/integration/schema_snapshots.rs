@@ -256,7 +256,6 @@ fn flattened_optional_field_docs_stay_on_wrapper() {
         Some("Not shown in docs.")
     );
     assert_eq!(wrapper["_metadata"]["docs::hidden"], true);
-    assert_eq!(wrapper["_metadata"]["docs::optional"], true);
 }
 
 #[test]

@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 use vector_lib::{config::LogNamespace, configurable::configurable_component};
 
 pub(crate) use crate::schema::Definition;

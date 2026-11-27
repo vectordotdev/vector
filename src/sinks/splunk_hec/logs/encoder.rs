@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use serde::Serialize;
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, codecs::Transformer, config::telemetry,
+    EstimatedJsonEncodedSizeOf, codecs::Transformer, config::telemetry, internal_event::emit,
     request_metadata::GroupedCountByteSize,
 };
 
@@ -92,7 +92,7 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                             HecEvent::Json(
                                 serializer
                                     .to_json_value(event)
-                                    .map_err(|error| emit!(SplunkEventEncodeError { error }))
+                                    .map_err(|error| emit(SplunkEventEncodeError { error }))
                                     .ok()?,
                             )
                         } else {
@@ -121,8 +121,8 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                         match serde_json::to_vec(&hec_data) {
                             Ok(value) => Some(value),
                             Err(error) => {
-                                emit!(SplunkEventEncodeError {
-                                    error: error.into()
+                                emit(SplunkEventEncodeError {
+                                    error: error.into(),
                                 });
                                 None
                             }

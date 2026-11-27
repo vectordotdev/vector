@@ -1,5 +1,3 @@
-#![warn(clippy::pedantic)]
-
 //! The Zerobus sink.
 //!
 //! This sink streams observability data to Databricks Unity Catalog tables

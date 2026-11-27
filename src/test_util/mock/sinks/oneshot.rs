@@ -63,11 +63,11 @@ impl ValidatedSink for OneshotSinkConfig {
             let mut guard = self.tx.lock().expect("who cares if the lock is poisoned");
             guard.take()
         };
-        let sink = Box::new(OneshotSink { tx });
+        let sink = OneshotSink { tx };
 
         let healthcheck = Box::pin(async { Ok(()) });
 
-        Ok((VectorSink::Stream(sink), healthcheck))
+        Ok((VectorSink::from_streamsink(sink), healthcheck))
     }
 }
 

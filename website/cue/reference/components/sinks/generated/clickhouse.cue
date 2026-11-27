@@ -51,15 +51,8 @@ generated: components: sinks: clickhouse: configuration: {
 				type: bool: default: false
 			}
 			codec: {
-				description: """
-					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
-
-					This is the streaming variant of the Arrow IPC format, which writes
-					a continuous stream of record batches.
-
-					[apache_arrow]: https://arrow.apache.org/
-					"""
-				required: true
+				description: "The codec to use for batch encoding events."
+				required:    true
 				type: string: enum: arrow_stream: """
 					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
 
