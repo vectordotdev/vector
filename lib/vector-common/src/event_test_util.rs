@@ -7,6 +7,18 @@ thread_local! {
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
 }
 
+/// Returns number of times the event name pattern is matched.
+#[must_use]
+pub fn contains_name_count(pattern: &str) -> usize {
+    EVENTS_RECORDED.with(|events| {
+        let events = events.borrow();
+        events
+            .iter()
+            .filter(|event| event_name_matches(event, pattern))
+            .count()
+    })
+}
+
 /// Returns Ok(()) if the event name pattern is matched only once.
 ///
 /// # Errors
