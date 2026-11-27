@@ -3,7 +3,10 @@ use std::{sync::Arc, time::Instant};
 use async_recursion::async_recursion;
 use tokio::sync::Mutex;
 use tracing::Span;
-use vector_common::internal_event::{InternalEventHandle, Registered, register};
+use vector_common::{
+    finalization::EventStatus,
+    internal_event::{InternalEventHandle, Registered, register},
+};
 
 use super::limited_queue::LimitedSender;
 use crate::{
@@ -76,22 +79,32 @@ where
                     writer.track_dropped(pre_count, pre_size);
                     return Ok(TryWriteOutcome::Dropped);
                 };
-                if item.event_count() as u64 != pre_count {
-                    let dropped_events = pre_count - item.event_count() as u64;
-                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
-                    writer.track_dropped(dropped_events, dropped_bytes);
+                let item_size = track_filter_drops(&writer, &item, pre_count, pre_size);
+
+                let max_record_size = writer.max_record_size();
+                if item_size <= max_record_size {
+                    return writer
+                        .write_record_outcome(item)
+                        .await
+                        .map_err(unrecoverable_writer_error);
                 }
 
-                writer.write_record_outcome(item).await.map_err(|e| {
-                    // Record-level failures that can never succeed (a record too large to encode
-                    // within the max record size) are handled inside the writer and surfaced as a
-                    // dropped outcome. Anything that reaches this point -- I/O errors,
-                    // serialization failures, an inconsistent writer state -- is genuinely
-                    // unrecoverable.
-                    error!("Disk buffer writer has encountered an unrecoverable error.");
-
-                    e.into()
-                })
+                // Every piece is written, waiting for room as needed, so the item counts as written
+                // if any part of it made it to disk. Pieces the writer drops are already accounted
+                // for in its ledger.
+                let mut outcome = TryWriteOutcome::Dropped;
+                let mut pieces = split_to_fit(item, item_size, max_record_size).into_iter();
+                while let Some(piece) = pieces.next() {
+                    match writer.write_record_outcome(piece).await {
+                        Ok(TryWriteOutcome::Written) => outcome = TryWriteOutcome::Written,
+                        Ok(_) => {}
+                        Err(error) => {
+                            error_unwritten_pieces(pieces);
+                            return Err(unrecoverable_writer_error(error));
+                        }
+                    }
+                }
+                Ok(outcome)
             }
         }
     }
@@ -119,22 +132,35 @@ where
                     writer.track_dropped(pre_count, pre_size);
                     return Ok(TryWriteOutcome::Dropped);
                 };
-                if item.event_count() as u64 != pre_count {
-                    let dropped_events = pre_count - item.event_count() as u64;
-                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
-                    writer.track_dropped(dropped_events, dropped_bytes);
+                let item_size = track_filter_drops(&writer, &item, pre_count, pre_size);
+
+                let max_record_size = writer.max_record_size();
+                if item_size <= max_record_size {
+                    return writer
+                        .try_write_record(item)
+                        .await
+                        .map_err(unrecoverable_writer_error);
                 }
 
-                writer.try_write_record(item).await.map_err(|e| {
-                    // Record-level failures that can never succeed (a record too large to encode
-                    // within the max record size) are handled inside the writer and surfaced as a
-                    // dropped outcome. Anything that reaches this point -- I/O errors,
-                    // serialization failures, an inconsistent writer state -- is genuinely
-                    // unrecoverable.
-                    error!("Disk buffer writer has encountered an unrecoverable error.");
-
-                    e.into()
-                })
+                // Pieces are written in order until one does not fit. Everything from that piece
+                // on is rejoined and handed back as `Full`, so the caller drops or overflows only
+                // what is not on disk, and in the original order.
+                let mut outcome = TryWriteOutcome::Dropped;
+                let mut pieces = split_to_fit(item, item_size, max_record_size).into_iter();
+                while let Some(piece) = pieces.next() {
+                    match writer.try_write_record(piece).await {
+                        Ok(TryWriteOutcome::Written) => outcome = TryWriteOutcome::Written,
+                        Ok(TryWriteOutcome::Dropped) => {}
+                        Ok(TryWriteOutcome::Full(piece)) => {
+                            return Ok(TryWriteOutcome::Full(pieces.fold(piece, T::rejoin)));
+                        }
+                        Err(error) => {
+                            error_unwritten_pieces(pieces);
+                            return Err(unrecoverable_writer_error(error));
+                        }
+                    }
+                }
+                Ok(outcome)
             }
         }
     }
@@ -171,6 +197,96 @@ where
             Self::DiskV2(writer) => writer.try_lock().ok().map(|writer| writer.usage_snapshot()),
         }
     }
+}
+
+/// Reports the sub-items `filter_unencodable` removed from an item that held `pre_count` events
+/// of `pre_size` bytes, and returns the size of what is left.
+fn track_filter_drops<T>(
+    writer: &disk_v2::BufferWriter<T, ProductionFilesystem>,
+    item: &T,
+    pre_count: u64,
+    pre_size: u64,
+) -> usize
+where
+    T: Bufferable,
+{
+    if item.event_count() as u64 == pre_count {
+        // `pre_size` came from a `usize`; if it somehow does not fit, treating the item as huge
+        // only sends it down the split path, which measures the pieces again.
+        return usize::try_from(pre_size).unwrap_or(usize::MAX);
+    }
+    let item_size = item.size_of();
+    let dropped_events = pre_count - item.event_count() as u64;
+    let dropped_bytes = pre_size.saturating_sub(item_size as u64);
+    writer.track_dropped(dropped_events, dropped_bytes);
+    item_size
+}
+
+/// Splits `item`, whose in-memory size is `item_size`, into pieces of at most `max_record_size`
+/// bytes each, in their original order.
+///
+/// The disk buffer writes an item as a single record and drops the whole record when it encodes
+/// to more than `max_record_size`, taking every event in it along. Splitting first means only an
+/// event that is too large on its own is lost. The in-memory size stands in for the encoded size,
+/// which is not known until the item is consumed by encoding. It is normally the larger of the two
+/// for events; a piece that still encodes over the limit is dropped by the writer, as any oversized
+/// record was before. Only oversized items pay for the extra size walks.
+fn split_to_fit<T>(item: T, item_size: usize, max_record_size: usize) -> Vec<T>
+where
+    T: Bufferable,
+{
+    fn split_into<T: Bufferable>(item: T, item_size: usize, max: usize, pieces: &mut Vec<T>) {
+        if item_size <= max {
+            pieces.push(item);
+            return;
+        }
+        match item.split_in_half() {
+            Ok((front, back)) => {
+                let (front_size, back_size) = (front.size_of(), back.size_of());
+                split_into(front, front_size, max, pieces);
+                split_into(back, back_size, max, pieces);
+            }
+            // A single sub-item over the limit; the writer drops it as unwritable.
+            Err(item) => pieces.push(item),
+        }
+    }
+
+    let mut pieces = Vec::new();
+    split_into(item, item_size, max_record_size, &mut pieces);
+    if pieces.len() > 1 {
+        debug!(
+            message =
+                "Split an item over the maximum record size into several disk buffer records.",
+            item_size,
+            max_record_size,
+            records = pieces.len(),
+        );
+    }
+    pieces
+}
+
+/// Resolves the finalizers of split pieces that will never be written as errored.
+///
+/// The writer errors the finalizers of the piece whose write failed, but pieces after it are never
+/// handed to the writer. Dropped as they are, their finalizers would keep their default
+/// `EventStatus::Dropped`, which acknowledging sources treat as delivered, and they would
+/// acknowledge or checkpoint events that never reached disk.
+fn error_unwritten_pieces<T: Bufferable>(pieces: impl IntoIterator<Item = T>) {
+    for mut piece in pieces {
+        piece
+            .take_finalizer_groups()
+            .update_status(EventStatus::Errored);
+    }
+}
+
+/// Record-level failures that can never succeed (a record too large to encode within the max
+/// record size) are handled inside the writer and surfaced as a dropped outcome. Anything that
+/// reaches this point -- I/O errors, serialization failures, an inconsistent writer state -- is
+/// genuinely unrecoverable.
+fn unrecoverable_writer_error<T: Bufferable>(e: disk_v2::WriterError<T>) -> vector_common::Error {
+    error!("Disk buffer writer has encountered an unrecoverable error.");
+
+    e.into()
 }
 
 enum UsageAccounting {
@@ -414,9 +530,30 @@ mod tests {
 
     use tempfile::tempdir;
     use tracing::Span;
+    use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus};
 
-    use super::SenderAdapter;
+    use super::{SenderAdapter, error_unwritten_pieces};
     use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull, test::SizedRecord};
+
+    #[tokio::test]
+    async fn unwritten_pieces_resolve_as_errored() {
+        let mut receivers = Vec::new();
+        let pieces: Vec<_> = (0..2)
+            .map(|value| {
+                let (batch, receiver) = BatchNotifier::new_with_receiver();
+                let mut piece = SizedRecord::new(value);
+                piece.add_batch_notifier(batch);
+                receivers.push(receiver);
+                piece
+            })
+            .collect();
+
+        error_unwritten_pieces(pieces);
+
+        for receiver in receivers {
+            assert_eq!(receiver.await, BatchStatus::Errored);
+        }
+    }
 
     #[tokio::test]
     async fn busy_disk_stage_makes_diagnostic_snapshot_unavailable() {
