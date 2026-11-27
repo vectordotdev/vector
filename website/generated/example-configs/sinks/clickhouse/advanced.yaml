@@ -8,6 +8,9 @@ sinks:
     database: mydatabase
     date_time_best_effort: false
     endpoint: http://localhost:8123
+    extra_query_params:
+      deduplicate_blocks_in_dependent_materialized_views: "0"
+      insert_quorum: "2"
     format: json_each_row
     insert_random_shard: false
     skip_unknown_fields: false
