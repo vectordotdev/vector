@@ -104,6 +104,36 @@ In CI, a Vector-team member can submit a PR review starting with
 The merge queue runs it automatically when the paths in
 [test.yaml](config/test.yaml) change.
 
+## Typed round-trip contract
+
+[`traces/contract.rs`](../datadog/traces/contract.rs) defines a separate, offline
+comparison for the [RFC's Datadog round-trip guarantee](../../../rfcs/2026-04-29-25329-trace-data-model/datadog-mapping.md).
+Its expectations come from the RFC, not from the legacy relay or a typed mapping's
+current output. Synthetic tests run without Docker:
+
+```shell
+make test FEATURES="e2e-tests-datadog,typed-trace" SCOPE="--test e2e datadog::traces::contract::"
+```
+
+The comparator covers Agent, tracer and chunk context alongside every span, link and
+event field. It allows envelope regrouping, cross-service interleaving changes and
+splitting multi-trace chunks, while preserving span multiplicity, distinct chunks and
+span order within each service partition. It compares doubles by their bits, including
+NaN payloads and signed zero. Only input-derived expectations receive the RFC's explicit
+normalizations; actual output is not repaired before comparison. Indexed input or output
+is rejected because this suite captures standard payloads only.
+
+This is an oracle, not yet a captured-input typed replay test. A mapping PR can call
+`contract::compare(&input, &output)` from this test module after passing the captured
+`input` through production typed decoding and encoding, and fail on every returned
+difference or error. The live relay's `compare` function is intentionally separate.
+Do not use the legacy source's lossy intermediate layout as the expected output, or add
+exceptions for losses that the RFC does not declare.
+
+Production replay wiring and the deliberately broken production-mapping check remain
+blocked on a callable direct `AgentPayload`-to-typed decoder. The synthetic mutation
+tests verify the comparator, not the production conversion.
+
 ## Known gaps
 
 - Span-level only: Agent envelope, tracer payload and chunk fields are not compared yet.
