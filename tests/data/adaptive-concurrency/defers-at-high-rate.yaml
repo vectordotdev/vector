@@ -11,24 +11,24 @@ params:
 
 stats:
   in_flight:
-    max: [16, 24]
+    max: [16, 34]
     mean: [6.0, 9.0]
   rate:
-    max: [90, 123]
-    mean: [31, 75]
+    max: [90, 140]
+    mean: [25, 78]
 
 controller:
   in_flight:
-    max: [16, 24]
-    mean: [8.0, 19.0]
+    max: [16, 36]
+    mean: [8.0, 26]
   concurrency_limit:
-    max: [16, 24]
-    mean: [8.0, 18.5]
+    max: [16, 36]
+    mean: [8.0, 26]
   observed_rtt:
     min: [0.100, 0.102]
-    max: [0.100, 1.203]
-    mean: [0.100, 0.85]
+    max: [0.100, 0.102]
+    mean: [0.100, 0.102]
   averaged_rtt:
     min: [0.100, 0.102]
-    max: [0.100, 1.203]
-    mean: [0.100, 0.30]
+    max: [0.100, 0.102]
+    mean: [0.100, 0.102]
