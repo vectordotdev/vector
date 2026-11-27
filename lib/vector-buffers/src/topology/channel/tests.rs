@@ -1,13 +1,20 @@
 use std::{
+    num::NonZeroUsize,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use tokio::{pin, sync::Barrier, time::sleep};
+use vector_common::finalization::{
+    AddBatchNotifier, BatchNotifier, BatchStatus, BatchStatusReceiver,
+};
 
 use crate::{
     Bufferable, WhenFull,
+    buffer_usage_data::BufferUsageHandle,
+    test::SizedRecord,
     topology::{
+        builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
         test_util::{assert_current_send_capacity, build_buffer},
     },
@@ -132,6 +139,63 @@ async fn test_sender_drop_newest() {
     let mut results: Vec<u64> = drain_receiver(tx, rx).await;
     results.sort_unstable();
     assert_eq!(results, vec![1, 2, 3]);
+}
+
+/// Builds a memory buffer of `SizedRecord`, which tracks its finalizers so the acknowledgement
+/// status of shed events can be observed.
+fn build_finalizable_memory_buffer(
+    capacity: usize,
+    mode: WhenFull,
+) -> (BufferSender<SizedRecord>, BufferReceiver<SizedRecord>) {
+    TopologyBuilder::standalone_memory_test(
+        NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
+        mode,
+        BufferUsageHandle::noop(),
+        None,
+    )
+}
+
+fn record_with_notifier(value: u32) -> (SizedRecord, BatchStatusReceiver) {
+    let (batch, status) = BatchNotifier::new_with_receiver();
+    let mut record = SizedRecord::new(value);
+    record.add_batch_notifier(batch);
+    (record, status)
+}
+
+#[tokio::test]
+async fn test_sender_reject_memory_sheds_as_errored() {
+    // `reject` marks shed events as errored for memory buffers too (not just disk), so the source
+    // observes the drop as a delivery failure rather than the default `Dropped`/delivered rollup.
+    let (mut tx, rx) = build_finalizable_memory_buffer(1, WhenFull::Reject);
+
+    // The first event fits and passes through untouched.
+    let (first, _first_status) = record_with_notifier(1);
+    assert!(tx.send(first, None).await.is_ok());
+
+    // The buffer is now full, so the second event is shed and marked errored.
+    let (second, second_status) = record_with_notifier(2);
+    assert!(tx.send(second, None).await.is_ok());
+    assert_eq!(second_status.await, BatchStatus::Errored);
+
+    drop(tx);
+    drop(rx);
+}
+
+#[tokio::test]
+async fn test_sender_drop_newest_memory_sheds_as_delivered() {
+    // Contrast with `reject`: `drop_newest` remains best-effort and rolls a shed event up as
+    // delivered (its finalizers default to `Dropped`), for memory and disk alike.
+    let (mut tx, rx) = build_finalizable_memory_buffer(1, WhenFull::DropNewest);
+
+    let (first, _first_status) = record_with_notifier(1);
+    assert!(tx.send(first, None).await.is_ok());
+
+    let (second, second_status) = record_with_notifier(2);
+    assert!(tx.send(second, None).await.is_ok());
+    assert_eq!(second_status.await, BatchStatus::Delivered);
+
+    drop(tx);
+    drop(rx);
 }
 
 #[tokio::test]
