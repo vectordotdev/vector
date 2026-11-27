@@ -49,6 +49,8 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
             key_file,
             key_pass,
             server_name,
+            min_version: _,
+            max_version: _,
         } = tls_config;
 
         if verify_certificate.is_some()

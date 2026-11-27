@@ -200,6 +200,13 @@ impl ValidatedSink for DatabendConfig {
         }
         let transformer = encoding.transformer();
 
+        vector_lib::tls::enforce_protocol_version_bounds(
+            self.tls.as_ref().and_then(|tls| tls.min_version),
+            self.tls.as_ref().and_then(|tls| tls.max_version),
+            "databend-client",
+            vector_lib::tls::TLS12_TO_TLS13,
+        )?;
+
         Ok(ValidatedDatabend {
             endpoint,
             request_settings,
