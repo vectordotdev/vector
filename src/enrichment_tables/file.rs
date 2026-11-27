@@ -1,6 +1,7 @@
 //! Handles enrichment tables for `type = file`.
-use std::{collections::HashMap, fs, hash::Hasher, path::PathBuf, time::SystemTime};
+use std::{collections::HashMap, fs, hash::Hasher, path::PathBuf, sync::Arc, time::SystemTime};
 
+use arc_swap::ArcSwap;
 use bytes::Bytes;
 use tracing::trace;
 use vector_lib::{
@@ -247,8 +248,8 @@ impl EnrichmentTableConfig for FileConfig {
         &self,
         globals: &crate::config::GlobalOptions,
         _prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
-    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        Ok(Box::new(File::new(
+    ) -> crate::Result<Arc<dyn Table>> {
+        Ok(Arc::new(File::new(
             self.clone(),
             self.load_file(globals.timezone())?,
         )))
@@ -268,16 +269,15 @@ pub struct FileData {
 }
 
 /// Maps a hash of the indexed field values to the matching row numbers.
-type FieldIndex = HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>;
+type FieldIndex = HashMap<u64, Arc<[usize]>, hash_hasher::HashBuildHasher>;
 
 /// A struct that implements [`vector_lib::enrichment::Table`] to handle loading enrichment data from a CSV file.
-#[derive(Clone)]
 pub struct File {
     config: FileConfig,
     last_modified: SystemTime,
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
-    indexes: Vec<(Case, Vec<usize>, FieldIndex)>,
+    indexes: ArcSwap<Vec<(Case, Vec<usize>, FieldIndex)>>,
 }
 
 impl File {
@@ -289,7 +289,7 @@ impl File {
             last_modified: data.modified,
             data: data.data,
             headers: data.headers,
-            indexes: Vec::new(),
+            indexes: ArcSwap::from_pointee(Vec::new()),
         }
     }
 
@@ -411,10 +411,11 @@ impl File {
     ///
     /// Ensure fields that are searched via a comparison are not included in the index!
     fn index_data(&self, fieldidx: &[usize], case: Case) -> Result<FieldIndex, Error> {
-        let mut index = HashMap::with_capacity_and_hasher(
-            self.data.len(),
-            hash_hasher::HashBuildHasher::default(),
-        );
+        let mut rows: HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher> =
+            HashMap::with_capacity_and_hasher(
+                self.data.len(),
+                hash_hasher::HashBuildHasher::default(),
+            );
 
         for (idx, row) in self.data.iter().enumerate() {
             let mut hash = seahash::SeaHasher::default();
@@ -425,13 +426,15 @@ impl File {
 
             let key = hash.finish();
 
-            let entry = index.entry(key).or_insert_with(Vec::new);
-            entry.push(idx);
+            rows.entry(key).or_default().push(idx);
         }
 
-        index.shrink_to_fit();
+        rows.shrink_to_fit();
 
-        Ok(index)
+        Ok(rows
+            .into_iter()
+            .map(|(key, rows)| (key, Arc::<[usize]>::from(rows)))
+            .collect())
     }
 
     /// Sequentially searches through the iterator for the given condition.
@@ -460,7 +463,7 @@ impl File {
         case: Case,
         condition: &'a [Condition<'a>],
         handle: IndexHandle,
-    ) -> Result<Option<&'a Vec<usize>>, Error> {
+    ) -> Result<Option<Arc<[usize]>>, Error> {
         // The index to use has been passed, we can use this to search the data.
         // We are assuming that the caller has passed an index that represents the fields
         // being passed in the condition.
@@ -477,7 +480,7 @@ impl File {
         let key = hash.finish();
 
         let IndexHandle(handle) = handle;
-        Ok(self.indexes[handle].2.get(&key))
+        Ok(self.indexes.load()[handle].2.get(&key).cloned())
     }
 
     fn indexed_with_wildcard<'a>(
@@ -486,7 +489,7 @@ impl File {
         wildcard: &'a Value,
         condition: &'a [Condition<'a>],
         handle: IndexHandle,
-    ) -> Result<Option<&'a Vec<usize>>, Error> {
+    ) -> Result<Option<Arc<[usize]>>, Error> {
         if let Some(result) = self.indexed(case, condition, handle)? {
             return Ok(Some(result));
         }
@@ -503,7 +506,7 @@ impl File {
 
         let wildcard_key = wildcard_hash.finish();
         let IndexHandle(handle) = handle;
-        Ok(self.indexes[handle].2.get(&wildcard_key))
+        Ok(self.indexes.load()[handle].2.get(&wildcard_key).cloned())
     }
 }
 
@@ -570,14 +573,13 @@ impl Table for File {
                 single_or_err(self.sequential(self.data.iter(), case, condition, select, wildcard))
             }
             Some(handle) => {
-                let result = if let Some(wildcard) = wildcard {
+                let rows = if let Some(wildcard) = wildcard {
                     self.indexed_with_wildcard(case, wildcard, condition, handle)?
                 } else {
                     self.indexed(case, condition, handle)?
                 }
-                .ok_or(Error::NoRowsFound)?
-                .iter()
-                .map(|idx| &self.data[*idx]);
+                .ok_or(Error::NoRowsFound)?;
+                let result = rows.iter().map(|idx| &self.data[*idx]);
 
                 // Perform a sequential scan over the indexed result.
                 single_or_err(self.sequential(result, case, condition, select, wildcard))
@@ -623,10 +625,10 @@ impl Table for File {
         }
     }
 
-    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
+    fn add_index(&self, case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         let normalized = self.normalize_index_fields(fields)?;
-        if let Some(pos) = self
-            .indexes
+        let mut indexes = self.indexes.load_full();
+        if let Some(pos) = indexes
             .iter()
             .position(|index| index.0 == case && index.1 == normalized)
         {
@@ -634,15 +636,21 @@ impl Table for File {
             Ok(IndexHandle(pos))
         } else {
             let index = self.index_data(&normalized, case)?;
-            self.indexes.push((case, normalized, index));
+            // The index list is shared with readers that are already using this table, so
+            // publishing a new list keeps them on the indexes they started with.
+            let entries = Arc::make_mut(&mut indexes);
+            entries.push((case, normalized, index));
             // The returned index handle is the position of the index in our list of indexes.
-            Ok(IndexHandle(self.indexes.len() - 1))
+            let handle = IndexHandle(entries.len() - 1);
+            self.indexes.store(indexes);
+            Ok(handle)
         }
     }
 
     /// Returns a list of the field names that are in each index
     fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
         self.indexes
+            .load()
             .iter()
             .map(|index| {
                 let (case, fields, _) = index;
@@ -671,7 +679,7 @@ impl std::fmt::Debug for File {
             f,
             "File {} row(s) {} index(es)",
             self.data.len(),
-            self.indexes.len()
+            self.indexes.load().len()
         )
     }
 }
@@ -919,7 +927,7 @@ mod tests {
 
     #[test]
     fn duplicate_indexes() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -936,12 +944,12 @@ mod tests {
         let handle2 = file.add_index(Case::Sensitive, &["field3", "field2"]);
 
         assert_eq!(handle1, handle2);
-        assert_eq!(1, file.indexes.len());
+        assert_eq!(1, file.indexes.load().len());
     }
 
     #[test]
     fn errors_on_missing_columns() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -965,7 +973,7 @@ mod tests {
 
     #[test]
     fn finds_row_with_index() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -995,7 +1003,7 @@ mod tests {
 
     #[test]
     fn finds_row_with_index_case_sensitive_and_wildcard() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -1032,7 +1040,7 @@ mod tests {
 
     #[test]
     fn finds_rows_with_index_case_sensitive() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -1087,7 +1095,7 @@ mod tests {
 
     #[test]
     fn selects_columns() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -1135,7 +1143,7 @@ mod tests {
     #[test]
     fn case_insensitive_lookup_accepts_strings_and_bytes() {
         for value in [Value::from("ZiP"), Value::Bytes("ZiP".into())] {
-            let mut file = File::new(
+            let file = File::new(
                 FileConfig::default(),
                 FileData {
                     modified: SystemTime::now(),
@@ -1204,7 +1212,7 @@ mod tests {
 
     #[test]
     fn finds_rows_with_index_case_insensitive() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -1268,7 +1276,7 @@ mod tests {
 
     #[test]
     fn finds_rows_with_index_case_insensitive_and_wildcard() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -1332,7 +1340,7 @@ mod tests {
 
     #[test]
     fn finds_row_between_dates() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -1399,7 +1407,7 @@ mod tests {
 
     #[test]
     fn finds_row_from_date() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -1462,7 +1470,7 @@ mod tests {
 
     #[test]
     fn finds_row_to_date() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -1550,7 +1558,7 @@ mod tests {
 
     #[test]
     fn doesnt_find_row_with_index() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),
@@ -1577,7 +1585,7 @@ mod tests {
 
     #[test]
     fn doesnt_find_row_with_index_and_wildcard() {
-        let mut file = File::new(
+        let file = File::new(
             FileConfig::default(),
             FileData {
                 modified: SystemTime::now(),

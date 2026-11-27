@@ -64,11 +64,11 @@ pub use loading::{
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
-pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
+pub use sink::{SharedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use sink_validated::{DynValidatedSink, ValidatedSink};
-pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
+pub use source::{SharedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
-    BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
+    SharedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
 };
 pub use unit_test::{UnitTestResult, build_unit_tests, build_unit_tests_main};
 pub use unix::UnixOnly;

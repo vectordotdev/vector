@@ -336,72 +336,17 @@ impl tokio_util::codec::Encoder<Event> for Encoder<()> {
 
 #[cfg(test)]
 mod tests {
-    use bytes::BufMut;
     use futures::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
     use vector_core::event::LogEvent;
 
     use super::*;
-    use crate::encoding::BoxedFramingError;
-
-    #[derive(Debug, Clone)]
-    struct ParenEncoder;
-
-    impl ParenEncoder {
-        pub(super) const fn new() -> Self {
-            Self
-        }
-    }
-
-    impl tokio_util::codec::Encoder<()> for ParenEncoder {
-        type Error = BoxedFramingError;
-
-        fn encode(&mut self, (): (), dst: &mut BytesMut) -> Result<(), Self::Error> {
-            dst.reserve(2);
-            let inner = dst.split();
-            dst.put_u8(b'(');
-            dst.unsplit(inner);
-            dst.put_u8(b')');
-            Ok(())
-        }
-    }
-
-    #[derive(Debug, Clone)]
-    struct ErrorNthEncoder<T>(T, usize, usize)
-    where
-        T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>;
-
-    impl<T> ErrorNthEncoder<T>
-    where
-        T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>,
-    {
-        pub(super) const fn new(encoder: T, n: usize) -> Self {
-            Self(encoder, 0, n)
-        }
-    }
-
-    impl<T> tokio_util::codec::Encoder<()> for ErrorNthEncoder<T>
-    where
-        T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>,
-    {
-        type Error = BoxedFramingError;
-
-        fn encode(&mut self, (): (), dst: &mut BytesMut) -> Result<(), Self::Error> {
-            self.0.encode((), dst)?;
-            let result = if self.1 == self.2 {
-                Err(Box::new(std::io::Error::other("error")) as _)
-            } else {
-                Ok(())
-            };
-            self.1 += 1;
-            result
-        }
-    }
+    use crate::encoding::framing::TestFramer;
 
     #[tokio::test]
     async fn test_encode_events_sink_empty() {
         let encoder = Encoder::<Framer>::new(
-            Framer::Boxed(Box::new(ParenEncoder::new())),
+            Framer::Test(TestFramer::parenthesize()),
             crate::encoding::TextSerializerConfig::default()
                 .build()
                 .into(),
@@ -422,7 +367,7 @@ mod tests {
     #[tokio::test]
     async fn test_encode_events_sink_non_empty() {
         let encoder = Encoder::<Framer>::new(
-            Framer::Boxed(Box::new(ParenEncoder::new())),
+            Framer::Test(TestFramer::parenthesize()),
             crate::encoding::TextSerializerConfig::default()
                 .build()
                 .into(),
@@ -443,7 +388,7 @@ mod tests {
     #[tokio::test]
     async fn test_encode_events_sink_empty_handle_framing_error() {
         let encoder = Encoder::<Framer>::new(
-            Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
+            Framer::Test(TestFramer::parenthesize_after(1)),
             crate::encoding::TextSerializerConfig::default()
                 .build()
                 .into(),
@@ -465,7 +410,7 @@ mod tests {
     #[tokio::test]
     async fn test_encode_events_sink_non_empty_handle_framing_error() {
         let encoder = Encoder::<Framer>::new(
-            Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
+            Framer::Test(TestFramer::parenthesize_after(1)),
             crate::encoding::TextSerializerConfig::default()
                 .build()
                 .into(),

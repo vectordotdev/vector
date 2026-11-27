@@ -18,7 +18,6 @@ chrono-tz.workspace = true
 cidr = { version = "0.3.1", default-features = false, features = ["std"] }
 crossbeam-utils.workspace = true
 derivative.workspace = true
-dyn-clone = { version = "1.0.20", default-features = false }
 enumflags2 = { version = "0.7.12", default-features = false }
 float_eq = { version = "1.0", default-features = false }
 futures.workspace = true

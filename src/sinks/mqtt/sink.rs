@@ -164,7 +164,7 @@ mod tests {
     use super::drive_event_loop;
     use crate::{
         common::mqtt::MqttCommonConfig,
-        config::{ComponentKey, Config, SinkConfig, SinkContext},
+        config::{ComponentKey, Config, SharedSink, SinkConfig, SinkContext},
         event::{Event, LogEvent},
         sinks::{
             VectorSink,
@@ -389,10 +389,11 @@ mod tests {
                 config.add_source("input", source);
                 config.add_sink("mqtt", &["input"], mqtt.clone());
                 let mut replacement = config.clone();
-                replacement.sinks[&ComponentKey::from("mqtt")].inner = Box::new(MqttSinkConfig {
-                    retain: true,
-                    ..mqtt
-                });
+                replacement.sinks[&ComponentKey::from("mqtt")].inner =
+                    SharedSink::new(MqttSinkConfig {
+                        retain: true,
+                        ..mqtt
+                    });
                 let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
                 input
                     .send_event(Event::Log(LogEvent::from("before reload")))

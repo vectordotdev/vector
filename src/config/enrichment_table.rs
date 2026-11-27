@@ -9,7 +9,7 @@ use vector_lib::{
     id::{ComponentKey, Inputs},
 };
 
-use super::{SinkConfig, SinkOuter, SourceConfig, SourceOuter, dot_graph::GraphConfig};
+use super::{SharedSink, SharedSource, SinkOuter, SourceOuter, dot_graph::GraphConfig};
 use crate::enrichment_tables::EnrichmentTables;
 
 /// Fully resolved enrichment table component.
@@ -173,24 +173,18 @@ pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync
         &self,
         globals: &GlobalOptions,
         prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
-    ) -> crate::Result<Box<dyn vector_lib::enrichment::Table + Send + Sync>>;
+    ) -> crate::Result<Arc<dyn vector_lib::enrichment::Table>>;
 
     /// Checks whether this table wants previous state, to try and restore it.
     fn wants_previous_state(&self) -> bool {
         false
     }
 
-    fn sink_config(
-        &self,
-        _default_key: &ComponentKey,
-    ) -> Option<(ComponentKey, Box<dyn SinkConfig>)> {
+    fn sink_config(&self, _default_key: &ComponentKey) -> Option<(ComponentKey, SharedSink)> {
         None
     }
 
-    fn source_config(
-        &self,
-        _default_key: &ComponentKey,
-    ) -> Option<(ComponentKey, Box<dyn SourceConfig>)> {
+    fn source_config(&self, _default_key: &ComponentKey) -> Option<(ComponentKey, SharedSource)> {
         None
     }
 }

@@ -1,12 +1,13 @@
 //! Functionality to handle enrichment tables.
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
 use vector_lib::configurable::configurable_component;
 pub use vector_lib::enrichment::{Condition, IndexHandle, Table};
 
 use crate::config::{
-    ComponentKey, EnrichmentTableConfig, GenerateConfig, GlobalOptions, SinkConfig, SourceConfig,
+    ComponentKey, EnrichmentTableConfig, GenerateConfig, GlobalOptions, SharedSink, SharedSource,
 };
 
 pub mod file;

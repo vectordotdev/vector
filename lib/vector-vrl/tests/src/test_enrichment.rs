@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use vrl::value::{ObjectMap, Value};
 
@@ -44,7 +44,7 @@ impl enrichment::Table for TestEnrichmentTable {
     }
 
     fn add_index(
-        &mut self,
+        &self,
         _case: enrichment::Case,
         _fields: &[&str],
     ) -> Result<enrichment::IndexHandle, enrichment::Error> {
@@ -63,8 +63,8 @@ impl enrichment::Table for TestEnrichmentTable {
 
 pub(crate) fn test_enrichment_table() -> enrichment::TableRegistry {
     let registry = enrichment::TableRegistry::default();
-    let mut tables: HashMap<String, Box<dyn enrichment::Table + Send + Sync>> = HashMap::new();
-    tables.insert("test".into(), Box::new(TestEnrichmentTable));
+    let mut tables: HashMap<String, Arc<dyn enrichment::Table>> = HashMap::new();
+    tables.insert("test".into(), Arc::new(TestEnrichmentTable));
     registry.load(tables);
 
     registry

@@ -234,7 +234,7 @@ impl<'a> Builder<'a> {
     /// Loads, or reloads the enrichment tables.
     /// The tables are stored in the `ENRICHMENT_TABLES` global variable.
     async fn load_enrichment_tables(&mut self) -> &'static vector_lib::enrichment::TableRegistry {
-        let mut enrichment_tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+        let mut enrichment_tables: HashMap<String, Arc<dyn Table>> = HashMap::new();
 
         // Build enrichment tables
         'tables: for (name, table_outer) in &self.config.enrichment_tables {
@@ -255,7 +255,7 @@ impl<'a> Builder<'a> {
                     prev_state = ENRICHMENT_TABLES.extract_state(&table_name);
                 }
 
-                let mut table = match table_outer
+                let table = match table_outer
                     .inner
                     .build(&self.config.global, prev_state)
                     .await
@@ -1068,7 +1068,7 @@ pub async fn reload_enrichment_tables(config: &Config) {
         {
             let indexes = Some(ENRICHMENT_TABLES.index_fields(&table_name));
 
-            let mut table = match table_outer.inner.build(&config.global, None).await {
+            let table = match table_outer.inner.build(&config.global, None).await {
                 Ok(table) => table,
                 Err(error) => {
                     error!("Enrichment table \"{name}\" reload failed: {error}");

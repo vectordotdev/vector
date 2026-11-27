@@ -56,7 +56,7 @@ impl Table for DummyEnrichmentTable {
         Ok(vec![self.data.clone()])
     }
 
-    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
+    fn add_index(&self, _case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         let mut indexes = self.indexes.lock().unwrap();
         indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
         Ok(IndexHandle(indexes.len() - 1))
@@ -75,9 +75,9 @@ impl Table for DummyEnrichmentTable {
 pub(crate) fn get_table_registry() -> TableRegistry {
     let registry = TableRegistry::default();
 
-    let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
-    tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
-    tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
+    let mut tables: HashMap<String, Arc<dyn Table>> = HashMap::new();
+    tables.insert("dummy1".to_string(), Arc::new(DummyEnrichmentTable::new()));
+    tables.insert("dummy2".to_string(), Arc::new(DummyEnrichmentTable::new()));
 
     registry.load(tables);
 
@@ -90,10 +90,10 @@ pub(crate) fn get_table_registry_with_tables(
 ) -> TableRegistry {
     let registry = TableRegistry::default();
 
-    let mut tablesmap: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+    let mut tablesmap: HashMap<String, Arc<dyn Table>> = HashMap::new();
 
     for (name, table) in tables {
-        tablesmap.insert(name, Box::new(table) as Box<dyn Table + Send + Sync>);
+        tablesmap.insert(name, Arc::new(table));
     }
 
     registry.load(tablesmap);

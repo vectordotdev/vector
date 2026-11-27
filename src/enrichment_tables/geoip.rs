@@ -106,8 +106,8 @@ impl EnrichmentTableConfig for GeoipConfig {
         &self,
         _: &crate::config::GlobalOptions,
         _: Option<Box<dyn std::any::Any + Send + Sync>>,
-    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        Ok(Box::new(Geoip::new(self.clone())?))
+    ) -> crate::Result<Arc<dyn Table>> {
+        Ok(Arc::new(Geoip::new(self.clone())?))
     }
 }
 
@@ -334,7 +334,7 @@ impl Table for Geoip {
     ///
     /// # Errors
     /// Errors if the fields are not in the table.
-    fn add_index(&mut self, _: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
+    fn add_index(&self, _: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         match fields.len() {
             0 => Err(Error::MissingRequiredField { field: "IP" }),
             1 => Ok(IndexHandle(0)),

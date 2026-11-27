@@ -10,16 +10,15 @@ mod length_delimited;
 mod newline_delimited;
 mod varint_length_delimited;
 
-use std::fmt::Debug;
-
 pub use character_delimited::{
     CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions,
 };
-use dyn_clone::DynClone;
 pub use length_delimited::{LengthDelimitedEncoder, LengthDelimitedEncoderConfig};
 pub use newline_delimited::{NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig};
 use tokio_util::codec::LinesCodecError;
 
+#[cfg(test)]
+pub(crate) use self::framer::TestFramer;
 pub use self::{
     bytes::{BytesEncoder, BytesEncoderConfig},
     framer::{Framer, FramingConfig},
@@ -49,26 +48,3 @@ impl From<varint_length_delimited::VarintFramingError> for BoxedFramingError {
 
 /// A `Box` containing a `FramingError`.
 pub type BoxedFramingError = Box<dyn FramingError>;
-
-/// Trait for types that can encode bytes with frame boundaries.
-///
-/// This trait is automatically implemented for any encoder that implements
-/// `tokio_util::codec::Encoder<(), Error = BoxedFramingError>` and the required
-/// trait bounds. It is primarily used for trait objects via the `BoxedFramer` type.
-pub trait FramingEncoder:
-    tokio_util::codec::Encoder<(), Error = BoxedFramingError> + DynClone + Debug + Send + Sync
-{
-}
-
-/// Default implementation of `FramingEncoder` for any type that implements
-/// the required encoder traits.
-impl<Encoder> FramingEncoder for Encoder where
-    Encoder:
-        tokio_util::codec::Encoder<(), Error = BoxedFramingError> + Clone + Debug + Send + Sync
-{
-}
-
-dyn_clone::clone_trait_object!(FramingEncoder);
-
-/// A boxed `FramingEncoder` trait object.
-pub type BoxedFramer = Box<dyn FramingEncoder>;

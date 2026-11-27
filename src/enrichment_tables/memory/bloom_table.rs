@@ -181,7 +181,7 @@ impl Table for BloomMemoryTable {
         }
     }
 
-    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
+    fn add_index(&self, _case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         match fields.len() {
             0 => Err(Error::MissingRequiredField { field: "Key" }),
             1 => Ok(IndexHandle(0)),

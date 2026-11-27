@@ -435,7 +435,6 @@ databend-client = { version = "0.28.0", default-features = false, features = ["r
 derivative.workspace = true
 derive_more.workspace = true
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.20", default-features = false }
 encoding_rs = { version = "0.8.35", default-features = false, features = ["serde"] }
 enum_dispatch = { version = "0.3.13", default-features = false }
 evmap = { version = "10.0.2", default-features = false, optional = true }

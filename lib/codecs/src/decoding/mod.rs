@@ -16,19 +16,20 @@ pub use decoder::Decoder;
 pub use decompression::{DecompressionAlgorithm, DecompressionConfig, Decompressor};
 pub use error::StreamDecodingError;
 pub use format::{
-    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
-    GelfDeserializerConfig, GelfDeserializerOptions, InfluxdbDeserializer,
-    InfluxdbDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions,
-    MsgPackDeserializer, MsgPackDeserializerConfig, NativeDeserializer, NativeDeserializerConfig,
+    BytesDeserializer, BytesDeserializerConfig, GelfDeserializer, GelfDeserializerConfig,
+    GelfDeserializerOptions, InfluxdbDeserializer, InfluxdbDeserializerConfig, JsonDeserializer,
+    JsonDeserializerConfig, JsonDeserializerOptions, MsgPackDeserializer,
+    MsgPackDeserializerConfig, NativeDeserializer, NativeDeserializerConfig,
     NativeJsonDeserializer, NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
     ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDeserializerOptions,
+    SharedDeserializer,
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType};
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
 pub use framing::{
-    BoxedFramer, BoxedFramingError, BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder,
+    BoxedFramingError, BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder,
     CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, ChunkedGelfDecoder,
     ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
@@ -195,8 +196,6 @@ pub enum Framer {
     NewlineDelimited(NewlineDelimitedDecoder),
     /// Uses a `OctetCountingDecoder` for framing.
     OctetCounting(OctetCountingDecoder),
-    /// Uses an opaque `Framer` implementation for framing.
-    Boxed(BoxedFramer),
     /// Uses a `ChunkedGelfDecoder` for framing.
     ChunkedGelf(ChunkedGelfDecoder),
     /// Uses a `VarintLengthDelimitedDecoder` for framing.
@@ -214,7 +213,6 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::LengthDelimited(framer) => framer.decode(src),
             Framer::NewlineDelimited(framer) => framer.decode(src),
             Framer::OctetCounting(framer) => framer.decode(src),
-            Framer::Boxed(framer) => framer.decode(src),
             Framer::ChunkedGelf(framer) => framer.decode(src),
             Framer::VarintLengthDelimited(framer) => framer.decode(src),
         }
@@ -227,7 +225,6 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::LengthDelimited(framer) => framer.decode_eof(src),
             Framer::NewlineDelimited(framer) => framer.decode_eof(src),
             Framer::OctetCounting(framer) => framer.decode_eof(src),
-            Framer::Boxed(framer) => framer.decode_eof(src),
             Framer::ChunkedGelf(framer) => framer.decode_eof(src),
             Framer::VarintLengthDelimited(framer) => framer.decode_eof(src),
         }
@@ -588,8 +585,8 @@ pub enum Deserializer {
     Native(NativeDeserializer),
     /// Uses a `NativeDeserializer` for deserialization.
     NativeJson(NativeJsonDeserializer),
-    /// Uses an opaque `Deserializer` implementation for deserialization.
-    Boxed(BoxedDeserializer),
+    /// Uses a shared, opaque `Deserializer` implementation for deserialization.
+    Shared(SharedDeserializer),
     /// Uses a `GelfDeserializer` for deserialization.
     Gelf(GelfDeserializer),
     /// Uses a `MsgPackDeserializer` for deserialization.
@@ -629,7 +626,7 @@ impl format::Deserializer for Deserializer {
             Deserializer::Syslog(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Native(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::NativeJson(deserializer) => deserializer.parse(bytes, log_namespace),
-            Deserializer::Boxed(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Shared(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Gelf(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Influxdb(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Vrl(deserializer) => deserializer.parse(bytes, log_namespace),

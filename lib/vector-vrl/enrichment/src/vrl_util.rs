@@ -80,7 +80,7 @@ pub(crate) fn evaluate_condition(key: &str, value: Value) -> ExpressionResult<Co
 
 /// Add an index for the given condition to the given enrichment table.
 pub(crate) fn add_index(
-    registry: &mut TableRegistry,
+    registry: &TableRegistry,
     tablename: &str,
     case: Case,
     condition: &BTreeMap<KeyString, expression::Expr>,
@@ -134,10 +134,10 @@ mod tests {
 
     #[test]
     fn add_indexes() {
-        let mut registry = test_util::get_table_registry();
+        let registry = test_util::get_table_registry();
         let conditions =
             BTreeMap::from([("field".into(), expression::Literal::from("value").into())]);
-        let index = add_index(&mut registry, "dummy1", Case::Insensitive, &conditions).unwrap();
+        let index = add_index(&registry, "dummy1", Case::Insensitive, &conditions).unwrap();
 
         assert_eq!(IndexHandle(0), index);
     }
@@ -147,7 +147,7 @@ mod tests {
         let indexes = Arc::new(Mutex::new(Vec::new()));
         let dummy = test_util::DummyEnrichmentTable::new_with_index(indexes.clone());
 
-        let mut registry =
+        let registry =
             test_util::get_table_registry_with_tables(vec![("dummy1".to_string(), dummy)]);
 
         let conditions = BTreeMap::from([
@@ -181,7 +181,7 @@ mod tests {
             ),
         ]);
 
-        let index = add_index(&mut registry, "dummy1", Case::Sensitive, &conditions).unwrap();
+        let index = add_index(&registry, "dummy1", Case::Sensitive, &conditions).unwrap();
 
         assert_eq!(IndexHandle(0), index);
 

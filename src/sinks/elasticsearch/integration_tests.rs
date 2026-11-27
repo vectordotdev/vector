@@ -391,7 +391,7 @@ async fn insert_events_over_http() {
 #[cfg(feature = "opensearch-integration-tests")]
 mod opensearch {
     use super::*;
-    use crate::config::BoxedSink;
+    use crate::config::SharedSink;
 
     #[tokio::test]
     async fn insert_events_with_auto_api_version_over_http() {
@@ -428,7 +428,7 @@ mod opensearch {
             config["tls"] = json!({ "ca_file": tls::TEST_PEM_CA_PATH });
         }
         // Omit api_version to exercise the constructor-selected OpenSearch API version.
-        let config: BoxedSink = serde_json::from_value(config).unwrap();
+        let config: SharedSink = serde_json::from_value(config).unwrap();
         let (sink, healthcheck) = config.build(SinkContext::default()).await.unwrap();
         healthcheck.await.unwrap();
 

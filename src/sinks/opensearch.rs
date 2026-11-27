@@ -65,7 +65,7 @@ impl ValidatedSink for OpenSearchConfig {
 mod tests {
     use super::*;
     use crate::{
-        config::BoxedSink,
+        config::SharedSink,
         sinks::elasticsearch::{ElasticsearchApiVersion, OpenSearchServiceType},
     };
 
@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn config_roundtrip() {
-        let config: BoxedSink = serde_yaml::from_str(
+        let config: SharedSink = serde_yaml::from_str(
             r"
             type: opensearch
             endpoints: [http://localhost:9200]
@@ -94,7 +94,7 @@ mod tests {
         let value = serde_json::to_value(&config).unwrap();
         assert_eq!(value["type"], "opensearch");
         assert_eq!(value["bulk"]["index"], "logs-%Y.%m.%d");
-        let roundtrip: BoxedSink = serde_json::from_value(value.clone()).unwrap();
+        let roundtrip: SharedSink = serde_json::from_value(value.clone()).unwrap();
         assert_eq!(serde_json::to_value(roundtrip).unwrap(), value);
     }
 
@@ -116,7 +116,7 @@ mod tests {
                     ],
                 ),
             ] {
-                let config: BoxedSink = serde_yaml::from_str(&format!(
+                let config: SharedSink = serde_yaml::from_str(&format!(
                     "type: {sink_type}\nendpoints: [http://localhost:9200]\napi_version: v7\n\
                      mode: {mode}\ndangerously_allow_unconfined_template_resolution: true"
                 ))
@@ -184,7 +184,7 @@ mod tests {
             "type: opensearch\nendpoints: [http://localhost:9200]\nbulk:\n  index: '{{ index }}'",
             "type: opensearch\nendpoints: [http://localhost:9200]\nopensearch_service_type: serverless",
         ] {
-            let config: BoxedSink = serde_yaml::from_str(yaml).unwrap();
+            let config: SharedSink = serde_yaml::from_str(yaml).unwrap();
             assert!(config.validate_dyn().is_err());
         }
     }
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn rejects_unknown_options() {
         assert!(
-            serde_yaml::from_str::<BoxedSink>(
+            serde_yaml::from_str::<SharedSink>(
                 "type: opensearch\nendpoints: [http://localhost:9200]\nunknown_option: true"
             )
             .is_err()
@@ -211,12 +211,12 @@ mod tests {
             aws:
               region: us-east-1
         ";
-        let config: BoxedSink = serde_yaml::from_str(yaml).unwrap();
+        let config: SharedSink = serde_yaml::from_str(yaml).unwrap();
         config.validate_dyn().unwrap();
 
         let mut value = serde_json::to_value(config).unwrap();
         value["api_version"] = serde_json::json!("v7");
-        let config: BoxedSink = serde_json::from_value(value).unwrap();
+        let config: SharedSink = serde_json::from_value(value).unwrap();
         assert!(config.validate_dyn().is_err());
     }
 }

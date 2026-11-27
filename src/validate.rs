@@ -5,6 +5,7 @@ use std::{
     fmt,
     fs::remove_dir_all,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use clap::Parser;
@@ -54,11 +55,7 @@ impl vector_lib::enrichment::Table for StubEnrichmentTable {
         unreachable!("stub table is compile-time only")
     }
 
-    fn add_index(
-        &mut self,
-        _: Case,
-        _: &[&str],
-    ) -> Result<IndexHandle, vector_lib::enrichment::Error> {
+    fn add_index(&self, _: Case, _: &[&str]) -> Result<IndexHandle, vector_lib::enrichment::Error> {
         Ok(IndexHandle(0))
     }
 
@@ -277,14 +274,13 @@ pub async fn validate_config(
 /// deferring data-loading to the environment phase.
 fn stub_enrichment_tables(config: &Config) -> TableRegistry {
     let enrichment_tables = TableRegistry::default();
-    let stubs: HashMap<String, Box<dyn vector_lib::enrichment::Table + Send + Sync>> = config
+    let stubs: HashMap<String, Arc<dyn vector_lib::enrichment::Table>> = config
         .enrichment_tables
         .keys()
         .map(|key| {
             (
                 key.to_string(),
-                Box::new(StubEnrichmentTable)
-                    as Box<dyn vector_lib::enrichment::Table + Send + Sync>,
+                Arc::new(StubEnrichmentTable) as Arc<dyn vector_lib::enrichment::Table>,
             )
         })
         .collect();

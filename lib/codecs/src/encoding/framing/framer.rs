@@ -1,10 +1,12 @@
 //! Configuration types for framing methods.
 
+#[cfg(test)]
+use bytes::BufMut;
 use bytes::BytesMut;
 use vector_config::configurable_component;
 
 use super::{
-    BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
+    BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig,
     NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, VarintLengthDelimitedEncoder,
     VarintLengthDelimitedEncoderConfig,
@@ -97,8 +99,59 @@ pub enum Framer {
     NewlineDelimited(NewlineDelimitedEncoder),
     /// Uses a `VarintLengthDelimitedEncoder` for framing.
     VarintLengthDelimited(VarintLengthDelimitedEncoder),
-    /// Uses an opaque `Encoder` implementation for framing.
-    Boxed(BoxedFramer),
+    /// A test-only framer used to exercise framing error handling.
+    #[cfg(test)]
+    Test(TestFramer),
+}
+
+/// A test-only framer that wraps frames in parentheses and can be made to fail.
+#[cfg(test)]
+#[derive(Debug, Clone)]
+pub struct TestFramer {
+    /// Number of frames to encode before failing. `None` never fails.
+    fail_after: Option<usize>,
+    /// Number of frames encoded so far.
+    encoded: usize,
+}
+
+#[cfg(test)]
+impl TestFramer {
+    /// Creates a framer that wraps each frame in parentheses.
+    pub(crate) const fn parenthesize() -> Self {
+        Self {
+            fail_after: None,
+            encoded: 0,
+        }
+    }
+
+    /// Creates a parenthesizing framer that fails after `frames` successful frames.
+    pub(crate) const fn parenthesize_after(frames: usize) -> Self {
+        Self {
+            fail_after: Some(frames),
+            encoded: 0,
+        }
+    }
+}
+
+#[cfg(test)]
+impl tokio_util::codec::Encoder<()> for TestFramer {
+    type Error = BoxedFramingError;
+
+    fn encode(&mut self, (): (), buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        if let Some(fail_after) = self.fail_after
+            && self.encoded >= fail_after
+        {
+            return Err(Box::new(std::io::Error::other("test framing error")));
+        }
+        self.encoded += 1;
+
+        buffer.reserve(2);
+        let inner = buffer.split();
+        buffer.put_u8(b'(');
+        buffer.unsplit(inner);
+        buffer.put_u8(b')');
+        Ok(())
+    }
 }
 
 impl From<BytesEncoder> for Framer {
@@ -131,12 +184,6 @@ impl From<VarintLengthDelimitedEncoder> for Framer {
     }
 }
 
-impl From<BoxedFramer> for Framer {
-    fn from(encoder: BoxedFramer) -> Self {
-        Self::Boxed(encoder)
-    }
-}
-
 impl tokio_util::codec::Encoder<()> for Framer {
     type Error = BoxedFramingError;
 
@@ -147,7 +194,8 @@ impl tokio_util::codec::Encoder<()> for Framer {
             Framer::LengthDelimited(framer) => framer.encode((), buffer),
             Framer::NewlineDelimited(framer) => framer.encode((), buffer),
             Framer::VarintLengthDelimited(framer) => framer.encode((), buffer),
-            Framer::Boxed(framer) => framer.encode((), buffer),
+            #[cfg(test)]
+            Framer::Test(framer) => framer.encode((), buffer),
         }
     }
 }

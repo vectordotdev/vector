@@ -8,7 +8,6 @@ pub mod tables;
 mod test_util;
 mod vrl_util;
 
-use dyn_clone::DynClone;
 use indoc::indoc;
 use snafu::Snafu;
 pub use tables::{TableRegistry, TableSearch};
@@ -102,7 +101,10 @@ impl From<Error> for vrl::prelude::ExpressionError {
 
 /// Enrichment tables represent additional data sources that can be used to enrich the event data
 /// passing through Vector.
-pub trait Table: DynClone {
+///
+/// Tables are shared between the registry entries that use them, including entries for tables
+/// that remain loaded across config reloads.
+pub trait Table: Send + Sync {
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
     ///
@@ -136,9 +138,12 @@ pub trait Table: DynClone {
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.
     ///
+    /// Tables are shared across registry entries, so implementations register indexes through
+    /// interior mutability.
+    ///
     /// # Errors
     /// Errors if the fields are not in the table.
-    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, Error>;
+    fn add_index(&self, case: Case, fields: &[&str]) -> Result<IndexHandle, Error>;
 
     /// Returns a list of the field names that are in each index
     fn index_fields(&self) -> Vec<(Case, Vec<String>)>;
@@ -151,8 +156,6 @@ pub trait Table: DynClone {
         None
     }
 }
-
-dyn_clone::clone_trait_object!(Table);
 
 #[must_use]
 pub fn vrl_functions() -> Vec<Box<dyn Function>> {
