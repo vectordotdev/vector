@@ -313,7 +313,10 @@ mod tests {
         event
             .as_mut_log()
             .insert(event_path!("tenant"), "../../escape");
-        assert!(partitioner.partition(&event).is_none());
+        assert!(matches!(
+            partitioner.partition(&event),
+            Ok(vector_lib::partition::PartitionDecision::Discard)
+        ));
     }
 
     #[test]

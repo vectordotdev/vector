@@ -24,7 +24,8 @@ generated: configuration: {
 			}
 			description: "API options."
 			warnings: ["The API currently does not support authentication. Only enable it in isolated environments or for debugging. It must not be exposed to untrusted clients."]
-			group: "api"
+			required: false
+			group:    "api"
 		}
 		enrichment_tables: {
 			type: object: options: "*": {
@@ -549,6 +550,7 @@ generated: configuration: {
 				required:    true
 			}
 			description: "All configured enrichment tables."
+			required:    false
 			group:       "pipeline_components"
 		}
 		healthchecks: {
@@ -575,6 +577,7 @@ generated: configuration: {
 				}
 			}
 			description: "Healthcheck options."
+			required:    false
 			group:       "global_options"
 		}
 		schema: {
@@ -629,7 +632,8 @@ generated: configuration: {
 
 				If you encounter issues with these features, please [report them here](https://github.com/vectordotdev/vector/issues/new?template=bug.yml).
 				"""
-			group: "schema"
+			required: false
+			group:    "schema"
 		}
 		secret: {
 			type: object: options: "*": {
@@ -780,6 +784,7 @@ generated: configuration: {
 				required: true
 			}
 			description: "All configured secrets backends."
+			required:    false
 			group:       "secrets"
 		}
 		sinks: {
@@ -826,6 +831,29 @@ generated: configuration: {
 														"""
 						required: true
 					}
+					measure_cpu_usage: {
+						type: bool: default: false
+						description: """
+														Enable CPU usage metrics for this sink.
+
+														When set to `true`, each poll of the sink task, and of the tasks it spawns (such as request
+														building or HTTP connections), is timed using the OS thread CPU clock and the accumulated
+														nanoseconds are reported as the `component_cpu_usage_ns_total` counter, tagged with
+														`component_id`, `component_kind`, and `component_type`.
+
+														Defaults to `false`. Enable only for sinks where CPU attribution is needed, as it adds a
+														`clock_gettime` call on every future poll.
+
+														CPU spent on threads or tasks that a third-party library manages on its own is not
+														included. Notably, the `kafka` sink compresses batches and performs TLS and network I/O on
+														librdkafka threads.
+
+														On Windows, `component_cpu_usage_ns_total` is a rough estimate: thread CPU time advances
+														only at the scheduler clock tick (typically 15.6 ms), so short polls are counted either as
+														zero or as a whole tick.
+														"""
+						required: false
+					}
 					proxy: {
 						type: _schemaDefinitions["vector_core::config::proxy::ProxyConfig"]
 						description: """
@@ -844,6 +872,7 @@ generated: configuration: {
 				required:    true
 			}
 			description: "All configured sinks."
+			required:    false
 			group:       "pipeline_components"
 		}
 		sources: {
@@ -876,6 +905,7 @@ generated: configuration: {
 				required:    true
 			}
 			description: "All configured sources."
+			required:    false
 			group:       "pipeline_components"
 		}
 		transforms: {
@@ -928,6 +958,7 @@ generated: configuration: {
 				required:    true
 			}
 			description: "All configured transforms."
+			required:    false
 			group:       "pipeline_components"
 		}
 		acknowledgements: {
@@ -962,7 +993,8 @@ generated: configuration: {
 
 				Must be greater than 0.
 				"""
-			group: "global_options"
+			required: false
+			group:    "global_options"
 		}
 		data_dir: {
 			type: string: default: "/var/lib/vector/"
@@ -974,7 +1006,8 @@ generated: configuration: {
 
 				Vector must have write permissions to this directory.
 				"""
-			group: "global_options"
+			required: false
+			group:    "global_options"
 		}
 		expire_metrics_per_metric_set: {
 			type: array: items: type: object: options: {
@@ -1066,7 +1099,8 @@ generated: configuration: {
 				By default this is empty and any metric not matched by one of these sets will use
 				the global default value, defined using `expire_metrics_secs`.
 				"""
-			group: "global_options"
+			required: false
+			group:    "global_options"
 		}
 		expire_metrics_secs: {
 			type: float: {}
@@ -1092,7 +1126,8 @@ generated: configuration: {
 
 				Must be between 0 and 1 exclusively (0 < alpha < 1).
 				"""
-			group: "global_options"
+			required: false
+			group:    "global_options"
 		}
 		log_schema: {
 			type: object: options: {
@@ -1146,9 +1181,9 @@ generated: configuration: {
 				This is used if a component does not have its own specific log schema. All events use a log
 				schema, whether or not the default is used, to assign event fields on incoming events.
 				"""
-			required: false
 			warnings: ["These settings are ignored when `schema.log_namespace` is set to `true`."]
-			group: "schema"
+			required: false
+			group:    "schema"
 		}
 		metrics_storage_refresh_period: {
 			type: float: {}
@@ -1159,7 +1194,8 @@ generated: configuration: {
 				Higher values lead to stale metric values from `get_vector_metric`,
 				`find_vector_metrics`, and `aggregate_vector_metrics` functions.
 				"""
-			group: "global_options"
+			required: false
+			group:    "global_options"
 		}
 		proxy: {
 			type: _schemaDefinitions["vector_core::config::proxy::ProxyConfig"]
@@ -1221,7 +1257,8 @@ generated: configuration: {
 
 				[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 				"""
-			group: "global_options"
+			required: false
+			group:    "global_options"
 		}
 		wildcard_matching: {
 			type: string: enum: {

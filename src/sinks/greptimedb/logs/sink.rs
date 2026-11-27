@@ -56,7 +56,7 @@ where
                 batcher_settings.timeout,
                 |_| batcher_settings.as_byte_size_config(),
             )
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|result| async move { result.ok() })
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,

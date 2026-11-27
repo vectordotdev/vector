@@ -75,10 +75,7 @@
             "docs::enum_tag_field": "type"
           }
         }
-      ],
-      "_metadata": {
-        "docs::optional": true
-      }
+      ]
     }
   ],
   "unevaluatedProperties": false

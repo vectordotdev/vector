@@ -8,12 +8,13 @@ use vector_lib::{codecs::encoding::Framer, request_metadata::RequestMetadata};
 
 use crate::{
     codecs::{Encoder, Transformer},
-    event::{Event, Finalizable},
+    event::{Event, EventFinalizers, Finalizable},
     sinks::{
         azure_blob::config::{AzureBlobMetadata, AzureBlobRequest, AzureBlobType},
         util::{
-            Compression, RequestBuilder, metadata::RequestMetadataBuilder,
-            request_builder::EncodeResult,
+            Compression, RequestBuilder,
+            metadata::RequestMetadataBuilder,
+            request_builder::{EncodeResult, RequestParts},
         },
     },
 };
@@ -49,23 +50,28 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
     fn split_input(
         &self,
         input: (String, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
         let azure_metadata = AzureBlobMetadata {
             partition_key,
             count: events.len(),
-            finalizers,
         };
 
         let builder = RequestMetadataBuilder::from_events(&events);
 
-        (azure_metadata, builder, events)
+        RequestParts {
+            metadata: azure_metadata,
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         mut azure_metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -91,6 +97,7 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         );
 
         AzureBlobRequest {
+            finalizers,
             blob_data,
             content_encoding: self.compression.content_encoding(),
             content_type: self.encoder.1.content_type(),

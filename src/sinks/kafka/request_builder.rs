@@ -33,31 +33,35 @@ impl RequestBuilder<(String, Event)> for KafkaRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        input: (String, Event),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, input: (String, Event)) -> RequestParts<Self::Metadata, Self::Events> {
         let (topic, mut event) = input;
         let builder = RequestMetadataBuilder::from_event(&event);
 
+        let finalizers = event.take_finalizers();
         let metadata = KafkaRequestMetadata {
-            finalizers: event.take_finalizers(),
             key: get_key(&event, self.key_field.as_ref()),
             timestamp_millis: get_timestamp_millis(&event),
             headers: get_headers(&event, self.headers_key.as_ref()),
             topic,
         };
 
-        (metadata, builder, event)
+        RequestParts {
+            metadata,
+            request_metadata_builder: builder,
+            events: event,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         KafkaRequest {
+            finalizers,
             body: payload.into_payload(),
             metadata,
             request_metadata,
