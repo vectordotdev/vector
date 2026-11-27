@@ -368,6 +368,17 @@ generated: components: sources: kubernetes_logs: configuration: {
 					examples: [".k8s.pod_annotations", "k8s.pod_annotations", ""]
 				}
 			}
+			pod_cpu_request_millicores: {
+				description: """
+					Set this path to include the Pod's effective CPU request (millicores) in legacy logs.
+					With log namespacing, the request is available in `%kubernetes_logs`.
+					"""
+				required: false
+				type: string: {
+					default: ""
+					examples: ["kubernetes.pod_cpu_request_millicores"]
+				}
+			}
 			pod_ip: {
 				description: """
 					Event field for the Pod's IPv4 address.
@@ -402,6 +413,17 @@ generated: components: sources: kubernetes_logs: configuration: {
 				type: string: {
 					default: ".kubernetes.pod_labels"
 					examples: [".k8s.pod_labels", "k8s.pod_labels", ""]
+				}
+			}
+			pod_memory_request_bytes: {
+				description: """
+					Set this path to include the Pod's effective memory request (bytes) in legacy logs.
+					With log namespacing, the request is available in `%kubernetes_logs`.
+					"""
+				required: false
+				type: string: {
+					default: ""
+					examples: ["kubernetes.pod_memory_request_bytes"]
 				}
 			}
 			pod_name: {

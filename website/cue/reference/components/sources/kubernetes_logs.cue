@@ -101,6 +101,16 @@ components: sources: kubernetes_logs: {
 					examples: ["coredns"]
 				}
 			}
+			"kubernetes.pod_cpu_request_millicores": {
+				description: "Effective Pod CPU request in millicores, including overhead. If `spec.resources.requests.cpu` is unset, Vector calculates the request from the Pod's app and init containers."
+				required:    false
+				type: uint: examples: [600, 2000]
+			}
+			"kubernetes.pod_memory_request_bytes": {
+				description: "Effective Pod memory request in bytes, including overhead. If `spec.resources.requests.memory` is unset, Vector calculates the request from the Pod's app and init containers."
+				required:    false
+				type: uint: examples: [301989888, 1073741824]
+			}
 			"kubernetes.namespace_labels": {
 				description: "Set of labels attached to the Namespace."
 				required:    false

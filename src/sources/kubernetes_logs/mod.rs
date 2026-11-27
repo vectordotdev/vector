@@ -72,6 +72,7 @@ mod parser;
 mod partial_events_merger;
 mod path_helpers;
 mod pod_metadata_annotator;
+mod resource_quantity;
 mod transform_utils;
 mod util;
 
@@ -425,6 +426,30 @@ impl SourceConfig for Config {
                     .map(LegacyKey::Overwrite),
                 &owned_value_path!("container_name"),
                 Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_cpu_request_millicores
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_cpu_request_millicores"),
+                Kind::integer().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                self.pod_annotation_fields
+                    .pod_memory_request_bytes
+                    .path
+                    .clone()
+                    .map(|k| k.path)
+                    .map(LegacyKey::Overwrite),
+                &owned_value_path!("pod_memory_request_bytes"),
+                Kind::integer().or_undefined(),
                 None,
             )
             .with_source_metadata(
@@ -1318,13 +1343,32 @@ mod tests {
     use vector_lib::{
         codecs::OversizedAction,
         config::LogNamespace,
-        lookup::{OwnedTargetPath, owned_value_path},
+        lookup::{OwnedTargetPath, event_path, owned_value_path},
         schema::Definition,
     };
     use vrl::value::{Kind, kind::Collection};
 
     use super::Config;
     use crate::config::SourceConfig;
+
+    #[test]
+    fn pod_request_schema_uses_custom_legacy_paths() {
+        let config: Config = serde_yaml::from_str(indoc! {"
+            pod_annotation_fields:
+              pod_cpu_request_millicores: custom.cpu
+              pod_memory_request_bytes: custom.memory
+        "})
+        .unwrap();
+        let schema = config.outputs(LogNamespace::Legacy)[0]
+            .schema_definition(true)
+            .unwrap();
+        for field in ["cpu", "memory"] {
+            assert_eq!(
+                schema.kind_at(event_path!("custom", field)),
+                Kind::integer().or_undefined()
+            );
+        }
+    }
 
     #[test]
     fn generate_config() {
@@ -1595,6 +1639,16 @@ mod tests {
                     .with_metadata_field(
                         &owned_value_path!("kubernetes_logs", "container_name"),
                         Kind::bytes().or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "pod_cpu_request_millicores"),
+                        Kind::integer().or_undefined(),
+                        None
+                    )
+                    .with_metadata_field(
+                        &owned_value_path!("kubernetes_logs", "pod_memory_request_bytes"),
+                        Kind::integer().or_undefined(),
                         None
                     )
                     .with_metadata_field(

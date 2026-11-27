@@ -3,8 +3,8 @@
 #![deny(missing_docs)]
 
 use k8s_openapi::{
-    api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
-    apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus, ResourceRequirements},
+    apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 use kube::runtime::reflector::{ObjectRef, store::Store};
 use vector_lib::{
@@ -20,6 +20,7 @@ use vector_lib::{
 use super::{
     Config,
     path_helpers::{LogFileInfo, parse_log_file_path},
+    resource_quantity::parse_quantity,
 };
 use crate::event::{Event, LogEvent};
 
@@ -100,6 +101,16 @@ pub(super) struct FieldsSpec {
     #[configurable(metadata(docs::examples = ""))]
     pub pod_owner: OptionalTargetPath,
 
+    /// Set this path to include the Pod's effective CPU request (millicores) in legacy logs.
+    /// With log namespacing, the request is available in `%kubernetes_logs`.
+    #[configurable(metadata(docs::examples = "kubernetes.pod_cpu_request_millicores"))]
+    pub pod_cpu_request_millicores: OptionalTargetPath,
+
+    /// Set this path to include the Pod's effective memory request (bytes) in legacy logs.
+    /// With log namespacing, the request is available in `%kubernetes_logs`.
+    #[configurable(metadata(docs::examples = "kubernetes.pod_memory_request_bytes"))]
+    pub pod_memory_request_bytes: OptionalTargetPath,
+
     /// Event field for the Container's name.
     ///
     /// Set to `""` to suppress this key.
@@ -152,6 +163,8 @@ impl Default for FieldsSpec {
             pod_node_name: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_node_name"))
                 .into(),
             pod_owner: OwnedTargetPath::event(owned_value_path!("kubernetes", "pod_owner")).into(),
+            pod_cpu_request_millicores: OptionalTargetPath::none(),
+            pod_memory_request_bytes: OptionalTargetPath::none(),
             container_name: OwnedTargetPath::event(owned_value_path!(
                 "kubernetes",
                 "container_name"
@@ -417,6 +430,38 @@ fn annotate_from_pod_spec(
     pod_spec: &PodSpec,
     log_namespace: LogNamespace,
 ) {
+    for (resource, decimal_scale, field_name, field) in [
+        (
+            "cpu",
+            3,
+            "pod_cpu_request_millicores",
+            &fields_spec.pod_cpu_request_millicores,
+        ),
+        (
+            "memory",
+            0,
+            "pod_memory_request_bytes",
+            &fields_spec.pod_memory_request_bytes,
+        ),
+    ] {
+        let legacy_key = field
+            .path
+            .as_ref()
+            .map(|path| LegacyKey::Overwrite(&path.path));
+        if log_namespace == LogNamespace::Legacy && legacy_key.is_none() {
+            continue;
+        }
+        if let Some(value) = pod_resource_request(pod_spec, resource, decimal_scale) {
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                legacy_key,
+                path!(field_name),
+                value,
+            );
+        }
+    }
+
     if let Some(value) = &pod_spec.node_name {
         let legacy_key = fields_spec
             .pod_node_name
@@ -433,6 +478,51 @@ fn annotate_from_pod_spec(
             value.to_owned(),
         );
     }
+}
+
+fn pod_resource_request(pod_spec: &PodSpec, resource: &str, decimal_scale: i32) -> Option<i64> {
+    let mut specified = false;
+    let mut parse = |quantity: Option<&Quantity>| {
+        quantity.map_or(Some(0), |quantity| {
+            specified = true;
+            parse_quantity(&quantity.0, decimal_scale)
+        })
+    };
+    let total = if let Some(quantity) = get_request(pod_spec.resources.as_ref(), resource) {
+        parse(Some(quantity))?
+    } else {
+        let mut running = 0_i64;
+        for container in &pod_spec.containers {
+            let request = get_request(container.resources.as_ref(), resource);
+            running = running.checked_add(parse(request)?)?;
+        }
+
+        let mut sidecars = 0_i64;
+        let mut initialization = 0;
+        for container in pod_spec.init_containers.iter().flatten() {
+            let request = parse(get_request(container.resources.as_ref(), resource))?;
+            let stage = if container.restart_policy.as_deref() == Some("Always") {
+                running = running.checked_add(request)?;
+                sidecars = sidecars.checked_add(request)?;
+                sidecars
+            } else {
+                // Earlier restartable init containers keep running during this stage.
+                sidecars.checked_add(request)?
+            };
+            initialization = initialization.max(stage);
+        }
+        running.max(initialization)
+    };
+    let overhead = pod_spec.overhead.as_ref().and_then(|map| map.get(resource));
+    let total = total.checked_add(parse(overhead)?)?;
+    specified.then_some(total)
+}
+
+fn get_request<'a>(
+    requirements: Option<&'a ResourceRequirements>,
+    resource: &str,
+) -> Option<&'a Quantity> {
+    requirements?.requests.as_ref()?.get(resource)
 }
 
 fn annotate_from_pod_status(
@@ -546,10 +636,128 @@ mod tests {
     use std::path::PathBuf;
 
     use k8s_openapi::api::core::v1::PodIP;
+    use kube::runtime::{reflector::store::Writer, watcher};
+    use serde_json::json;
     use similar_asserts::assert_eq;
     use vector_lib::lookup::{event_path, metadata_path};
 
     use super::*;
+    use crate::event::Value;
+
+    #[test]
+    fn annotates_pod_requests_from_the_cached_spec() {
+        let pod = serde_json::from_value(json!({
+            "metadata": {"name": "pod", "namespace": "ns", "uid": "uid"},
+            "spec": {
+                "containers": [{
+                    "name": "app",
+                    "resources": {"requests": {"cpu": "500m", "memory": "64M"}}
+                }],
+                "resources": {"requests": {"cpu": "1"}},
+                "overhead": {"cpu": "50m", "memory": "1M"}
+            }
+        }))
+        .unwrap();
+        let mut writer = Writer::default();
+        writer.apply_watcher_event(&watcher::Event::Apply(pod));
+        let annotate = |namespace, fields| {
+            let annotator = PodMetadataAnnotator::new(writer.as_reader(), fields, namespace);
+            let mut event = Event::Log(LogEvent::default());
+            annotator
+                .annotate(&mut event, "/var/log/pods/ns_pod_uid/app/0.log")
+                .unwrap();
+            event.into_log()
+        };
+
+        let cpu = Value::from(1050);
+        let memory = Value::from(65_000_000);
+        let legacy = annotate(LogNamespace::Legacy, FieldsSpec::default());
+        assert_eq!(
+            legacy.get(event_path!("kubernetes", "pod_cpu_request_millicores")),
+            None
+        );
+        assert_eq!(
+            legacy.get(event_path!("kubernetes", "pod_memory_request_bytes")),
+            None
+        );
+
+        let custom = serde_json::from_value(json!({
+            "pod_cpu_request_millicores": "requests.cpu",
+            "pod_memory_request_bytes": "requests.memory"
+        }))
+        .unwrap();
+        let legacy = annotate(LogNamespace::Legacy, custom);
+        assert_eq!(legacy.get(event_path!("requests", "cpu")), Some(&cpu));
+        assert_eq!(legacy.get(event_path!("requests", "memory")), Some(&memory));
+
+        let vector = annotate(LogNamespace::Vector, FieldsSpec::default());
+        assert_eq!(
+            vector.get(metadata_path!(
+                "kubernetes_logs",
+                "pod_cpu_request_millicores"
+            )),
+            Some(&cpu)
+        );
+        assert_eq!(
+            vector.get(metadata_path!(
+                "kubernetes_logs",
+                "pod_memory_request_bytes"
+            )),
+            Some(&memory)
+        );
+    }
+
+    #[test]
+    fn pod_requests_use_the_peak_of_running_and_init_containers() {
+        let spec: PodSpec = serde_json::from_value(json!({
+            "containers": [
+                {"name": "app", "resources": {"requests": {"cpu": "500m", "memory": "60M"}}},
+                {"name": "worker", "resources": {"requests": {"memory": "40M"}}}
+            ],
+            "initContainers": [
+                {
+                    "name": "early-sidecar",
+                    "restartPolicy": "Always",
+                    "resources": {"requests": {"cpu": "100m", "memory": "10M"}}
+                },
+                {"name": "init", "resources": {"requests": {"cpu": "1", "memory": "90M"}}},
+                {
+                    "name": "late-sidecar",
+                    "restartPolicy": "Always",
+                    "resources": {"requests": {"cpu": "200m", "memory": "20M"}}
+                }
+            ]
+        }))
+        .unwrap();
+
+        assert_eq!(pod_resource_request(&spec, "cpu", 3), Some(1100));
+        assert_eq!(pod_resource_request(&spec, "memory", 0), Some(130_000_000));
+    }
+
+    #[test]
+    fn pod_requests_distinguish_zero_from_missing() {
+        let spec: PodSpec = serde_json::from_value(json!({
+            "containers": [{"name": "app", "resources": {"requests": {"cpu": "0"}}}]
+        }))
+        .unwrap();
+
+        assert_eq!(pod_resource_request(&spec, "cpu", 3), Some(0));
+        assert_eq!(pod_resource_request(&spec, "memory", 0), None);
+    }
+
+    #[test]
+    fn pod_request_overflow_only_omits_the_affected_resource() {
+        let spec: PodSpec = serde_json::from_value(json!({
+            "containers": [
+                {"name": "app", "resources": {"requests": {"cpu": "1", "memory": "5E"}}},
+                {"name": "worker", "resources": {"requests": {"memory": "5E"}}}
+            ]
+        }))
+        .unwrap();
+
+        assert_eq!(pod_resource_request(&spec, "cpu", 3), Some(1000));
+        assert_eq!(pod_resource_request(&spec, "memory", 0), None);
+    }
 
     #[allow(
         clippy::too_many_lines,
