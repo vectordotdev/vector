@@ -19,7 +19,8 @@ use super::{
         CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
         GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
         LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-        NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer,
+        NativeSerializerConfig, PrometheusTextSerializer, PrometheusTextSerializerConfig,
+        ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer,
         RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
     },
     framing::{
@@ -110,6 +111,23 @@ pub enum SerializerConfig {
     /// [otlp]: https://opentelemetry.io/docs/specs/otlp/
     #[cfg(feature = "opentelemetry")]
     Otlp,
+
+    /// Encodes a metric in the [Prometheus text exposition format][prometheus_text].
+    ///
+    /// Every event is encoded on its own, as a `# TYPE` line followed by one line per series.
+    /// The `http` sink instead encodes each request as one exposition, with a single `# TYPE`
+    /// line per metric family and a single sample per series (from the last event of that
+    /// series), and frames that exposition as a whole.
+    ///
+    /// Only absolute counters, gauges, sets, aggregated histograms and aggregated summaries can
+    /// be encoded; any other metric (such as an incremental metric, a distribution or a
+    /// sketch) is rejected. Use the `incremental_to_absolute` transform to turn incremental
+    /// metrics into absolute ones. Metrics whose name or tag names are not valid Prometheus
+    /// names, metrics with a `__name__` tag, histograms with an `le` tag and summaries with a
+    /// `quantile` tag are rejected too.
+    ///
+    /// [prometheus_text]: https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format
+    PrometheusText,
 
     /// Encodes an event as a [Protobuf][protobuf] message.
     ///
@@ -255,6 +273,12 @@ impl From<JsonSerializerConfig> for SerializerConfig {
     }
 }
 
+impl From<PrometheusTextSerializerConfig> for SerializerConfig {
+    fn from(_: PrometheusTextSerializerConfig) -> Self {
+        Self::PrometheusText
+    }
+}
+
 impl From<LogfmtSerializerConfig> for SerializerConfig {
     fn from(_: LogfmtSerializerConfig) -> Self {
         Self::Logfmt
@@ -324,6 +348,9 @@ impl SerializerConfig {
             SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
             SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),
+            SerializerConfig::PrometheusText => Ok(Serializer::PrometheusText(
+                PrometheusTextSerializerConfig.build(),
+            )),
             SerializerConfig::NativeJson => {
                 Ok(Serializer::NativeJson(NativeJsonSerializerConfig.build()))
             }
@@ -361,6 +388,8 @@ impl SerializerConfig {
             }
             #[cfg(feature = "opentelemetry")]
             SerializerConfig::Otlp => FramingConfig::Bytes,
+            // Every line of the output ends with a line feed already.
+            SerializerConfig::PrometheusText => FramingConfig::Bytes,
             SerializerConfig::Protobuf(_) => {
                 FramingConfig::VarintLengthDelimited(VarintLengthDelimitedEncoderConfig::default())
             }
@@ -392,6 +421,7 @@ impl SerializerConfig {
             SerializerConfig::Json(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
+            SerializerConfig::PrometheusText => PrometheusTextSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
             #[cfg(feature = "opentelemetry")]
             SerializerConfig::Otlp => OtlpSerializerConfig::default().input_type(),
@@ -416,6 +446,7 @@ impl SerializerConfig {
             SerializerConfig::Json(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
+            SerializerConfig::PrometheusText => PrometheusTextSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
             #[cfg(feature = "opentelemetry")]
             SerializerConfig::Otlp => OtlpSerializerConfig::default().schema_requirement(),
@@ -452,6 +483,8 @@ pub enum Serializer {
     Otlp(OtlpSerializer),
     /// Uses a `ProtobufSerializer` for serialization.
     Protobuf(ProtobufSerializer),
+    /// Uses a `PrometheusTextSerializer` for serialization.
+    PrometheusText(PrometheusTextSerializer),
     /// Uses a `RawMessageSerializer` for serialization.
     RawMessage(RawMessageSerializer),
     /// Uses a `TextSerializer` for serialization.
@@ -473,6 +506,7 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::PrometheusText(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => false,
             #[cfg(feature = "syslog")]
@@ -506,6 +540,7 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::PrometheusText(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => {
                 panic!("Serializer does not support JSON")
@@ -550,6 +585,7 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Gelf(_)
             | Serializer::Json(_)
+            | Serializer::PrometheusText(_)
             | Serializer::Text(_)
             | Serializer::NativeJson(_) => false,
         }
@@ -565,6 +601,12 @@ impl From<AvroSerializer> for Serializer {
 impl From<CefSerializer> for Serializer {
     fn from(serializer: CefSerializer) -> Self {
         Self::Cef(serializer)
+    }
+}
+
+impl From<PrometheusTextSerializer> for Serializer {
+    fn from(serializer: PrometheusTextSerializer) -> Self {
+        Self::PrometheusText(serializer)
     }
 }
 
@@ -646,6 +688,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Gelf(serializer) => serializer.encode(event, buffer),
             Serializer::Json(serializer) => serializer.encode(event, buffer),
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
+            Serializer::PrometheusText(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),
             Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
             #[cfg(feature = "opentelemetry")]

@@ -37,8 +37,9 @@ pub use encoding::{
     JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
     NativeSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializer, RawMessageSerializerConfig, SinkType, TextSerializer,
-    TextSerializerConfig, TimestampFormat, Transformer,
+    PrometheusTextSerializer, PrometheusTextSerializerConfig, RawMessageSerializer,
+    RawMessageSerializerConfig, SinkType, TextSerializer, TextSerializerConfig, TimestampFormat,
+    Transformer,
 };
 pub use gelf::{VALID_FIELD_REGEX, gelf_fields};
 pub use ready_frames::ReadyFrames;

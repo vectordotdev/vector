@@ -256,6 +256,7 @@ fn serializer_config_to_deserializer(
         SerializerConfig::Logfmt => unimplemented!(),
         SerializerConfig::Native => DeserializerConfig::Native,
         SerializerConfig::NativeJson => DeserializerConfig::NativeJson(Default::default()),
+        SerializerConfig::PrometheusText => unimplemented!(),
         SerializerConfig::Protobuf(config) => {
             DeserializerConfig::Protobuf(vector_lib::codecs::decoding::ProtobufDeserializerConfig {
                 protobuf: vector_lib::codecs::decoding::ProtobufDeserializerOptions {

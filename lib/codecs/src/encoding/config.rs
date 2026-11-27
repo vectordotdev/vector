@@ -2,12 +2,9 @@ use vector_config::configurable_component;
 
 use super::{Encoder, EncoderKind, Transformer};
 use crate::encoding::{
-    CharacterDelimitedEncoder, Framer, FramingConfig, LengthDelimitedEncoder,
+    BytesEncoder, CharacterDelimitedEncoder, Framer, FramingConfig, LengthDelimitedEncoder,
     NewlineDelimitedEncoder, Serializer, SerializerConfig,
 };
-
-#[cfg(feature = "opentelemetry")]
-use crate::encoding::BytesEncoder;
 
 /// Encoding configuration.
 #[configurable_component]
@@ -179,6 +176,8 @@ impl EncodingConfigWithFraming {
             (None, Serializer::Syslog(_)) => NewlineDelimitedEncoder::default().into(),
             #[cfg(feature = "opentelemetry")]
             (None, Serializer::Otlp(_)) => BytesEncoder.into(),
+            // Every line of the output ends with a line feed already.
+            (None, Serializer::PrometheusText(_)) => BytesEncoder.into(),
         };
 
         Ok((framer, serializer))

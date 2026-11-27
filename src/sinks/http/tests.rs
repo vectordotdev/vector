@@ -15,10 +15,12 @@ use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     codecs::{
         JsonSerializerConfig, NativeJsonDeserializerConfig, NewlineDelimitedEncoderConfig,
-        TextSerializerConfig, decoding::format::Deserializer as _, encoding::FramingConfig,
+        PrometheusTextSerializerConfig, TextSerializerConfig, decoding::format::Deserializer as _,
+        encoding::FramingConfig,
     },
-    event::{BatchNotifier, BatchStatus, Event, LogEvent, MetricValue, Value},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent, Metric, MetricKind, MetricValue, Value},
     finalization::AddBatchNotifier,
+    metric_tags,
     metrics::Controller,
     serde::AsciiChar,
     stream::batcher::limiter::ItemBatchSize as _,
@@ -133,6 +135,94 @@ fn http_encode_event_ndjson() {
     let output = serde_json::from_slice::<ExpectedEvent>(&output_buffer[..]).unwrap();
 
     assert_eq!(output.message, "hello world".to_string());
+}
+
+#[test]
+fn http_encode_prometheus_text_writes_each_family_once() {
+    let gauge = |host: &str, value: f64| {
+        Event::Metric(
+            Metric::new("up", MetricKind::Absolute, MetricValue::Gauge { value })
+                .with_tags(Some(metric_tags!("host" => host))),
+        )
+    };
+    let counter = Event::Metric(Metric::new(
+        "requests",
+        MetricKind::Absolute,
+        MetricValue::Counter { value: 3.0 },
+    ));
+
+    let cfg = default_cfg((None::<FramingConfig>, PrometheusTextSerializerConfig).into());
+    let encoder = HttpEncoder::new(
+        cfg.build_encoder().unwrap(),
+        cfg.encoding.transformer(),
+        String::new(),
+        String::new(),
+    );
+
+    let mut output_buffer = vec![];
+    let (encoded_size, _byte_size) = encoder
+        .encode_input(
+            vec![gauge("a", 1.0), counter, gauge("b", 0.0)],
+            &mut output_buffer,
+        )
+        .unwrap();
+
+    assert_eq!(output_buffer.len(), encoded_size);
+    assert_eq!(
+        String::from_utf8(output_buffer).unwrap(),
+        "# TYPE requests counter\n\
+         requests 3\n\
+         # TYPE up gauge\n\
+         up{host=\"a\"} 1\n\
+         up{host=\"b\"} 0\n"
+    );
+}
+
+#[test]
+fn http_encode_prometheus_text_frames_the_exposition() {
+    let encode = |max_frame_length: usize| {
+        let cfg: HttpSinkConfig = serde_yaml::from_str(&format!(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: prometheus_text
+            framing:
+              method: length_delimited
+              length_delimited:
+                max_frame_length: {max_frame_length}
+            "#
+        ))
+        .unwrap();
+        let encoder = HttpEncoder::new(
+            cfg.build_encoder().unwrap(),
+            cfg.encoding.transformer(),
+            String::new(),
+            String::new(),
+        );
+        let gauge = |host: &str| {
+            Event::Metric(
+                Metric::new(
+                    "up",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(metric_tags!("host" => host))),
+            )
+        };
+        let mut output_buffer = vec![];
+        encoder
+            .encode_input(vec![gauge("a"), gauge("b")], &mut output_buffer)
+            .map(|_| output_buffer)
+    };
+
+    // The framing applies to the exposition as a whole, not to each event.
+    let exposition = "# TYPE up gauge\nup{host=\"a\"} 1\nup{host=\"b\"} 1\n";
+    let length = u32::try_from(exposition.len()).unwrap().to_be_bytes();
+    assert_eq!(
+        encode(1024).unwrap(),
+        [&length[..], exposition.as_bytes()].concat()
+    );
+    assert!(encode(exposition.len() - 1).is_err());
 }
 
 #[test]

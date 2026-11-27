@@ -83,6 +83,23 @@ _schemaDefinitions: "codecs::encoding::config::EncodingConfig": object: options:
 
 				[otlp]: https://opentelemetry.io/docs/specs/otlp/
 				"""
+			prometheus_text: """
+				Encodes a metric in the [Prometheus text exposition format][prometheus_text].
+
+				Every event is encoded on its own, as a `# TYPE` line followed by one line per series.
+				The `http` sink instead encodes each request as one exposition, with a single `# TYPE`
+				line per metric family and a single sample per series (from the last event of that
+				series), and frames that exposition as a whole.
+
+				Only absolute counters, gauges, sets, aggregated histograms and aggregated summaries can
+				be encoded; any other metric (such as an incremental metric, a distribution or a
+				sketch) is rejected. Use the `incremental_to_absolute` transform to turn incremental
+				metrics into absolute ones. Metrics whose name or tag names are not valid Prometheus
+				names, metrics with a `__name__` tag, histograms with an `le` tag and summaries with a
+				`quantile` tag are rejected too.
+
+				[prometheus_text]: https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format
+				"""
 			protobuf: """
 				Encodes an event as a [Protobuf][protobuf] message.
 
