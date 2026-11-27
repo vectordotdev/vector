@@ -66,6 +66,19 @@ pub enum StatsdConfig {
     Unix(UnixOnly<UnixConfig>),
 }
 
+/// Unix socket modes.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum UnixMode {
+    /// Stream-oriented (`SOCK_STREAM`).
+    #[default]
+    Stream,
+
+    /// Datagram-oriented (`SOCK_DGRAM`).
+    Datagram,
+}
+
 /// Unix domain socket configuration for the `statsd` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -75,6 +88,18 @@ pub struct UnixConfig {
     /// This should be an absolute path.
     #[configurable(metadata(docs::examples = "/path/to/socket"))]
     pub path: PathBuf,
+
+    /// The Unix socket mode to use.
+    #[serde(default)]
+    pub unix_mode: UnixMode,
+
+    /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+    ///
+    /// Note: The file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
+    #[configurable(metadata(docs::examples = 0o777))]
+    #[configurable(metadata(docs::examples = 0o600))]
+    pub socket_file_mode: Option<u32>,
 
     #[serde(default = "default_sanitize")]
     pub sanitize: bool,
@@ -544,6 +569,8 @@ mod test {
             let config = StatsdConfig::Unix(
                 UnixConfig {
                     path: in_path.clone(),
+                    unix_mode: UnixMode::Stream,
+                    socket_file_mode: None,
                     sanitize: true,
                     convert_to: ConversionUnit::Seconds,
                 }
@@ -563,6 +590,93 @@ mod test {
             test_statsd(config, sender).await;
         })
         .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_statsd_unix_datagram() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
+            let in_path = tempfile::tempdir().unwrap().keep().join("unix_dgram_test");
+            let config = StatsdConfig::Unix(
+                UnixConfig {
+                    path: in_path.clone(),
+                    unix_mode: UnixMode::Datagram,
+                    socket_file_mode: None,
+                    sanitize: true,
+                    convert_to: ConversionUnit::Seconds,
+                }
+                .into(),
+            );
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                let socket = tokio::net::UnixDatagram::unbound().unwrap();
+                while let Some(bytes) = receiver.next().await {
+                    socket.send_to(bytes, &in_path).await.unwrap();
+                }
+            });
+            test_statsd(config, sender).await;
+        })
+        .await;
+    }
+
+    // Linux only: exceeding the 100 KiB receive limit needs a datagram larger than other
+    // platforms, such as macOS, accept by default.
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn test_statsd_unix_datagram_drops_truncated_metric() {
+        // Not `assert_source_error`: the framer and the receive loop each report an error here.
+        crate::test_util::components::init_test();
+        {
+            let in_path = tempfile::tempdir().unwrap().keep().join("unix_dgram_test");
+            let config = StatsdConfig::Unix(
+                UnixConfig {
+                    path: in_path.clone(),
+                    unix_mode: UnixMode::Datagram,
+                    socket_file_mode: None,
+                    sanitize: true,
+                    convert_to: ConversionUnit::Seconds,
+                }
+                .into(),
+            );
+
+            let component_key = ComponentKey::from("statsd_unix_datagram_truncated");
+            let (tx, rx) = SourceSender::new_test_sender_with_options(4096, None);
+            let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
+            let source = config
+                .build(source_ctx)
+                .await
+                .expect("failed to build source");
+            tokio::spawn(async move {
+                source.await.expect("source should not fail");
+            });
+            sleep(Duration::from_millis(250)).await;
+
+            // The receive limit cuts this metric within its tag value, before any newline. The
+            // cut-off prefix is still a valid metric, so it must be dropped rather than parsed.
+            let mut oversized = b"foo:1|c|#tag:".to_vec();
+            oversized.resize(oversized.len() + crate::serde::default_max_length(), b'a');
+            oversized.push(b'\n');
+            let socket = tokio::net::UnixDatagram::unbound().unwrap();
+            socket.send_to(&oversized, &in_path).await.unwrap();
+            socket.send_to(b"bar:1|c\n", &in_path).await.unwrap();
+
+            sleep(Duration::from_millis(250)).await;
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+                .await;
+
+            let names = collect_limited(rx)
+                .await
+                .into_iter()
+                .flat_map(EventContainer::into_events)
+                .map(|event| event.into_metric().name().to_owned())
+                .collect::<Vec<_>>();
+            assert_eq!(names, ["bar"]);
+
+            vector_lib::event_test_util::contains_name_once("UnixSocketDatagramTooLargeError")
+                .unwrap();
+            vector_lib::event_test_util::contains_name_once("DecoderFrameTooLongError").unwrap();
+        }
     }
 
     #[tokio::test]
