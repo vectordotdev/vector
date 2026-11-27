@@ -175,32 +175,27 @@ impl Fingerprinter {
         }
     }
 
-    /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
-    pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
-        use FileFingerprint::{DevInode, FirstLinesChecksum};
-
-        match self.strategy {
+    pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<(FileFingerprint, File)> {
+        let mut file = File::open(path).await?;
+        let fingerprint = match self.strategy {
             FingerprintStrategy::DevInode => {
-                let file_handle = File::open(path).await?;
-                let file_info = file_handle.file_info().await?;
-                let dev = file_info.portable_dev();
-                let ino = file_info.portable_ino();
-                Ok(DevInode(dev, ino))
+                let file_info = file.file_info().await?;
+                FileFingerprint::DevInode(file_info.portable_dev(), file_info.portable_ino())
             }
             FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes,
                 lines,
             } => {
                 let buffer = self.buffer.resize_slice_mut(self.max_line_length);
-                let mut fp = File::open(path).await?;
-                let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
+                let mut reader = UncompressedReaderImpl::reader(&mut file).await?;
 
                 skip_first_n_bytes(&mut reader, ignored_header_bytes).await?;
                 let bytes_read = fingerprinter_read_until(reader, b'\n', lines, buffer).await?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
-                Ok(FirstLinesChecksum(fingerprint))
+                FileFingerprint::FirstLinesChecksum(FINGERPRINT_CRC.checksum(&buffer[..bytes_read]))
             }
-        }
+        };
+        file.seek(SeekFrom::Start(0)).await?;
+        Ok((fingerprint, file))
     }
 
     pub async fn fingerprint_or_emit(
@@ -208,7 +203,7 @@ impl Fingerprinter {
         path: &Path,
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
-    ) -> Option<FileFingerprint> {
+    ) -> Option<(FileFingerprint, File)> {
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
                 if metadata.is_dir() {
@@ -343,8 +338,8 @@ mod test {
                 .is_err()
         );
         assert_eq!(
-            fingerprinter.fingerprint(&full_line_path).await.unwrap(),
-            fingerprinter.fingerprint(&duplicate_path).await.unwrap(),
+            fingerprinter.fingerprint(&full_line_path).await.unwrap().0,
+            fingerprinter.fingerprint(&duplicate_path).await.unwrap().0,
         );
     }
 
@@ -408,7 +403,7 @@ mod test {
             max_line_length - 1,
         );
 
-        let mut run = async |path| fingerprinter.fingerprint(path).await;
+        let mut run = async |path| fingerprinter.fingerprint(path).await.map(|(id, _)| id);
 
         assert!(run(&empty).await.is_err());
         assert!(run(&incomplete_line).await.is_err());
@@ -503,7 +498,7 @@ mod test {
             b"line one\nline two\nine three\n",
         );
 
-        let mut run = async move |path| fingerprinter.fingerprint(path).await;
+        let mut run = async move |path| fingerprinter.fingerprint(path).await.map(|(id, _)| id);
 
         assert!(run(&incomplete_lines).await.is_err());
 
@@ -570,7 +565,7 @@ mod test {
         // Finish the header and append a complete record to the same file.
         let mut file = fs::OpenOptions::new().append(true).open(&path).unwrap();
         file.write_all(b"!record\n").unwrap();
-        let fingerprint = fingerprinter.fingerprint(&path).await.unwrap();
+        let (fingerprint, _) = fingerprinter.fingerprint(&path).await.unwrap();
         // The expected checksum includes only the record, not its header.
         assert_eq!(
             fingerprint,
@@ -616,7 +611,7 @@ mod test {
             &gzip(b"some-header-22\nhellow world\nfrom vector\n").await,
         );
 
-        let mut run = async move |path| fingerprinter.fingerprint(path).await;
+        let mut run = async move |path| fingerprinter.fingerprint(path).await.map(|(id, _)| id);
 
         assert!(run(&two_lines).await.is_ok());
         assert_eq!(
@@ -654,8 +649,8 @@ mod test {
         assert!(fingerprinter.fingerprint(&empty_path).await.is_ok());
         assert!(fingerprinter.fingerprint(&small_path).await.is_ok());
         assert_ne!(
-            fingerprinter.fingerprint(&medium_path).await.unwrap(),
-            fingerprinter.fingerprint(&duplicate_path).await.unwrap()
+            fingerprinter.fingerprint(&medium_path).await.unwrap().0,
+            fingerprinter.fingerprint(&duplicate_path).await.unwrap().0
         );
     }
 
