@@ -3,7 +3,9 @@
 
 pub mod buffer;
 pub mod checkpointer;
+pub mod clock;
 mod fingerprinter;
+pub mod fs;
 pub mod internal_events;
 mod metadata_ext;
 
@@ -11,7 +13,9 @@ use vector_config::configurable_component;
 
 pub use self::{
     checkpointer::{CHECKPOINT_FILE_NAME, Checkpointer, CheckpointsView},
+    clock::{Clock, MonotonicInstant, SystemClock},
     fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
+    fs::{AsyncFile, FileIdentity, FileMetadata, FileSystem, OsFileSystem},
     internal_events::FileSourceInternalEvents,
     metadata_ext::{AsyncFileInfo, PortableFileExt},
 };

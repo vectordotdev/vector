@@ -8,16 +8,13 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::{
-    fs::File,
-    io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncSeekExt, BufReader, ReadBuf},
-    time::Instant,
-};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncSeekExt, BufReader, ReadBuf};
 use tracing::debug;
 use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
-    AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
+    AsyncFile, Clock, FilePosition, FileSystem, MonotonicInstant, OsFileSystem, ReadFrom,
+    SystemClock,
     buffer::{ReadResult, read_until_with_max_size},
 };
 use vector_common::compression::gzip_multiple_decoder;
@@ -42,29 +39,29 @@ mod tests;
 /// The enum approach has zero extra fd overhead - we access the same File owned by
 /// `BufReader` through `get_ref()`. This is critical for accurately tracking
 /// `bytes_unread` even after file deletion (the fd remains valid).
-enum FileReader {
+enum FileReader<F: AsyncFile = tokio::fs::File> {
     /// Plain file reader - we can access the File via `get_ref()` for metadata
-    Plain(BufReader<File>),
+    Plain(BufReader<F>),
     /// Gzipped file reader - no meaningful file position tracking
     /// Boxed to reduce enum size (this variant is much larger than others)
-    Gzipped(Box<BufReader<GzipDecoder<BufReader<File>>>>),
+    Gzipped(Box<BufReader<GzipDecoder<BufReader<F>>>>),
     /// Null reader for skipped files
     Null(io::Cursor<Vec<u8>>),
 }
 
-impl FileReader {
+impl<F: AsyncFile> FileReader<F> {
     /// Get the current file size by accessing the underlying File.
     /// Returns None for metadata errors, or gzipped or null readers where file size isn't meaningful.
     /// This works even after the file has been deleted (on Unix) since the fd is still open.
     async fn file_size(&self) -> Option<u64> {
         match self {
-            FileReader::Plain(reader) => reader.get_ref().metadata().await.ok().map(|m| m.len()),
+            FileReader::Plain(reader) => reader.get_ref().metadata().await.ok().map(|m| m.len),
             FileReader::Gzipped(_) | FileReader::Null(_) => None,
         }
     }
 }
 
-impl AsyncRead for FileReader {
+impl<F: AsyncFile> AsyncRead for FileReader<F> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -78,7 +75,7 @@ impl AsyncRead for FileReader {
     }
 }
 
-impl AsyncBufRead for FileReader {
+impl<F: AsyncFile> AsyncBufRead for FileReader<F> {
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
         match self.get_mut() {
             FileReader::Plain(r) => Pin::new(r).poll_fill_buf(cx),
@@ -136,30 +133,27 @@ pub struct FileUnwatchInfo {
 /// The `FileWatcher` is expected to live for the lifetime of the file
 /// path. `FileServer` is responsible for clearing away `FileWatchers` which no
 /// longer exist.
-pub struct FileWatcher {
+pub struct FileWatcher<FS: FileSystem = OsFileSystem> {
     pub path: PathBuf,
+    fs: FS,
     findable: bool,
-    reader: FileReader,
+    reader: FileReader<FS::File>,
     file_position: FilePosition,
     devno: u64,
     inode: u64,
     is_dead: bool,
     reached_eof: bool,
-    last_read_attempt: Instant,
-    last_read_success: Instant,
+    last_read_attempt: MonotonicInstant,
+    last_read_success: MonotonicInstant,
     read_retry_delay: Duration,
-    last_seen: Instant,
+    last_seen: MonotonicInstant,
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
 }
 
-impl FileWatcher {
-    /// Create a new `FileWatcher`
-    ///
-    /// The input path will be used by `FileWatcher` to prime its state
-    /// machine. A `FileWatcher` tracks _only one_ file. This function returns
-    /// an error if the path does not exist or is not readable by the current process.
+impl FileWatcher<OsFileSystem> {
+    /// Create a new `FileWatcher` backed by the OS filesystem and system clock.
     ///
     /// # Errors
     /// Returns an error if opening the file, reading its metadata, or checking
@@ -173,22 +167,58 @@ impl FileWatcher {
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
-    ) -> Result<FileWatcher, std::io::Error> {
-        let f = File::open(&path).await?;
-        let file_info = f.file_info().await?;
-        let (devno, ino) = (file_info.portable_dev(), file_info.portable_ino());
+    ) -> Result<Self, std::io::Error> {
+        Self::new_with_fs(
+            path,
+            read_from,
+            ignore_before,
+            max_line_bytes,
+            line_delimiter,
+            OsFileSystem,
+            &SystemClock,
+        )
+        .await
+    }
 
-        #[cfg(unix)]
-        let metadata = file_info;
-        #[cfg(windows)]
-        let metadata = f.metadata().await?;
+    #[cfg(test)]
+    pub(super) async fn read_line(&mut self) -> io::Result<RawLineResult> {
+        self.read_line_with_clock(&SystemClock).await
+    }
+
+    #[cfg(test)]
+    pub fn should_read(&self) -> bool {
+        self.should_read_at(SystemClock.now())
+    }
+}
+
+impl<FS: FileSystem> FileWatcher<FS> {
+    /// Create a new `FileWatcher` using the provided [`FileSystem`] and [`Clock`].
+    ///
+    /// # Errors
+    /// Returns an error if opening the file, reading its metadata, or checking
+    /// its compression header fails.
+    ///
+    /// # Panics
+    /// Panics if seeking to the initial position in an uncompressed file fails.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn new_with_fs<C: Clock>(
+        path: PathBuf,
+        read_from: ReadFrom,
+        ignore_before: Option<DateTime<Utc>>,
+        max_line_bytes: usize,
+        line_delimiter: Bytes,
+        fs: FS,
+        clock: &C,
+    ) -> Result<Self, std::io::Error> {
+        let f = fs.open(&path).await?;
+        let (metadata, identity) = f.open_info().await?;
+        let (devno, ino) = (identity.dev, identity.ino);
 
         let mut reader = BufReader::new(f);
 
-        let too_old = if let (Some(ignore_before), Ok(modified_time)) = (
-            ignore_before,
-            metadata.modified().map(DateTime::<Utc>::from),
-        ) {
+        let too_old = if let (Some(ignore_before), Some(modified_time)) =
+            (ignore_before, metadata.modified)
+        {
             modified_time < ignore_before
         } else {
             false
@@ -199,7 +229,7 @@ impl FileWatcher {
         // Determine the actual position at which we should start reading.
         // For non-gzipped files, we use FileReader::Plain which allows metadata access.
         // For gzipped files, position tracking is not meaningful.
-        let (reader, file_position): (FileReader, FilePosition) =
+        let (reader, file_position): (FileReader<FS::File>, FilePosition) =
             match (gzipped, too_old, read_from) {
                 (true, true, _) => {
                     debug!(
@@ -245,15 +275,17 @@ impl FileWatcher {
                 }
             };
 
+        let now = clock.now();
+        let now_utc = clock.now_utc();
         let ts = metadata
-            .modified()
-            .ok()
-            .and_then(|mtime| mtime.elapsed().ok())
-            .and_then(|diff| Instant::now().checked_sub(diff))
-            .unwrap_or_else(Instant::now);
+            .modified
+            .and_then(|mtime| now_utc.signed_duration_since(mtime).to_std().ok())
+            .and_then(|diff| now.checked_sub(diff))
+            .unwrap_or(now);
 
         Ok(FileWatcher {
             path,
+            fs,
             findable: true,
             reader,
             file_position,
@@ -281,35 +313,34 @@ impl FileWatcher {
     /// Returns an error if opening the replacement file, reading its metadata
     /// or compression header, or restoring the file position fails.
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<Option<FileUnwatchInfo>> {
-        let new_file = File::open(&path).await?;
+        let new_file = self.fs.open(&path).await?;
 
-        let file_info = new_file.file_info().await?;
-        let unwatch_info =
-            if (file_info.portable_dev(), file_info.portable_ino()) == (self.devno, self.inode) {
-                None
-            } else {
-                // Capture metrics from the old file before switching
-                let old_info = self.get_unwatch_info().await;
+        let identity = new_file.identity().await?;
+        let unwatch_info = if (identity.dev, identity.ino) == (self.devno, self.inode) {
+            None
+        } else {
+            // Capture metrics from the old file before switching
+            let old_info = self.get_unwatch_info().await;
 
-                let mut reader = BufReader::new(new_file);
-                let gzipped = is_gzipped(&mut reader).await?;
-                let new_reader = if gzipped {
-                    if self.file_position != 0 {
-                        FileReader::Null(io::Cursor::new(Vec::new()))
-                    } else {
-                        FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader))))
-                    }
+            let mut reader = BufReader::new(new_file);
+            let gzipped = is_gzipped(&mut reader).await?;
+            let new_reader = if gzipped {
+                if self.file_position != 0 {
+                    FileReader::Null(io::Cursor::new(Vec::new()))
                 } else {
-                    reader.seek(io::SeekFrom::Start(self.file_position)).await?;
-                    FileReader::Plain(reader)
-                };
-                self.reader = new_reader;
-
-                self.devno = file_info.portable_dev();
-                self.inode = file_info.portable_ino();
-
-                Some(old_info)
+                    FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader))))
+                }
+            } else {
+                reader.seek(io::SeekFrom::Start(self.file_position)).await?;
+                FileReader::Plain(reader)
             };
+            self.reader = new_reader;
+
+            self.devno = identity.dev;
+            self.inode = identity.ino;
+
+            Some(old_info)
+        };
 
         self.reached_eof = false;
         self.read_retry_delay = EOF_READ_BACKOFF_MIN;
@@ -317,10 +348,10 @@ impl FileWatcher {
         Ok(unwatch_info)
     }
 
-    pub fn set_file_findable(&mut self, f: bool) {
+    pub fn set_file_findable_at(&mut self, f: bool, now: MonotonicInstant) {
         self.findable = f;
         if f {
-            self.last_seen = Instant::now();
+            self.last_seen = now;
         }
     }
 
@@ -364,13 +395,13 @@ impl FileWatcher {
         }
     }
 
-    /// Read a single line from the underlying file
-    ///
-    /// This function will attempt to read a new line from its file, blocking,
-    /// up to some maximum but unspecified amount of time. `read_line` will open
-    /// a new file handler as needed, transparently to the caller.
-    pub(super) async fn read_line(&mut self) -> io::Result<RawLineResult> {
-        self.track_read_attempt();
+    /// Read a single line from the underlying file, sampling `clock` at attempt
+    /// start and on read completion so slow I/O does not backdate `last_read_success`.
+    pub(super) async fn read_line_with_clock<C: Clock>(
+        &mut self,
+        clock: &C,
+    ) -> io::Result<RawLineResult> {
+        self.track_read_attempt(clock.now());
 
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
@@ -388,7 +419,7 @@ impl FileWatcher {
                 successfully_read: Some(_),
                 discarded_for_size_and_truncated,
             }) => {
-                self.track_read_success();
+                self.track_read_success(clock.now());
                 Ok(RawLineResult {
                     raw_line: Some(RawLine {
                         offset: initial_position,
@@ -441,15 +472,15 @@ impl FileWatcher {
     }
 
     #[inline]
-    fn track_read_attempt(&mut self) {
-        self.last_read_attempt = Instant::now();
+    fn track_read_attempt(&mut self, now: MonotonicInstant) {
+        self.last_read_attempt = now;
     }
 
     #[inline]
-    fn track_read_success(&mut self) {
+    fn track_read_success(&mut self, now: MonotonicInstant) {
         self.reached_eof = false;
         self.read_retry_delay = EOF_READ_BACKOFF_MIN;
-        self.last_read_success = Instant::now();
+        self.last_read_success = now;
     }
 
     #[inline]
@@ -466,22 +497,24 @@ impl FileWatcher {
     }
 
     #[inline]
-    pub fn last_read_success(&self) -> Instant {
+    pub fn last_read_success(&self) -> MonotonicInstant {
         self.last_read_success
     }
 
     #[inline]
-    pub fn should_read(&self) -> bool {
-        if self.reached_eof && self.last_read_attempt.elapsed() < self.read_retry_delay {
+    pub fn should_read_at(&self, now: MonotonicInstant) -> bool {
+        if self.reached_eof
+            && now.saturating_duration_since(self.last_read_attempt) < self.read_retry_delay
+        {
             return false;
         }
 
-        self.last_read_success.elapsed() < Duration::from_secs(10)
-            || self.last_read_attempt.elapsed() > Duration::from_secs(10)
+        now.saturating_duration_since(self.last_read_success) < Duration::from_secs(10)
+            || now.saturating_duration_since(self.last_read_attempt) > Duration::from_secs(10)
     }
 
     #[inline]
-    pub fn last_seen(&self) -> Instant {
+    pub fn last_seen(&self) -> MonotonicInstant {
         self.last_seen
     }
 

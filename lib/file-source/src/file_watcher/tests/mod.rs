@@ -6,8 +6,9 @@ use std::{fs, path::PathBuf, str, thread};
 
 use async_compression::tokio::bufread::GzipEncoder;
 use bytes::{Bytes, BytesMut};
+use file_source_common::{Clock, OsFileSystem, SystemClock};
 use quickcheck::{Arbitrary, Gen};
-use tokio::{io::AsyncReadExt as _, time::Instant};
+use tokio::io::AsyncReadExt as _;
 
 use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileReader, FileWatcher};
 
@@ -205,7 +206,7 @@ async fn gzip_multi_stream_reads_all_members() {
 
     let mut lines = Vec::new();
     for _ in 0..10 {
-        fw.track_read_attempt();
+        fw.track_read_attempt(SystemClock.now());
         let result = fw.read_line().await.expect("read_line error");
         if let Some(raw) = result.raw_line {
             lines.push(String::from_utf8(raw.bytes.to_vec()).unwrap());
@@ -219,10 +220,11 @@ async fn gzip_multi_stream_reads_all_members() {
 }
 
 fn watcher_for_timing() -> FileWatcher {
-    let now = Instant::now();
+    let now = SystemClock.now();
 
     FileWatcher {
         path: PathBuf::new(),
+        fs: OsFileSystem,
         findable: true,
         reader: FileReader::Null(std::io::Cursor::new(Vec::new())),
         file_position: 0,
@@ -244,7 +246,7 @@ fn watcher_for_timing() -> FileWatcher {
 fn backs_off_after_eof() {
     let mut watcher = watcher_for_timing();
 
-    watcher.track_read_attempt();
+    watcher.track_read_attempt(SystemClock.now());
     watcher.track_read_eof();
 
     assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
@@ -254,7 +256,7 @@ fn backs_off_after_eof() {
 
     assert!(watcher.should_read());
 
-    watcher.track_read_attempt();
+    watcher.track_read_attempt(SystemClock.now());
     watcher.track_read_eof();
 
     assert_eq!(
@@ -268,13 +270,13 @@ fn caps_and_resets_eof_backoff() {
     let mut watcher = watcher_for_timing();
 
     for _ in 0..16 {
-        watcher.track_read_attempt();
+        watcher.track_read_attempt(SystemClock.now());
         watcher.track_read_eof();
     }
 
     assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MAX);
 
-    watcher.track_read_success();
+    watcher.track_read_success(SystemClock.now());
 
     assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
     assert!(!watcher.reached_eof());
@@ -297,7 +299,7 @@ async fn updating_path_resets_eof_backoff() {
         .await
         .unwrap();
         for _ in 0..16 {
-            watcher.track_read_attempt();
+            watcher.track_read_attempt(SystemClock.now());
             watcher.track_read_eof();
         }
         assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MAX);
