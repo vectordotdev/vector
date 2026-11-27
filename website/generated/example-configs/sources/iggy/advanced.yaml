@@ -1,0 +1,15 @@
+sources:
+  my_source_id:
+    type: iggy
+    batch_length: 1000
+    commit_interval_secs: 5
+    consumer_name: vector
+    drain_timeout_secs: 5
+    offset_key_field: offset
+    partition_id_key_field: partition_id
+    poll_interval_ms: 100
+    stream: vector
+    stream_key_field: stream
+    topic: logs
+    topic_key_field: topic
+    url: iggy+tcp://iggy:iggy@127.0.0.1:8090

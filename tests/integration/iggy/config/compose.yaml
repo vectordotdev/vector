@@ -1,0 +1,27 @@
+version: "3"
+
+services:
+  iggy:
+    image: docker.io/apache/iggy:${CONFIG_VERSION}
+    ports:
+      - 8090:8090
+    environment:
+      # Pin the root credentials so they match the `iggy:iggy` user/password
+      # in `test.yaml`; without these the server generates a random root
+      # password on first start and the tests fail authentication.
+      - IGGY_ROOT_USERNAME=iggy
+      - IGGY_ROOT_PASSWORD=iggy
+      # The image binds TCP to loopback by default, which the runner cannot
+      # reach over the compose network. A wildcard bind requires the address
+      # clients dial, which is this service's network name.
+      - IGGY_TCP_ADDRESS=0.0.0.0:8090
+      - IGGY_NODE_ADVERTISED_ADDRESS=iggy
+    # Iggy opens its storage through io_uring, which the default seccomp
+    # profile blocks, so the server panics on start without this.
+    security_opt:
+      - seccomp=unconfined
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
