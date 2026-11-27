@@ -1346,6 +1346,7 @@ impl ContainerLogInfo {
         // Only completed messages advance the cursor shared with the next
         // attachment. Unfinished chunks are fetched again and rebuilt locally.
         self.last_log = stream_state.last_log;
+        self.last_read = None;
         stream_state.replay_partial_until = None;
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.

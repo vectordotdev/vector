@@ -1,6 +1,46 @@
 use crate::sources::docker_logs::*;
 
 #[test]
+fn completed_only_attachment_does_not_guard_new_partials() {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let completed = "2026-11-06T21:03:17Z done\n";
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, completed).is_some());
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, completed).is_none());
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:17Z new-prefix").is_none());
+    let log = event(
+        &mut info,
+        &mut state,
+        "2026-11-06T21:03:17.000000001Z suffix\n",
+    )
+    .unwrap();
+    assert_eq!(
+        log.get(vrl::event_path!("message"))
+            .unwrap()
+            .coerce_to_bytes()
+            .as_ref(),
+        b"new-prefixsuffix",
+    );
+}
+
+#[test]
 fn delayed_restart_events_preserve_current_run_partial_on_second_reattachment() {
     let mut info = container_log_info();
     let bytes_received = register(BytesReceived::from(Protocol::HTTP));
