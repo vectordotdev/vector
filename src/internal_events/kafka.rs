@@ -194,6 +194,54 @@ mod source {
         }
     }
 
+    #[cfg(feature = "azure-core")]
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct KafkaOAuthTokenRefreshError<'a> {
+        pub error: &'a dyn std::error::Error,
+    }
+
+    #[cfg(feature = "azure-core")]
+    impl InternalEvent for KafkaOAuthTokenRefreshError<'_> {
+        fn emit(self) {
+            // Azure SDK errors print only their own message, so add the text of each source that
+            // the message does not contain yet. A source often holds the cause, for example the
+            // connection or TLS error under a failed token request.
+            let mut error = self.error.to_string();
+            let mut source = self.error.source();
+            while let Some(cause) = source {
+                let cause_text = cause.to_string();
+                if !error.contains(&cause_text) {
+                    error.push_str(": ");
+                    error.push_str(&cause_text);
+                }
+                source = cause.source();
+            }
+            // Some messages have line breaks, for example before the troubleshooting link that
+            // `azure_identity` adds, and a text log would show the rest of the error on lines of
+            // its own. So log the error on one line, with `; ` in place of each line break.
+            let error = error
+                .split(['\r', '\n'])
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .collect::<Vec<_>>()
+                .join("; ");
+            error!(
+                message = "Failed to get a SASL/OAUTHBEARER token.",
+                %error,
+                error_code = "oauth_token_refresh",
+                error_type = error_type::REQUEST_FAILED,
+                stage = error_stage::RECEIVING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "oauth_token_refresh",
+                "error_type" => error_type::REQUEST_FAILED,
+                "stage" => error_stage::RECEIVING,
+            )
+            .increment(1);
+        }
+    }
+
     #[derive(Debug, NamedInternalEvent)]
     pub(crate) struct KafkaPayloadDecompressionError<'a> {
         pub error: &'a std::io::Error,
