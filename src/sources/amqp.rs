@@ -39,6 +39,11 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
+const TIMESTAMP: &str = "timestamp";
+const ROUTING: &str = "routing";
+const EXCHANGE: &str = "exchange";
+const OFFSET: &str = "offset";
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("Could not create AMQP consumer: {}", source))]
@@ -122,15 +127,15 @@ fn default_consumer() -> String {
 }
 
 fn default_routing_key_field() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("routing"))
+    OptionalValuePath::from(owned_value_path!(ROUTING))
 }
 
 fn default_exchange_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("exchange"))
+    OptionalValuePath::from(owned_value_path!(EXCHANGE))
 }
 
 fn default_offset_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("offset"))
+    OptionalValuePath::from(owned_value_path!(OFFSET))
 }
 
 impl_generate_config_from_default!(AmqpSourceConfig);
@@ -160,9 +165,9 @@ impl SourceConfig for AmqpSourceConfig {
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
                 None,
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP),
                 Kind::timestamp(),
-                Some("timestamp"),
+                Some(TIMESTAMP),
             )
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
@@ -170,21 +175,21 @@ impl SourceConfig for AmqpSourceConfig {
                     .path
                     .clone()
                     .map(LegacyKey::InsertIfEmpty),
-                &owned_value_path!("routing"),
+                &owned_value_path!(ROUTING),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
                 self.exchange_key.path.clone().map(LegacyKey::InsertIfEmpty),
-                &owned_value_path!("exchange"),
+                &owned_value_path!(EXCHANGE),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 AmqpSourceConfig::NAME,
                 self.offset_key.path.clone().map(LegacyKey::InsertIfEmpty),
-                &owned_value_path!("offset"),
+                &owned_value_path!(OFFSET),
                 Kind::integer(),
                 None,
             );
@@ -260,7 +265,7 @@ fn populate_log_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        path!("routing"),
+        path!(ROUTING),
         keys.routing.to_string(),
     );
 
@@ -271,7 +276,7 @@ fn populate_log_event(
             .path
             .as_ref()
             .map(LegacyKey::InsertIfEmpty),
-        path!("exchange"),
+        path!(EXCHANGE),
         keys.exchange.to_string(),
     );
 
@@ -279,7 +284,7 @@ fn populate_log_event(
         AmqpSourceConfig::NAME,
         log,
         keys.offset_key.path.as_ref().map(LegacyKey::InsertIfEmpty),
-        path!("offset"),
+        path!(OFFSET),
         keys.delivery_tag,
     );
 
@@ -296,10 +301,7 @@ fn populate_log_event(
     match log_namespace {
         LogNamespace::Vector => {
             if let Some(timestamp) = timestamp {
-                log.insert(
-                    metadata_path!(AmqpSourceConfig::NAME, "timestamp"),
-                    timestamp,
-                );
+                log.insert(metadata_path!(AmqpSourceConfig::NAME, TIMESTAMP), timestamp);
             }
 
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
@@ -583,13 +585,13 @@ pub mod test {
                     None,
                 )
                 .with_metadata_field(
-                    &owned_value_path!("amqp", "timestamp"),
+                    &owned_value_path!("amqp", TIMESTAMP),
                     Kind::timestamp(),
-                    Some("timestamp"),
+                    Some(TIMESTAMP),
                 )
-                .with_metadata_field(&owned_value_path!("amqp", "routing"), Kind::bytes(), None)
-                .with_metadata_field(&owned_value_path!("amqp", "exchange"), Kind::bytes(), None)
-                .with_metadata_field(&owned_value_path!("amqp", "offset"), Kind::integer(), None);
+                .with_metadata_field(&owned_value_path!("amqp", ROUTING), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", EXCHANGE), Kind::bytes(), None)
+                .with_metadata_field(&owned_value_path!("amqp", OFFSET), Kind::integer(), None);
 
         assert_eq!(definition, Some(expected_definition));
     }
@@ -612,11 +614,11 @@ pub mod test {
             Kind::bytes(),
             Some("message"),
         )
-        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!(TIMESTAMP), Kind::timestamp(), None)
         .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("routing"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("exchange"), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!("offset"), Kind::integer(), None);
+        .with_event_field(&owned_value_path!(ROUTING), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(EXCHANGE), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(OFFSET), Kind::integer(), None);
 
         assert_eq!(definition, Some(expected_definition));
     }
@@ -774,13 +776,13 @@ mod integration_test {
         let log = events[0].as_log();
         trace!("{log:?}");
         assert_eq!(*log.get_message().unwrap(), "my message".into());
-        assert_eq!(log["routing"], routing_key.into());
+        assert_eq!(log[ROUTING], routing_key.into());
         assert_eq!(*log.get_source_type().unwrap(), "amqp".into());
         let log_ts = log[log_schema().timestamp_key().unwrap().to_string()]
             .as_timestamp()
             .unwrap();
         assert!(log_ts.signed_duration_since(now) < chrono::Duration::seconds(1));
-        assert_eq!(log["exchange"], exchange.as_str().into());
+        assert_eq!(log[EXCHANGE], exchange.as_str().into());
     }
 
     #[tokio::test]
