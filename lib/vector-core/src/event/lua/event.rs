@@ -25,11 +25,7 @@ impl IntoLua for LuaEvent {
                 .into_lua(lua)?,
             )?,
             Event::Trace(_) => {
-                return Err(LuaError::ToLuaConversionError {
-                    from: String::from("Event"),
-                    to: "table",
-                    message: Some("Trace are not supported".to_string()),
-                });
+                return Err(LuaError::external("Trace events are not supported"));
             }
         }
         Ok(LuaValue::Table(table))
@@ -109,6 +105,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn into_lua_metric() {
         let event = Event::Metric(Metric::new(
             "example counter",
@@ -148,6 +145,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn from_lua_metric() {
         let lua_event = r#"
         {

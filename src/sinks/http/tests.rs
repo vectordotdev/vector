@@ -14,17 +14,20 @@ use serde::{Deserialize, de};
 use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     codecs::{
-        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-        encoding::FramingConfig,
+        JsonSerializerConfig, NativeJsonDeserializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig, decoding::format::Deserializer as _, encoding::FramingConfig,
     },
-    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent, MetricValue, Value},
     finalization::AddBatchNotifier,
+    metrics::Controller,
     serde::AsciiChar,
+    stream::batcher::limiter::ItemBatchSize as _,
 };
 
 use vrl::event_path;
 
 use super::{
+    batch::HttpBatchSizer,
     config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
     encoder::HttpEncoder,
 };
@@ -130,6 +133,74 @@ fn http_encode_event_ndjson() {
     let output = serde_json::from_slice::<ExpectedEvent>(&output_buffer[..]).unwrap();
 
     assert_eq!(output.message, "hello world".to_string());
+}
+
+#[test]
+fn http_native_json_batch_sizing_does_not_report_dropped_events() {
+    init_test();
+    let controller = Controller::get().unwrap();
+    controller.reset();
+
+    let config = indoc::indoc! {r#"
+        uri: "http://127.0.0.1:8080"
+        encoding:
+          codec: native_json
+          except_fields: [bad]
+        framing:
+          method: newline_delimited
+        "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
+    let encoder = config.build_encoder().unwrap();
+    let sizer = HttpBatchSizer {
+        encoder: encoder.clone(),
+    };
+    let expected = Event::Log(LogEvent::from("keep this event"));
+    let mut event = expected.clone();
+    let too_deep = (0..41).fold(Value::from("leaf"), |value, _| Value::Array(vec![value]));
+    event.as_mut_log().insert(event_path!("bad"), too_deep);
+
+    assert_eq!(sizer.size(&event), event.size_of());
+
+    let filtered_encoder = HttpEncoder::new(
+        encoder.clone(),
+        config.encoding.transformer(),
+        String::new(),
+        String::new(),
+    );
+    let mut output = Vec::new();
+    filtered_encoder
+        .encode_input(vec![event.clone()], &mut output)
+        .expect("excluding the deeply nested field should allow encoding");
+    let decoded = NativeJsonDeserializerConfig::default()
+        .build()
+        .parse(output.into(), crate::config::LogNamespace::Legacy)
+        .unwrap();
+    assert_eq!(decoded.as_slice(), &[expected]);
+
+    let metrics = controller.capture_metrics();
+    for name in ["component_errors_total", "component_discarded_events_total"] {
+        assert!(
+            !metrics.iter().any(|metric| metric.name() == name),
+            "batch sizing must not report {name} for an event that encodes after filtering"
+        );
+    }
+
+    let unfiltered_encoder = HttpEncoder::new(
+        encoder,
+        Transformer::default(),
+        String::new(),
+        String::new(),
+    );
+    assert!(
+        unfiltered_encoder
+            .encode_input(vec![event], &mut Vec::new())
+            .is_err()
+    );
+    let metrics = controller.capture_metrics();
+    for name in ["component_errors_total", "component_discarded_events_total"] {
+        let metric = metrics.iter().find(|metric| metric.name() == name).unwrap();
+        assert_eq!(metric.value(), &MetricValue::Counter { value: 1.0 });
+    }
 }
 
 #[test]
@@ -593,7 +664,7 @@ async fn custom_retry_does_not_retry_unconfigured_status_code() {
             unreachable!("There should be no successful requests")
         })
         .await;
-        assert!(output_lines.is_empty());
+        assert_eq!(output_lines, [] as [std::string::String; 0]);
     })
     .await;
 }
@@ -620,7 +691,7 @@ async fn fails_on_permanent_error() {
 
         let output_lines =
             get_received_gzip(rx, |_| unreachable!("There should be no lines")).await;
-        assert!(output_lines.is_empty());
+        assert_eq!(output_lines, [] as [std::string::String; 0]);
     })
     .await;
 }
@@ -966,15 +1037,52 @@ async fn missing_field_in_uri_template() {
 
     drop(trigger);
 
-    // TODO(https://github.com/vectordotdev/vector/issues/23366): Currently, When the KeyPartitioner fails to build the batch key from
-    // an event, the finalizer is not notified with
-    // EventStatus::Rejected. The error is silently ignored.
-    // See src/sinks/http/sink.rs:47
-    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
     // No requests should have been made to the server
     let requests = rx.collect::<Vec<_>>().await;
     assert!(requests.is_empty());
+}
+
+#[tokio::test]
+async fn encode_error_rejects_the_unsent_request_and_keeps_draining() {
+    let (_guard, in_addr) = next_addr();
+    let config: HttpSinkConfig = serde_yaml::from_str(&format!(
+        r#"
+        uri: "http://{in_addr}/"
+        encoding:
+          codec: avro
+          avro:
+            schema: '{{"type":"record","name":"Log","fields":[{{"name":"required_field","type":"string"}}]}}'
+        batch:
+          max_events: 2
+        compression: none
+        "#,
+    ))
+    .unwrap();
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+    tokio::spawn(server);
+
+    let event = |has_required_field| {
+        let mut log = LogEvent::from("test message");
+        if has_required_field {
+            log.insert(event_path!("required_field"), "present");
+        }
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        (Event::Log(log.with_batch_notifier(&batch)), receiver)
+    };
+    let (first, first_status) = event(true);
+    let (invalid, invalid_status) = event(false);
+    let (next, next_status) = event(true);
+
+    sink.run_events([first, invalid, next]).await.unwrap();
+    drop(trigger);
+
+    assert_eq!(first_status.await, BatchStatus::Rejected);
+    assert_eq!(invalid_status.await, BatchStatus::Rejected);
+    assert_eq!(next_status.await, BatchStatus::Delivered);
+    assert_eq!(rx.collect::<Vec<_>>().await.len(), 1);
 }
 
 #[tokio::test]

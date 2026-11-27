@@ -5,14 +5,14 @@ use serde_with::serde_as;
 use tower::{
     Service, ServiceBuilder,
     balance::p2c::Balance,
-    buffer::{Buffer, BufferLayer},
+    buffer::Buffer,
     discover::Change,
     layer::{Layer, util::Stack},
     limit::RateLimit,
     retry::Retry,
     timeout::Timeout,
 };
-use vector_lib::configurable::configurable_component;
+use vector_lib::{configurable::configurable_component, cpu_time::spawn_timed};
 
 pub use crate::sinks::util::service::{
     concurrency::Concurrency,
@@ -355,13 +355,20 @@ impl TowerRequestSettings {
             .map(|(i, service)| Ok::<_, S::Error>(Change::Insert(i, service)))
             .collect::<Vec<_>>();
 
+        // [Balance] must be wrapped with a [Buffer] so that the overall service implements Clone.
+        // The worker is spawned here rather than by `Buffer::new` so that it inherits the sink's
+        // CPU counter.
+        let (buffer, worker) = Buffer::pair(
+            Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>),
+            buffer_bound,
+        );
+        spawn_timed(worker);
+
         // Build sink service
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            // [Balance] must be wrapped with a [BufferLayer] so that the overall service implements Clone.
-            .layer(BufferLayer::new(buffer_bound))
-            .service(Balance::new(Box::pin(stream::iter(services)) as Pin<Box<_>>))
+            .service(buffer)
     }
 }
 

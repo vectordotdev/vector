@@ -528,8 +528,7 @@ impl HttpSinkConfig {
                 )
             }
             _ => HttpService::new(client, http_sink_request_builder),
-        }
-        .with_response_decompression();
+        };
 
         let service = ServiceBuilder::new()
             .settings(
@@ -826,6 +825,9 @@ mod tests {
         assert_eq!(validated.payload_prefix, "");
         assert_eq!(validated.payload_suffix, "");
         assert!(validated.template_headers.is_empty());
-        assert!(validated.converted_static_headers.is_empty());
+        assert_eq!(
+            validated.converted_static_headers,
+            [] as [(http::HeaderName, http::HeaderValue); 0]
+        );
     }
 }

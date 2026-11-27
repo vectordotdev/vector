@@ -131,6 +131,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             StatusCode::OK,
             true,
             self.tls.as_ref(),
+            None,
             self.auth.as_ref(),
             cx,
             self.acknowledgements,
@@ -950,6 +951,6 @@ mod integration_tests {
             &HTTP_PUSH_SOURCE_TAGS,
         )
         .await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     }
 }

@@ -24,8 +24,8 @@ use vector_config::{
 };
 
 use super::schema_validation::{
-    encoded_value_validates_against_schema, json_schema_safe_f64, json_schema_safe_i64,
-    json_schema_safe_u64,
+    assert_schema_allows, encoded_value_validates_against_schema, json_schema_safe_f64,
+    json_schema_safe_i64, json_schema_safe_u64,
 };
 
 /// A templated string.
@@ -932,6 +932,35 @@ fn required_one_of_generates_one_of_constraint() {
             ]
         })
     );
+}
+
+/// A `required_one_of` group with a member that also accepts an alias.
+#[configurable_component]
+#[derive(Clone, Debug)]
+struct RequiredOneOfWithAliasConfig {
+    /// First option.
+    #[configurable(required_one_of = "group")]
+    #[serde(alias = "src")]
+    source: Option<String>,
+
+    /// Second option.
+    #[configurable(required_one_of = "group")]
+    file: Option<String>,
+}
+
+#[test]
+fn required_one_of_accepts_aliases() {
+    let schema = generate_test_schema::<RequiredOneOfWithAliasConfig>();
+    let required: Vec<_> = schema["allOf"][1]["oneOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|branch| branch["required"][0].as_str().unwrap())
+        .collect();
+    assert_eq!(required, ["source", "src", "file"]);
+
+    // A config that sets the member through its alias satisfies the constraint.
+    assert_schema_allows::<RequiredOneOfWithAliasConfig>(json!({ "src": "a" }));
 }
 
 proptest! {

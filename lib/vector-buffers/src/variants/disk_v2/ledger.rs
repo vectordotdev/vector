@@ -643,11 +643,11 @@ where
         let new_reader_file_id = self.state().increment_reader_file_id();
 
         // We ignore the return value because when the value is already zero, we don't want to do an
-        // update, so we return `None`, which causes `fetch_update` to return `Err`.  It's not
+        // update, so we return `None`, which causes `try_update` to return `Err`.  It's not
         // really an error, we just wanted to avoid the extra atomic compare/exchange.
         //
         // Basically, this call is actually infallible for our purposes.
-        let result = self.unacked_reader_file_id_offset.fetch_update(
+        let result = self.unacked_reader_file_id_offset.try_update(
             Ordering::Release,
             Ordering::Relaxed,
             |n| {
@@ -669,16 +669,11 @@ where
     /// receives `true` is responsible for flushing the necessary files.
     pub fn should_flush(&self) -> bool {
         let last_flush = self.last_flush.load();
-        if last_flush.elapsed() > self.config.flush_interval
+        last_flush.elapsed() > self.config.flush_interval
             && self
                 .last_flush
                 .compare_exchange(last_flush, Instant::now())
                 .is_ok()
-        {
-            return true;
-        }
-
-        false
     }
 
     /// Flushes the memory-mapped file backing the ledger to disk.
@@ -856,13 +851,21 @@ where
         Ok(ledger)
     }
 
+    /// Spawns the task that applies reader acknowledgements to the ledger.
+    ///
+    /// The task holds only a weak reference so that dropping the last buffer handle releases the
+    /// ledger, and its lock file, immediately instead of whenever the task next gets polled.
     #[must_use]
-    pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
+    pub(super) fn spawn_finalizer(self: &Arc<Self>) -> OrderedFinalizer<u64> {
         let (finalizer, mut stream) = OrderedFinalizer::new(None);
+        let ledger = Arc::downgrade(self);
         vector_common::spawn_in_current_span(async move {
             while let Some((_status, amount)) = stream.next().await {
-                self.increment_pending_acks(amount);
-                self.notify_writer_waiters();
+                let Some(ledger) = ledger.upgrade() else {
+                    break;
+                };
+                ledger.increment_pending_acks(amount);
+                ledger.notify_writer_waiters();
             }
         });
         finalizer

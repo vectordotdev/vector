@@ -73,8 +73,7 @@ pub struct StaticMetricConfig {
 
     /// Key-value pairs representing tags and their values to add to the metric.
     #[configurable(metadata(
-        docs::additional_props_description = "An individual tag - value pair.",
-        docs::required = true,
+        docs::additional_props_description = "An individual tag - value pair."
     ))]
     pub tags: BTreeMap<String, String>,
 }
@@ -256,7 +255,7 @@ mod tests {
     async fn default_empty() {
         let events = events_from_config(StaticMetricsConfig::default()).await;
 
-        assert!(events.is_empty());
+        assert_eq!(events, [] as [vector_lib::event::Event; 0]);
     }
 
     #[tokio::test]
@@ -267,7 +266,7 @@ mod tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         assert_eq!(event.as_metric().namespace(), Some("static"));
     }
@@ -280,7 +279,7 @@ mod tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         assert_eq!(event.as_metric().namespace(), Some("static"));
         let event = events.remove(0);
@@ -298,7 +297,7 @@ mod tests {
         };
 
         let mut events = events_from_config(config).await;
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
 
         assert_eq!(event.as_metric().namespace(), Some(namespace));
@@ -317,7 +316,7 @@ mod tests {
         })
         .await;
 
-        assert!(!events.is_empty());
+        assert_ne!(events, [] as [vector_lib::event::Event; 0]);
         let event = events.remove(0);
         let metric = event.as_metric();
 

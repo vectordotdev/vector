@@ -12,7 +12,7 @@ pub(super) struct DorisRequestBuilder {
 }
 
 impl RequestBuilder<(DorisPartitionKey, Vec<Event>)> for DorisRequestBuilder {
-    type Metadata = (DorisPartitionKey, EventFinalizers);
+    type Metadata = DorisPartitionKey;
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -30,21 +30,26 @@ impl RequestBuilder<(DorisPartitionKey, Vec<Event>)> for DorisRequestBuilder {
     fn split_input(
         &self,
         input: (DorisPartitionKey, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (key, mut events) = input;
 
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        ((key, finalizers), builder, events)
+        RequestParts {
+            metadata: key,
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        key: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (key, finalizers) = metadata;
         HttpRequest::new(
             payload.into_payload(),
             finalizers,

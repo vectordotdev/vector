@@ -174,7 +174,6 @@ macro_rules! series {
 /// # Panics
 ///
 /// Panics if the counter is absent or its value differs from the expected value.
-#[expect(clippy::float_cmp, reason = "Fixture values must match exactly.")]
 pub fn assert_counter(metrics: &SplitMetrics, series: &MetricSeries, expected: f64) {
     let actual_counter = read_counter_value(metrics, series);
     assert!(actual_counter.is_some(), "counter '{series}' was not found");
@@ -190,7 +189,6 @@ pub fn assert_counter(metrics: &SplitMetrics, series: &MetricSeries, expected: f
 /// # Panics
 ///
 /// Panics if the gauge is absent or its value differs from the expected value.
-#[expect(clippy::float_cmp, reason = "Fixture values must match exactly.")]
 pub fn assert_gauge(metrics: &SplitMetrics, series: &MetricSeries, expected: f64) {
     let actual_gauge = read_gauge_value(metrics, series);
     assert!(actual_gauge.is_some(), "gauge '{series}' was not found");
@@ -206,7 +204,6 @@ pub fn assert_gauge(metrics: &SplitMetrics, series: &MetricSeries, expected: f64
 /// # Panics
 ///
 /// Panics if the distribution is absent or its sum, count, or bounds differ from expectations.
-#[expect(clippy::float_cmp, reason = "Fixture values must match exactly.")]
 pub fn assert_distribution(
     metrics: &SplitMetrics,
     series: &MetricSeries,

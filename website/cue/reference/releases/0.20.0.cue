@@ -103,7 +103,7 @@ releases: "0.20.0": {
 				  provided as brackets. For example: `%{data:field:array("", "-")} will parse "a-b" into ["a", "b"].
 				- The `keyvalue` filter now supports nested paths as keys. For example:
 
-				  ```coffeescript
+				  ```vrl
 					parse_groks("db.name=my_db,db.operation=insert",
 					  patterns: ["%{data::keyvalue}"]
 					)
@@ -121,7 +121,7 @@ releases: "0.20.0": {
 				  ```
 				- The `date` filter now supports the `d` and `y` shorthands. For example:
 
-				  ```coffeescript
+				  ```vrl
 				    parse_groks("Nov 16 2020 13:41:29 GMT", patterns: ["%{date("MMM d y HH:mm:ss z"):field}"] )
 				  ```
 
@@ -163,7 +163,7 @@ releases: "0.20.0": {
 				The `abort` function can now take an optional string message to include in logs and the metadata for
 				dropped events. For example:
 
-				```coffeescript
+				```vrl
 				if .foo == 5 {
 					abort "foo is " + .foo + "!"
 				}

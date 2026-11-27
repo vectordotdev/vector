@@ -129,6 +129,7 @@ where
                 batch_settings.timeout,
                 |_| batch_settings.as_byte_size_config(),
             )
+            .unwrap_infallible()
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -231,8 +232,12 @@ impl EventPartitioner {
 impl Partitioner for EventPartitioner {
     type Item = HecProcessedEvent;
     type Key = Option<Partitioned>;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
         let emit_err = |error, field| {
             emit(TemplateRenderingError {
                 error,
@@ -271,13 +276,13 @@ impl Partitioner for EventPartitioner {
         .and_then(|path| item.event.get(&path))
         .and_then(|value| value.to_str_lossy().map(|s| s.to_string()));
 
-        Some(Partitioned {
+        Ok(PartitionDecision::Route(Some(Partitioned {
             token: item.event.metadata().splunk_hec_token(),
             source,
             sourcetype,
             index,
             host,
-        })
+        })))
     }
 }
 

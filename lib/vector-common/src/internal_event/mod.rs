@@ -21,7 +21,7 @@ pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENT
 pub use component_events_timed_out::ComponentEventsTimedOut;
 pub use events_received::{EventsReceived, EventsReceivedHandle};
 pub use events_sent::{DEFAULT_OUTPUT, EventsSent, TaggedEventsSent};
-pub use metric_name::{CounterName, GaugeName, HistogramName};
+pub use metric_name::{CounterName, GaugeName, HistogramName, InternalMetricKind, all_metrics};
 pub use metric_value::LossyF64;
 pub use metrics::SharedString;
 pub use optional_tag::OptionalTag;

@@ -37,7 +37,7 @@ impl GenerateConfig for TraceToLogConfig {
 #[typetag::serde(name = "trace_to_log")]
 impl TransformConfig for TraceToLogConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(TraceToLog))
+        Ok(Transform::stateless(TraceToLog))
     }
 
     fn enable_concurrency(&self) -> bool {
@@ -64,7 +64,7 @@ impl TransformConfig for TraceToLogConfig {
 pub struct TraceToLog;
 
 impl FunctionTransform for TraceToLog {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, event: Event) {
         if let Event::Trace(trace) = event {
             output.push(Event::Log(LogEvent::from(trace)));
         }
@@ -112,9 +112,9 @@ mod tests {
 
     #[tokio::test]
     async fn transform_trace() {
-        use vrl::btreemap;
+        use vrl::objectmap;
 
-        let trace = TraceEvent::from(btreemap! {
+        let trace = TraceEvent::from(objectmap! {
             "span_id" => "abc123",
             "trace_id" => "xyz789",
             "span_name" => "test-span",
@@ -137,9 +137,9 @@ mod tests {
 
     #[tokio::test]
     async fn drops_trace_layout_marker() {
-        use vrl::btreemap;
+        use vrl::objectmap;
 
-        let mut trace = TraceEvent::from(btreemap! {
+        let mut trace = TraceEvent::from(objectmap! {
             "host" => "a_hostname",
             "span_id" => "abc123",
         });

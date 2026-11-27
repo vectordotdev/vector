@@ -13,10 +13,10 @@ pub use vector_lib::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
     internal_event::{CountByteSize, TaggedEventsSent},
     json_size::JsonSize,
-    partition::Partitioner,
+    partition::{PartitionDecision, Partitioner},
     request_metadata::{GetEventCountTags, GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     schema::Requirement,
-    sink::{StreamSink, VectorSink},
+    sink::{PreparationError, StreamSink, VectorSink},
     stream::{BatcherSettings, DriverResponse},
     tls::TlsSettings,
 };
@@ -30,7 +30,7 @@ pub use crate::{
         Healthcheck, HealthcheckError,
         util::{
             BatchConfig, Compression, Concurrency, NoDefaultsBatchSettings, RequestBuilder,
-            SinkBatchSettings, TowerRequestConfig,
+            RequestParts, SinkBatchSettings, TowerRequestConfig,
             builder::SinkBuilderExt,
             encoding::{self, write_all},
             metadata::RequestMetadataBuilder,

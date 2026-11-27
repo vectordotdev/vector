@@ -637,7 +637,7 @@ impl DockerLogsSource {
 
                             emit(DockerLogsContainerEventReceived { container_id: &id, action: &action });
 
-                            let id = ContainerId::new(id.clone());
+                            let id = ContainerId::new(id);
 
                             // Update container status
                             match action.as_str() {

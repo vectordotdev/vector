@@ -65,6 +65,10 @@ where
     ///
     /// # Errors
     /// Returns an error if the service fails while waiting to become ready.
+    #[expect(
+        clippy::result_unit_err,
+        reason = "The sink only reports whether service readiness failed"
+    )]
     pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mode = self.mode;
         let id_key_field = self.id_key_field.as_ref();

@@ -9,6 +9,7 @@ use criterion::{
     BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
     criterion_main, measurement::WallTime,
 };
+use tempfile::TempDir;
 use tokio::runtime::{Handle, Runtime};
 use vector_buffers::{BufferType, MemoryBufferSize, WhenFull};
 
@@ -30,7 +31,7 @@ mod common;
 /// when it is dropped. This keeps disk consumption to a minimum.
 struct DataDir {
     index: usize,
-    base: PathBuf,
+    base: TempDir,
 }
 
 struct PathGuard {
@@ -45,30 +46,21 @@ enum BoundBy {
 
 impl DataDir {
     fn new(name: &str) -> Self {
-        let mut base_dir = PathBuf::new();
-        base_dir.push(std::env::temp_dir());
-        base_dir.push(name);
-        std::fs::create_dir_all(&base_dir).expect("could not make base dir");
+        let base = tempfile::Builder::new()
+            .prefix(name)
+            .tempdir()
+            .expect("could not make base dir");
 
-        Self {
-            index: 0,
-            base: base_dir,
-        }
+        Self { index: 0, base }
     }
 
     fn next(&mut self) -> PathGuard {
-        let mut nxt = self.base.clone();
+        let mut nxt = self.base.path().to_path_buf();
         nxt.push(self.index.to_string());
         self.index += 1;
         std::fs::create_dir_all(&nxt).expect("could not make next dir");
 
         PathGuard { inner: nxt }
-    }
-}
-
-impl Drop for DataDir {
-    fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.base).expect("could not remove base dir");
     }
 }
 
@@ -114,9 +106,7 @@ macro_rules! experiment {
 
         $(
             // Additional constant factor here is to avoid potential message
-            // drops due to reuse of disk buffer's internals between
-            // runs. Tempdir has low entropy compared to the number of
-            // iterations we make in these benchmarks.
+            // drops due to reuse of disk buffer's internals between runs.
             let max_size = 1_000_000 * max_events as u64 * mem::size_of::<crate::common::Message<$width>>() as u64;
             let bytes = mem::size_of::<crate::common::Message<$width>>();
             group.throughput(Throughput::Elements(max_events as u64));

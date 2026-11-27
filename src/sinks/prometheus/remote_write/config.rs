@@ -98,7 +98,6 @@ pub(crate) struct RemoteWriteConfig {
     ///
     /// If unset, sending unique incremental metrics to this sink will cause indefinite memory growth.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
     pub tls: Option<TlsConfig>,
