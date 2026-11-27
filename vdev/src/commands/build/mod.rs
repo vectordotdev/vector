@@ -4,6 +4,7 @@ mod coverage;
 mod debian_maintainer_scripts;
 pub(crate) mod docs_json;
 mod licenses;
+mod linux;
 mod manifests;
 mod publish_metadata;
 mod vector;
@@ -19,6 +20,7 @@ crate::cli_subcommands! {
     debian_maintainer_scripts,
     docs_json,
     licenses,
+    linux,
     manifests,
     publish_metadata,
     vector,

@@ -1,0 +1,45 @@
+name: Linux release build without cross-rs
+description: Build with native host tools, then package on the runner. ARM32 uses ARM64-hosted cross-compilers.
+
+inputs:
+  target:
+    description: Rust release target
+    required: true
+  probe-only:
+    description: Only build and execute the ARM32 toolchain probe
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/prepare-armv6-runtime
+      if: startsWith(inputs.target, 'arm-unknown-linux-')
+
+    - name: Build and verify with the shared Linux builder
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        PROBE_ONLY: ${{ inputs.probe-only }}
+        CARGO_BUILD_JOBS: "6"
+        CARGO_INCREMENTAL: "0"
+        CFLAGS: "-g0 -O3"
+      run: |
+        FLAGS=(--verify)
+        if [[ "$PROBE_ONLY" == true ]]; then
+          FLAGS=(--probe-only)
+        fi
+        # Use this checkout's vdev: the pinned installed version may predate
+        # the Linux builder. Build tools run natively; no QEMU is registered.
+        cargo run --locked --package vdev -- build linux "$TARGET" "${FLAGS[@]}"
+
+    - name: Package the verified binary
+      if: inputs.probe-only != 'true'
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        # vdev restores ownership of container outputs, including on failure.
+        # Never rebuild the verified binary with the host packaging toolchain.
+        BINARY_DIGEST=$(sha256sum "target/$TARGET/release/vector")
+        make PREBUILT=true VERSION="$VECTOR_VERSION" VDEV="$VDEV" "package-$TARGET-all"
+        printf '%s\n' "$BINARY_DIGEST" | sha256sum --check -

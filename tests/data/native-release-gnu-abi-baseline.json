@@ -1,0 +1,15 @@
+{
+  "release": "v0.61.0",
+  "targets": {
+    "arm-unknown-linux-gnueabi": {
+      "legacy_cross_digest": "sha256:0c70b0e54724bd599dff00a2888f8ea176a5b6c85af47aad9ad25296f63e2967",
+      "maximum_glibc": "GLIBC_2.30",
+      "replacement_ceiling": "GLIBC_2.17"
+    },
+    "armv7-unknown-linux-gnueabihf": {
+      "legacy_cross_digest": "sha256:73294ebb06e077e49bbbecfe8f17507e9e0b733a2a1ba23056abcd9c0ba617c9",
+      "maximum_glibc": "GLIBC_2.30",
+      "replacement_ceiling": "GLIBC_2.17"
+    }
+  }
+}

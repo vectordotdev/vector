@@ -116,9 +116,8 @@ install_protoc() {
   local download_path="${TMP_DIR}/${archive}"
 
   echo "Downloading ${url}"
-  # Stay compatible with the curl shipped by Ubuntu 20.04 focal (7.68.x) used
-  # in the ghcr.io/cross-rs/* base images: --retry-all-errors was only added
-  # in curl 7.71.0, so rely on the transport-level retry that --retry covers.
+  # Keep support for older curl versions in maintained GNU build containers.
+  # Use the transport-level retry covered by --retry.
   curl --retry 5 --retry-delay 10 -fsSL "${url}" -o "${download_path}"
 
   local actual_sha256
@@ -129,6 +128,10 @@ install_protoc() {
   fi
 
   unzip -qq "${download_path}" -d "${TMP_DIR}"
+  # protoc finds well-known types in an include directory beside its executable.
+  # Keep these files when installing outside a system protobuf development package.
+  mkdir -p "${INSTALL_PATH}/include"
+  cp -R "${TMP_DIR}/include/." "${INSTALL_PATH}/include/"
   mv -f -v "${TMP_DIR}/bin/$(get_bin_name)" "${install_path}"
 }
 

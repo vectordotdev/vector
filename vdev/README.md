@@ -11,6 +11,7 @@ Table of Contents:
 
 - [Pre-requisites](#pre-requisites)
 - [Installation](#installation)
+- [Linux container builds](#linux-container-builds)
 - [Running Tests](#running-tests)
   - [Running Integration tests](#running-integration-tests)
 - [Coverage publishing](#coverage-publishing)
@@ -58,6 +59,15 @@ cargo install vdev
 
 You can also use `cargo vdev` from the Vector repository without installing vdev.
 
+
+## Linux container builds
+
+Use `cargo vdev build linux <target>` to build a Linux release with native
+container tools. ARM32 uses ARM64-hosted cross-compilers. The builder preserves
+the release features and fat LTO, and does not use cross-rs or QEMU.
+
+See [Linux container builds](../docs/native-linux-builds.md) for target triples,
+host requirements, ABI checks, and Makefile aliases.
 
 ## Running Tests
 
