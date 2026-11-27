@@ -167,6 +167,10 @@ impl SourceConfig for SocketConfig {
                 )
             }
             Mode::Udp(config) => {
+                if config.receive_concurrency() == 0 {
+                    return Err("receive_concurrency must be at least 1".into());
+                }
+
                 let log_namespace = cx.log_namespace(config.log_namespace);
                 let decoding = config.decoding().clone();
                 let framing = config
@@ -1171,7 +1175,28 @@ mod test {
             config
         };
 
-        let server = SocketConfig::from(config)
+        let server = build_udp_source(sender, source_key, shutdown_signal, config)
+            .await
+            .unwrap();
+        let source_handle = tokio::spawn(server);
+
+        // Wait for UDP to start listening
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        if let Some(guard) = guard {
+            drop(guard);
+        }
+
+        (address, source_handle)
+    }
+
+    async fn build_udp_source(
+        sender: SourceSender,
+        source_key: &ComponentKey,
+        shutdown_signal: ShutdownSignal,
+        config: UdpConfig,
+    ) -> crate::Result<crate::sources::Source> {
+        SocketConfig::from(config)
             .build(SourceContext {
                 key: source_key.clone(),
                 globals: GlobalOptions::default(),
@@ -1186,17 +1211,44 @@ mod test {
                 metrics_storage: MetricsStorage::default(),
             })
             .await
-            .unwrap();
-        let source_handle = tokio::spawn(server);
+    }
 
-        // Wait for UDP to start listening
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    async fn init_udp_with_config_and_shutdown(
+        sender: SourceSender,
+        source_id: &ComponentKey,
+        shutdown: &mut SourceShutdownCoordinator,
+        config: UdpConfig,
+    ) -> (
+        SocketAddr,
+        JoinHandle<Result<(), crate::sources::SourceError>>,
+    ) {
+        let (shutdown_signal, _) = shutdown.register_source(source_id, false);
+        init_udp_inner(sender, source_id, shutdown_signal, Some(config), false).await
+    }
 
-        if let Some(guard) = guard {
-            drop(guard);
-        }
+    fn udp_config_with_receive_concurrency(
+        address: SocketAddr,
+        receive_concurrency: u64,
+    ) -> UdpConfig {
+        serde_json::from_value(json!({
+            "address": address.to_string(),
+            "receive_concurrency": receive_concurrency,
+        }))
+        .unwrap()
+    }
 
-        (address, source_handle)
+    fn messages_of(events: &[Event]) -> Vec<String> {
+        let mut messages: Vec<String> = events
+            .iter()
+            .map(|event| {
+                // `Display` for `Value` quotes strings; this returns the bare text.
+                event.as_log()[log_schema().message_key().unwrap().to_string()]
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        messages.sort_unstable();
+        messages
     }
 
     #[tokio::test]
@@ -1356,6 +1408,125 @@ mod test {
                 events[0].as_log()[log_schema().message_key().unwrap().to_string()],
                 another_big_message.into()
             );
+        })
+        .await;
+    }
+
+    #[test]
+    fn udp_receive_concurrency_defaults_to_one() {
+        let address = "127.0.0.1:1234";
+        let default: UdpConfig = serde_json::from_value(json!({ "address": address })).unwrap();
+        let explicit: UdpConfig =
+            serde_json::from_value(json!({ "address": address, "receive_concurrency": 4 }))
+                .unwrap();
+
+        assert_eq!(
+            serde_json::to_value(default).unwrap()["receive_concurrency"],
+            json!(1)
+        );
+        assert_eq!(
+            serde_json::to_value(explicit).unwrap()["receive_concurrency"],
+            json!(4)
+        );
+    }
+
+    // `assert_source_compliance` relies on a thread-local recorder, which cannot see events
+    // emitted by reader tasks on other runtime threads, so the multi-thread tests skip it.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn udp_receive_concurrency_delivers_all_datagrams() {
+        let (tx, rx) = SourceSender::new_test();
+        let (_, address) = next_addr();
+        let address =
+            init_udp_with_config(tx, udp_config_with_receive_concurrency(address, 4)).await;
+
+        let mut expected: Vec<String> = (0..64).map(|i| format!("message-{i}")).collect();
+        send_lines_udp(address, expected.iter().cloned());
+        expected.sort_unstable();
+
+        let events = timeout(Duration::from_secs(10), collect_n(rx, expected.len()))
+            .await
+            .expect("timed out waiting for datagrams");
+        assert_eq!(messages_of(&events), expected);
+    }
+
+    #[tokio::test]
+    async fn udp_receive_concurrency_zero_is_rejected() {
+        let (tx, _rx) = SourceSender::new_test();
+        let (_, address) = next_addr();
+
+        let error = build_udp_source(
+            tx,
+            &ComponentKey::from("default"),
+            ShutdownSignal::noop(),
+            udp_config_with_receive_concurrency(address, 0),
+        )
+        .await
+        .err()
+        .expect("receive_concurrency = 0 must be rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("receive_concurrency must be at least 1"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn udp_receive_concurrency_decodes_chunked_gelf_messages() {
+        let (tx, rx) = SourceSender::new_test();
+        let (_, address) = next_addr();
+        let mut config = udp_config_with_receive_concurrency(address, 4);
+        config.decoding = GelfDeserializerConfig::default().into();
+        let address = init_udp_with_config(tx, config).await;
+
+        let mut rng = SmallRng::seed_from_u64(42);
+        let mut chunks: Vec<Bytes> = Vec::new();
+        let mut expected: Vec<String> = Vec::new();
+        for i in 0..8 {
+            let message = format!("chunked message {i} ").repeat(100);
+            chunks.append(&mut get_gelf_chunks(&message, 300, &mut rng));
+            expected.push(message);
+        }
+        chunks.shuffle(&mut rng);
+        expected.sort_unstable();
+
+        send_packets_udp(address, chunks);
+
+        let events = timeout(Duration::from_secs(10), collect_n(rx, expected.len()))
+            .await
+            .expect("timed out waiting for chunked GELF messages");
+        assert_eq!(messages_of(&events), expected);
+    }
+
+    #[tokio::test]
+    async fn udp_receive_concurrency_shutdown() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, rx) = SourceSender::new_test();
+            let source_id = ComponentKey::from("udp_receive_concurrency_shutdown");
+            let (_, address) = next_addr();
+
+            let mut shutdown = SourceShutdownCoordinator::default();
+            let (address, source_handle) = init_udp_with_config_and_shutdown(
+                tx,
+                &source_id,
+                &mut shutdown,
+                udp_config_with_receive_concurrency(address, 4),
+            )
+            .await;
+
+            send_lines_udp(address, vec!["test".to_string()]);
+            let events = timeout(Duration::from_secs(10), collect_n(rx, 1))
+                .await
+                .expect("timed out waiting for datagram");
+            assert_eq!(
+                events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+                "test".into()
+            );
+
+            let deadline = Instant::now() + Duration::from_secs(10);
+            assert!(shutdown.shutdown_source(&source_id, deadline).await);
+            source_handle.await.unwrap().unwrap();
         })
         .await;
     }

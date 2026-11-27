@@ -173,7 +173,9 @@ generated: components: sources: socket: configuration: {
 			Number of concurrent socket readers.
 
 			A single reader caps throughput at one CPU core per socket; multiple readers
-			parallelize datagram decoding.
+			parallelize datagram decoding. With more than one reader, events from different
+			datagrams can arrive out of order. Every reader wakes up for each datagram, so a
+			few readers are usually enough.
 			"""
 		relevant_when: "mode = \"udp\""
 		required:      false

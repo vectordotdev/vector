@@ -112,7 +112,9 @@ pub struct UdpConfig {
     /// Number of concurrent socket readers.
     ///
     /// A single reader caps throughput at one CPU core per socket; multiple readers
-    /// parallelize datagram decoding.
+    /// parallelize datagram decoding. With more than one reader, events from different
+    /// datagrams can arrive out of order. Every reader wakes up for each datagram, so a
+    /// few readers are usually enough.
     #[serde(default = "default_receive_concurrency")]
     #[configurable(validation(range(min = 1)))]
     receive_concurrency: usize,
@@ -160,6 +162,10 @@ impl UdpConfig {
 
     pub(super) const fn address(&self) -> SocketListenAddr {
         self.address
+    }
+
+    pub(super) const fn receive_concurrency(&self) -> usize {
+        self.receive_concurrency
     }
 
     #[must_use]
@@ -259,12 +265,6 @@ pub(super) fn udp(
         let port_key = config.port_key.clone();
         let receive_concurrency = config.receive_concurrency;
 
-        if receive_concurrency == 0 {
-            return Err(SourceError::from(std::io::Error::other(
-                "receive_concurrency must be at least 1",
-            )));
-        }
-
         // Capture the span so spawned tasks inherit component labels for metrics.
         let span = tracing::Span::current();
 
@@ -285,8 +285,7 @@ pub(super) fn udp(
             );
         }
 
-        // The original signal and sender are dropped here, leaving one completion token
-        // per task; the source completes when the last task finishes.
+        // Each reader holds a completion token; the source completes when the last one exits.
         while let Some(result) = join_set.join_next().await {
             match result {
                 Ok(Ok(())) => {}
