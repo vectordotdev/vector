@@ -1,4 +1,12 @@
 services:
+  bigquery-emulator:
+    image: ghcr.io/goccy/bigquery-emulator:latest
+    command:
+      - --project=testproject
+      - --data-from-yaml=/data.yaml
+    volumes:
+      - ./bigquery-emulator-schema.yaml:/data.yaml:ro
+
   gcloud-pubsub:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:${CONFIG_VERSION}-emulators
     command:
