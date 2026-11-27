@@ -1,6 +1,7 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use futures::{FutureExt, TryFutureExt};
+use tower::{ServiceBuilder, limit::ConcurrencyLimitLayer};
 use vector_lib::{
     configurable::configurable_component,
     event::ObjectMap,
@@ -940,6 +941,7 @@ impl ElasticsearchConfig {
             })
             .collect::<Vec<_>>();
 
+        let concurrency_limit = validated.request_limits.concurrency;
         let service = validated.request_limits.clone().distributed_service(
             &ElasticsearchRetryLogic {
                 retry_partial: self.request_retry_partial,
@@ -949,6 +951,11 @@ impl ElasticsearchConfig {
             &ElasticsearchHealthLogic,
             1,
         );
+
+        // Hold fixed-concurrency permits while requests are waiting to retry.
+        let service = ServiceBuilder::new()
+            .option_layer(concurrency_limit.map(ConcurrencyLimitLayer::new))
+            .service(service);
 
         let sink = ElasticsearchSink::new(&common, self, service, validated.batch_settings);
 
