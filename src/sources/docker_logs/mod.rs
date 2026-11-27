@@ -808,6 +808,7 @@ impl EventStreamBuilder {
         let core = Arc::clone(&self.core);
 
         let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+        let mut stream_state = LogStreamState::new(&info);
 
         let mut error = None;
         let events_stream = stream
@@ -817,6 +818,7 @@ impl EventStreamBuilder {
                         message,
                         core.config.partial_event_marker_field.clone(),
                         core.config.auto_partial_merge,
+                        &mut stream_state,
                         &bytes_received,
                         self.log_namespace,
                     )),
@@ -966,12 +968,8 @@ impl ContainerState {
         self.generation += 1;
     }
 
-    fn stopped(&mut self) {
+    const fn stopped(&mut self) {
         self.running = false;
-        // Parked container information may outlive the container itself.
-        if let Some(info) = &mut self.info {
-            info.partial_event_merge_state = None;
-        }
     }
 
     const fn is_running(&self) -> bool {
@@ -980,29 +978,19 @@ impl ContainerState {
 
     /// True if it needs to be restarted.
     #[must_use]
-    fn return_info(&mut self, mut info: ContainerLogInfo) -> bool {
+    fn return_info(&mut self, info: ContainerLogInfo) -> bool {
         debug_assert!(self.info.is_none());
         // Generation is the only one strictly necessary,
         // but with v.running, restarting event_stream is automatically done.
         let restart = self.running || info.generation < self.generation;
-        if !restart {
-            // Match the old stream-local buffer lifetime when no reattachment
-            // is needed, without retaining the unfinished payload indefinitely.
-            info.partial_event_merge_state = None;
-        }
         self.info = Some(info);
         restart
     }
 
     fn take_info(&mut self) -> Option<ContainerLogInfo> {
         self.info.take().map(|mut info| {
-            // Do not join an unfinished message from a previous container run.
-            if info.generation != self.generation {
-                info.partial_event_merge_state = None;
-            }
             // Update info
             info.generation = self.generation;
-            info.last_log_before_stream = info.last_log.map(|(timestamp, _)| timestamp);
             info
         })
     }
@@ -1014,15 +1002,34 @@ struct ContainerLogInfo {
     id: ContainerId,
     /// Timestamp of event which created this struct
     created: DateTime<Utc>,
-    /// Timestamp of last log message with it's generation
-    last_log: Option<(DateTime<FixedOffset>, u64)>,
-    /// Replay boundary captured before attaching a new log stream.
-    last_log_before_stream: Option<DateTime<FixedOffset>>,
-    /// Buffered partial message, retained with the cursor across reattachments.
-    partial_event_merge_state: Option<LogEventMergeState>,
+    /// Last completed message's timestamp and consumed frame count at that timestamp.
+    last_log: Option<(DateTime<FixedOffset>, usize)>,
+    /// Highest frame timestamp read, including unfinished messages to replay.
+    last_read: Option<DateTime<FixedOffset>>,
     /// generation of `ContainerState` at `event_stream` creation
     generation: u64,
     metadata: ContainerMetadata,
+}
+
+/// Unfinished messages belong to an attachment, not to the parked container.
+struct LogStreamState {
+    last_log: Option<(DateTime<FixedOffset>, usize)>,
+    replay_boundary: Option<DateTime<FixedOffset>>,
+    replay_remaining: usize,
+    replay_partial_until: Option<DateTime<FixedOffset>>,
+    partial_event_merge_state: Option<LogEventMergeState>,
+}
+
+impl LogStreamState {
+    fn new(info: &ContainerLogInfo) -> Self {
+        Self {
+            last_log: info.last_log,
+            replay_boundary: info.last_log.map(|(timestamp, _)| timestamp),
+            replay_remaining: info.last_log.map_or(0, |(_, count)| count),
+            replay_partial_until: info.last_read,
+            partial_event_merge_state: None,
+        }
+    }
 }
 
 impl ContainerLogInfo {
@@ -1033,8 +1040,7 @@ impl ContainerLogInfo {
             id,
             created,
             last_log: None,
-            last_log_before_stream: None,
-            partial_event_merge_state: None,
+            last_read: None,
             generation: 0,
             metadata,
         }
@@ -1059,6 +1065,7 @@ impl ContainerLogInfo {
         log_output: LogOutput,
         partial_event_marker_field: Option<String>,
         auto_partial_merge: bool,
+        stream_state: &mut LogStreamState,
         bytes_received: &Registered<BytesReceived>,
         log_namespace: LogNamespace,
     ) -> Option<LogEvent> {
@@ -1076,23 +1083,23 @@ impl ContainerLogInfo {
         let timestamp_str = splitter.next()?;
         let timestamp = match DateTime::parse_from_rfc3339(timestamp_str) {
             Ok(timestamp) => {
-                // Reattachments can happen without a container generation change (for
-                // example, when the follow stream ends before the die event arrives).
-                // Keep this boundary fixed so equal timestamps within this stream are
-                // still accepted, but records delivered by an earlier stream are not.
-                if self
-                    .last_log_before_stream
-                    .is_some_and(|last| timestamp <= last)
-                {
-                    return None;
+                // Skip only frames belonging to messages already completed by
+                // the previous attachment, not an unread equal-timestamp suffix.
+                if let Some(boundary) = stream_state.replay_boundary {
+                    if timestamp < boundary {
+                        return None;
+                    }
+                    if timestamp == boundary && stream_state.replay_remaining > 0 {
+                        stream_state.replay_remaining -= 1;
+                        return None;
+                    }
                 }
                 // Timestamp check. This is included to avoid processing the same log multiple times, which can
                 // occur when a container changes generations, and to avoid processing logs with timestamps before
                 // the created timestamp.
-                match self.last_log.as_ref() {
-                    Some(&(last, generation)) => {
-                        if last < timestamp || (last == timestamp && generation == self.generation)
-                        {
+                match stream_state.last_log.as_ref() {
+                    Some(&(last, _)) => {
+                        if last <= timestamp {
                             // Noop - log received in order.
                         } else {
                             // Docker returns logs in order.
@@ -1122,7 +1129,23 @@ impl ContainerLogInfo {
                     }
                 }
 
-                self.last_log = Some((timestamp, self.generation));
+                // Rebuild an unfinished message only from its own timestamp:
+                // Docker split-line chunks share a timestamp. A replayed prefix
+                // must not be joined to a new run's line after a delayed die.
+                // Do not change normal, non-replayed partial merging.
+                if stream_state.replay_partial_until.is_some_and(|until| {
+                    stream_state
+                        .last_log
+                        .is_some_and(|(last, _)| last <= until && timestamp != last)
+                }) {
+                    stream_state.partial_event_merge_state = None;
+                }
+                let count = stream_state
+                    .last_log
+                    .filter(|(last, _)| *last == timestamp)
+                    .map_or(1, |(_, count)| count + 1);
+                stream_state.last_log = Some((timestamp, count));
+                self.last_read = Some(self.last_read.map_or(timestamp, |last| last.max(timestamp)));
 
                 let log_len = splitter.next().map_or(0, str::len);
                 let remove_len = message.len() - log_len;
@@ -1255,7 +1278,8 @@ impl ContainerLogInfo {
                 // message has to be merged into that existing state.
                 // Otherwise, create a new partial event merge state with the
                 // current message being the initial one.
-                if let Some(partial_event_merge_state) = &mut self.partial_event_merge_state {
+                if let Some(partial_event_merge_state) = &mut stream_state.partial_event_merge_state
+                {
                     // Depending on the log namespace the actual contents of the log "message" will be
                     // found in either the root of the event ("."), or at the globally configured "message_key".
                     match log_namespace {
@@ -1273,7 +1297,7 @@ impl ContainerLogInfo {
                         }
                     }
                 } else {
-                    self.partial_event_merge_state = Some(LogEventMergeState::new(log));
+                    stream_state.partial_event_merge_state = Some(LogEventMergeState::new(log));
                 }
                 return None;
             }
@@ -1282,7 +1306,7 @@ impl ContainerLogInfo {
             // state from before, the current event must be a final event, that
             // would give us a merged event we can return.
             // Otherwise it's just a regular event that we return as-is.
-            match self.partial_event_merge_state.take() {
+            match stream_state.partial_event_merge_state.take() {
                 // Depending on the log namespace the actual contents of the log "message" will be
                 // found in either the root of the event ("."), or at the globally configured "message_key".
                 Some(partial_event_merge_state) => match log_namespace {
@@ -1319,6 +1343,10 @@ impl ContainerLogInfo {
             log
         };
 
+        // Only completed messages advance the cursor shared with the next
+        // attachment. Unfinished chunks are fetched again and rebuilt locally.
+        self.last_log = stream_state.last_log;
+        stream_state.replay_partial_until = None;
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.
         emit(DockerLogsEventsReceived {
