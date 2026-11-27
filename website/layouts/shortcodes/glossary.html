@@ -3,7 +3,7 @@
   {{ range $glossary }}
   <div class="py-4 px-6">
     <span>
-      {{ partial "heading.html" (dict "text" .term) }}
+      {{ partial "heading.html" (dict "text" .term "anchor" true) }}
     </span>
 
     <div class="mt-3 prose dark:prose-invert max-w-none">

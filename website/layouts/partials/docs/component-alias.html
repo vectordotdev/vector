@@ -1,6 +1,6 @@
 {{ $kindSingular := .kind | singularize }}
 
-{{ partial "heading.html" (dict "text" "Alias" "level" 2) }}
+{{ partial "heading.html" (dict "text" "Alias" "level" 2 "anchor" true) }}
 
 <p>
   This component was previously called the <code>{{ .alias }}</code> {{ $kindSingular }}. Make sure to update your

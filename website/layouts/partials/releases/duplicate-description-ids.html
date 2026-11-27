@@ -1,0 +1,27 @@
+{{/* Map heading IDs that appear in more than one release description to the first
+     release version in index order, so the release index can keep a single legacy
+     fragment alias while giving every entry a unique versioned permalink. */}}
+{{ $counts := dict }}
+{{ $firstVersion := dict }}
+{{ with site.GetPage "/releases" }}
+  {{ range .RegularPages.Reverse }}
+    {{ $ver := .File.BaseFileName }}
+    {{ $rel := index site.Data.docs.releases $ver }}
+    {{ with $rel.description }}
+      {{ $rendered := . | markdownify }}
+      {{ range findRE `<h[1-6][^>]*\sid="[^"]+"` $rendered }}
+        {{ $hid := replaceRE `(?s)^.*\sid="([^"]+)"$` "${1}" . }}
+        {{ $n := add (index $counts $hid | default 0) 1 }}
+        {{ $counts = merge (dict $hid $n) $counts }}
+        {{ $firstVersion = merge $firstVersion (dict $hid $ver) }}
+      {{ end }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+{{ $dups := dict }}
+{{ range $k, $v := $counts }}
+  {{ if gt $v 1 }}
+    {{ $dups = merge (dict $k (index $firstVersion $k)) $dups }}
+  {{ end }}
+{{ end }}
+{{ return $dups }}

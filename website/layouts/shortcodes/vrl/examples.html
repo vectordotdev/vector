@@ -10,7 +10,7 @@
 {{ end }}
 
 {{ $text := printf "%s examples" . }}
-{{ partial "heading.html" (dict "text" $text "level" 2) }}
+{{ partial "heading.html" (dict "text" $text "level" 2 "anchor" true) }}
 
 {{ partial "data.html" (dict "vrl_examples" $funcs) }}
 {{ end }}

@@ -402,7 +402,7 @@
         {{ $id := printf "examples-%s" .title | urlize }}
         <div class="py-3 px-5 flex flex-col space-y-2">
           <span>
-            {{ partial "heading.html" (dict "text" .title "level" 3 "id" $id) }}
+            {{ partial "heading.html" (dict "text" .title "level" 3 "id" $id "anchor" true) }}
           </span>
 
           <span> Given this event... </span>
@@ -605,7 +605,7 @@
       {{/* Options */}}
       <div class="py-4 px-6">
         <span>
-          {{ partial "heading.html" (dict "text" "Options" "level" 3) }}
+          {{ partial "heading.html" (dict "text" "Options" "level" 3 "anchor" true) }}
         </span>
 
         <div class="mt-4 border rounded flex flex-col divide-y dark:divide-gray-700 dark:border-gray-700">
@@ -1176,11 +1176,15 @@
 
   {{/* VRL expressions */}}
   {{ with .vrl_expressions }}
+    {{ $seenChar := dict }}
+    {{ range $k, $v := . }}
+      {{ $seenChar = merge (dict ($v.title | urlize) true) $seenChar }}
+    {{ end }}
     <div class="divide-y dark:divide-gray-700">
       {{ range $k, $v := . }}
         <div class="py-4 px-6">
           <span>
-            {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
+            {{ partial "heading.html" (dict "text" $v.title "level" 3 "anchor" true) }}
           </span>
 
           <div class="mt-6 prose dark:prose-invert max-w-none leading-snug">
@@ -1191,7 +1195,7 @@
             {{ $id := printf "%s-grammar" $k }}
             <div class="mt-4">
               <span>
-                {{ partial "heading.html" (dict "text" "Grammar" "level" 4 "id" $id) }}
+                {{ partial "heading.html" (dict "text" "Grammar" "level" 4 "id" $id "anchor" true) }}
               </span>
             </div>
 
@@ -1233,7 +1237,7 @@
             {{ $id := printf "%s-examples" $k }}
             <div class="mt-6">
               <span>
-                {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id) }}
+                {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id "anchor" true) }}
               </span>
 
               <div
@@ -1250,13 +1254,18 @@
             {{ $id := printf "%s-characteristics" ($v.title | urlize) }}
             <div class="mt-4">
               <span>
-                {{ partial "heading.html" (dict "text" "Characteristics" "level" 4 "id" $id) }}
+                {{ partial "heading.html" (dict "text" "Characteristics" "level" 4 "id" $id "anchor" true) }}
               </span>
 
               <div class="mt-2 flex flex-col divide-y dark:divide-gray-700 border dark:border-gray-700">
                 {{ range . }}
+                  {{ $charSlug := .title | urlize }}
                   <div class="py-1.5 px-3">
-                    {{ partial "heading.html" (dict "text" .title "level" 5 "icon" false) }}
+                    {{ if not (isset $seenChar $charSlug) }}
+                      {{ $seenChar = merge (dict $charSlug true) $seenChar }}
+                      <span id="{{ $charSlug }}" aria-hidden="true"></span>
+                    {{ end }}
+                    {{ partial "heading.html" (dict "text" .title "level" 5 "id" (printf "%s-%s" ($k | urlize) $charSlug) "icon" false "anchor" true) }}
 
                     {{ with .description }}
                       <div class="mt-1 prose prose-sm dark:prose-invert max-w-none">
@@ -1285,13 +1294,22 @@
 
   {{/* VRL examples */}}
   {{ with .vrl_examples }}
+    {{ $exampleCounts := dict }}
+    {{ range site.Data.docs.remap.functions }}
+      {{ range .examples }}
+        {{ $slug := .title | urlize }}
+        {{ $n := add (index $exampleCounts $slug | default 0) 1 }}
+        {{ $exampleCounts = merge (dict $slug $n) $exampleCounts }}
+      {{ end }}
+    {{ end }}
+    {{ $seen := dict }}
     <div class="flex flex-col divide-y dark:divide-gray-700">
       {{ range . }}
         {{ $name := .name }}
         {{ $link := printf "docs/reference/vrl/functions/#%s" $name | relURL }}
         <div class="py-4 px-6">
           <span class="text-base font-mono">
-            {{ partial "heading.html" (dict "text" $name "level" 3) }}
+            {{ partial "heading.html" (dict "text" $name "level" 3 "anchor" true) }}
           </span>
 
           <div class="my-4 prose dark:prose-invert max-w-none leading-snug">
@@ -1300,9 +1318,20 @@
 
           <div class="border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
             {{ range .examples }}
+              {{ $slug := .title | urlize }}
+              {{ $exId := $slug }}
+              {{ $needsLegacyAlias := false }}
+              {{ if or (gt (index $exampleCounts $slug | default 0) 1) (isset site.Data.docs.remap.functions $slug) }}
+                {{ $exId = printf "%s-%s" ($name | urlize) $slug }}
+                {{ if and (not (isset site.Data.docs.remap.functions $slug)) (not (isset $seen $slug)) }}
+                  {{ $needsLegacyAlias = true }}
+                  {{ $seen = merge (dict $slug true) $seen }}
+                {{ end }}
+              {{ end }}
               <div class="py-3 px-5">
+                {{ if $needsLegacyAlias }}<span id="{{ $slug }}" aria-hidden="true"></span>{{ end }}
                 <span class="font-semibold">
-                  {{ partial "heading.html" (dict "text" .title "level" 4) }}
+                  {{ partial "heading.html" (dict "text" .title "level" 4 "id" $exId "anchor" true) }}
                 </span>
 
                 <div class="mt-2">
@@ -1367,7 +1396,7 @@
       {{ range . }}
         {{ $title := .title }}
         <div class="py-4 px-6">
-          {{ partial "heading.html" (dict "text" .title "level" 3) }}
+          {{ partial "heading.html" (dict "text" .title "level" 3 "anchor" true) }}
 
           {{ with .description }}
             <div class="mt-2 prose dark:prose-invert max-w-none">
@@ -1379,7 +1408,7 @@
             {{ $id := printf "%s-examples" (urlize $title) }}
             <div class="mt-3">
               <span>
-                {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id) }}
+                {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id "anchor" true) }}
               </span>
 
               <div class="mt-2 flex flex-col space-y-2">
@@ -1396,11 +1425,15 @@
 
   {{/* VRL literals */}}
   {{ with .vrl_literals }}
+    {{ $seenChar := dict }}
+    {{ range $k, $v := . }}
+      {{ $seenChar = merge (dict ($v.title | urlize) true) $seenChar }}
+    {{ end }}
     <div class="flex flex-col divide-y dark:divide-gray-700">
       {{ range $k, $v := . }}
         <div class="py-4 px-6">
           <span>
-            {{ partial "heading.html" (dict "text" $v.title "level" 3 "icon" false) }}
+            {{ partial "heading.html" (dict "text" $v.title "level" 3 "icon" false "anchor" true) }}
           </span>
 
           {{ with $v.description }}
@@ -1413,7 +1446,7 @@
             {{ $id := printf "%s-examples" ($v.title | urlize) }}
             <div class="mt-4">
               <span>
-                {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id) }}
+                {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id "anchor" true) }}
               </span>
 
               <div class="mt-2 flex flex-col space-y-2 text-sm">
@@ -1428,13 +1461,18 @@
             {{ $id := printf "%s-characteristics" ($v.title | urlize) }}
             <div class="mt-4">
               <span>
-                {{ partial "heading.html" (dict "text" "Characteristics" "level" 4 "id" $id) }}
+                {{ partial "heading.html" (dict "text" "Characteristics" "level" 4 "id" $id "anchor" true) }}
               </span>
 
               <div class="mt-2 flex flex-col divide-y dark:divide-gray-700 border dark:border-gray-700">
                 {{ range . }}
+                  {{ $charSlug := .title | urlize }}
                   <div class="py-1.5 px-3">
-                    {{ partial "heading.html" (dict "text" .title "level" 5 "icon" false) }}
+                    {{ if not (isset $seenChar $charSlug) }}
+                      {{ $seenChar = merge (dict $charSlug true) $seenChar }}
+                      <span id="{{ $charSlug }}" aria-hidden="true"></span>
+                    {{ end }}
+                    {{ partial "heading.html" (dict "text" .title "level" 5 "id" (printf "%s-%s" ($v.title | urlize) $charSlug) "icon" false "anchor" true) }}
 
                     {{ with .description }}
                       <div class="mt-1 prose prose-sm dark:prose-invert max-w-none">
@@ -1463,12 +1501,16 @@
 
   {{/* VRL concepts */}}
   {{ with .vrl_concepts }}
+    {{ $seenChar := dict }}
+    {{ range $k, $v := . }}
+      {{ $seenChar = merge (dict ($v.title | urlize) true) $seenChar }}
+    {{ end }}
     <div class="flex flex-col divide-y dark:divide-gray-700">
       {{ range $k, $v := . }}
         {{ $id := .anchor }}
         <div class="py-3 px-5">
           <span>
-            {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
+            {{ partial "heading.html" (dict "text" $v.title "level" 3 "anchor" true) }}
           </span>
 
           <div class="mt-2 prose dark:prose-invert max-w-none">
@@ -1476,17 +1518,22 @@
           </div>
 
           {{ with $v.characteristics }}
-            {{ $id := printf "%s-characteristics" $id }}
+            {{ $charId := printf "%s-characteristics" $id }}
             <div class="mt-3">
               <span>
-                {{ partial "heading.html" (dict "text" "Characteristics" "level" 4 "id" $id) }}
+                {{ partial "heading.html" (dict "text" "Characteristics" "level" 4 "id" $charId "anchor" true) }}
               </span>
 
               <div class="mt-2 flex flex-col divide-y border rounded-sm dark:border-gray-700 dark:divide-gray-700">
                 {{ range . }}
+                  {{ $charSlug := .title | urlize }}
                   <div class="py-2 px-4">
+                    {{ if not (isset $seenChar $charSlug) }}
+                      {{ $seenChar = merge (dict $charSlug true) $seenChar }}
+                      <span id="{{ $charSlug }}" aria-hidden="true"></span>
+                    {{ end }}
                     <span class="font-semibold">
-                      {{ partial "heading.html" (dict "text" .title "level" 5) }}
+                      {{ partial "heading.html" (dict "text" .title "level" 5 "id" (printf "%s-%s" ($v.title | urlize) $charSlug) "anchor" true) }}
                     </span>
 
                     <div class="mt-2 prose prose-sm dark:prose-invert max-w-none">
@@ -1504,12 +1551,16 @@
 
   {{/* VRL features */}}
   {{ with .vrl_features }}
+    {{ $seenChar := dict }}
+    {{ range . }}
+      {{ $seenChar = merge (dict (.title | urlize) true) $seenChar }}
+    {{ end }}
     <div class="flex flex-col divide-y dark:divide-gray-700">
       {{ range . }}
-        {{ $id := .anchor }}
+        {{ $featId := .anchor | urlize }}
         <div class="py-3 px-5">
           <span>
-            {{ partial "heading.html" (dict "text" .title "level" 3) }}
+            {{ partial "heading.html" (dict "text" .title "level" 3 "anchor" true) }}
           </span>
 
           <div class="mt-3 prose dark:prose-invert max-w-none">
@@ -1517,16 +1568,25 @@
           </div>
 
           {{ with .characteristics }}
-            {{ $id := printf "%s-characteristics" $id }}
+            {{ $charId := printf "%s-characteristics" $featId }}
             <div class="mt-3">
+              {{ if not (isset $seenChar "characteristics") }}
+                {{ $seenChar = merge (dict "characteristics" true) $seenChar }}
+                <span id="characteristics" aria-hidden="true"></span>
+              {{ end }}
               <span>
-                {{ partial "heading.html" (dict "text" "Characteristics" "level" 4) }}
+                {{ partial "heading.html" (dict "text" "Characteristics" "level" 4 "id" $charId "anchor" true) }}
               </span>
 
               <div class="mt-2 flex flex-col space-y-2">
                 {{ range . }}
+                  {{ $charSlug := .title | urlize }}
                   <div>
-                    {{ partial "heading.html" (dict "text" .title "level" 5) }}
+                    {{ if not (isset $seenChar $charSlug) }}
+                      {{ $seenChar = merge (dict $charSlug true) $seenChar }}
+                      <span id="{{ $charSlug }}" aria-hidden="true"></span>
+                    {{ end }}
+                    {{ partial "heading.html" (dict "text" .title "level" 5 "id" (printf "%s-%s" $featId $charSlug) "anchor" true) }}
 
 
                     <div class="mt-2 prose prose-sm dark:prose-invert max-w-none">
@@ -1548,7 +1608,7 @@
       {{ range . }}
         <div class="py-4 px-6">
           <span>
-            {{ partial "heading.html" (dict "text" .title "level" 3) }}
+            {{ partial "heading.html" (dict "text" .title "level" 3 "anchor" true) }}
           </span>
 
           <div class="mt-3 prose dark:prose-invert max-w-none">

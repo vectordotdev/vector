@@ -337,6 +337,29 @@
 }
 
 /* Unlayered so these override toc.sass's `.prose *:focus { outline: none }`. */
+.prose :is(h1, h2, h3, h4, h5, h6) > a[href^="#"] {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+}
+
+.prose :is(h1, h2, h3, h4, h5, h6) > a[href^="#"]:hover {
+  color: inherit;
+}
+
+.dark .prose :is(h1, h2, h3, h4, h5, h6) > a[href^="#"] {
+  color: inherit;
+}
+
+.dark .prose :is(h1, h2, h3, h4, h5, h6) > a[href^="#"]:hover {
+  color: inherit;
+}
+
+.prose :is(h1, h2, h3, h4, h5, h6) > a:focus-visible,
+.prose .heading-permalink:focus-visible {
+  @apply outline-2 outline-offset-2 outline-dark dark:outline-secondary rounded-xs;
+}
+
 .prose .code-copy-button:focus-visible,
 .prose .code-toggle-button:focus-visible {
   @apply outline-2 outline-offset-2 outline-secondary text-white;
