@@ -15,7 +15,9 @@ impl RatioSampler {
         debug_assert!((0.0..=1.0).contains(&ratio));
         Self {
             ratio,
-            value: 1.0 - ratio,
+            // Starting just below the threshold makes the first event retained, but a zero ratio
+            // must never retain any event.
+            value: if ratio > 0.0 { 1.0 - ratio } else { 0.0 },
         }
     }
 
@@ -46,6 +48,12 @@ mod tests {
     fn retains_every_event_at_full_ratio() {
         let mut sampler = RatioSampler::new(1.0);
         assert!((0..6).all(|_| sampler.sample()));
+    }
+
+    #[test]
+    fn retains_no_events_at_zero_ratio() {
+        let mut sampler = RatioSampler::new(0.0);
+        assert!((0..6).all(|_| !sampler.sample()));
     }
 
     #[test]
