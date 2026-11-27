@@ -85,6 +85,7 @@ where
                     healthcheck: Default::default(),
                     buffer: Default::default(),
                     proxy: Default::default(),
+                    measure_cpu_usage: false,
                     inner: sink,
                     validated: self.validated.clone(),
                 },

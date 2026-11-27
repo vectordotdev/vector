@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, time::Duration};
 use vector_lib::internal_event::emit;
 
 use http::{
@@ -14,6 +14,21 @@ use crate::{
     internal_events::http_client::{AboutToSendHttpRequest, GotHttpResponse, GotHttpWarning},
     tls::MaybeTlsSettings,
 };
+
+/// The connection setup limit that [`HttpClient::new`] applies; see
+/// [`ConnectionOptions::connect_timeout`].
+///
+/// A request timeout does not bound every connect. When an idle connection becomes available
+/// while a new one is still being set up, the pool moves the unfinished connect into a
+/// background task so that its socket can be reused later, and nothing else bounds that task.
+/// If its TLS handshake stalls, for example because the peer's FIN or RST was lost on a lossy
+/// path, the socket stays open until the process exits, and enough of them exhaust the file
+/// descriptors. See <https://github.com/vectordotdev/vector/issues/27245>.
+///
+/// This is a little above the default sink request timeout of 60 seconds, so that with default
+/// settings a connect made for a request is still ended by the request timeout first, rather
+/// than both timers expiring on the same tick.
+pub(crate) const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(65);
 
 /// A [`vector_http::HttpClient`] that adds Vector's default request headers and emits the HTTP
 /// client events.
@@ -31,14 +46,19 @@ impl fmt::Debug for HttpClient {
 
 impl HttpClient {
     /// Builds a client that routes requests through `proxy` and uses `tls` for HTTPS
-    /// destinations and TLS proxies.
+    /// destinations and TLS proxies. Connection setup is limited to
+    /// [`DEFAULT_CONNECT_TIMEOUT`].
     ///
     /// # Errors
     ///
     /// Returns an error if a configured proxy URL is invalid or the TLS settings cannot
     /// build a connector.
     pub fn new(tls: MaybeTlsSettings, proxy: &ProxyConfig) -> crate::Result<Self> {
-        Self::new_with_options(tls, proxy, ConnectionOptions::default())
+        Self::new_with_options(
+            tls,
+            proxy,
+            ConnectionOptions::default().connect_timeout(Some(DEFAULT_CONNECT_TIMEOUT)),
+        )
     }
 
     /// Like [`HttpClient::new`], with the given connection `options`.
@@ -118,6 +138,11 @@ fn default_user_agent() -> HeaderValue {
     .expect("the application name and version must form a valid user agent")
 }
 
+/// Sets `User-Agent` and `Accept-Encoding` unless the caller already set them.
+///
+/// `Accept-Encoding` defaults to `identity` because callers of [`HttpClient::send`] read the
+/// raw body. Sink services that decode compressed responses, such as
+/// `sinks::util::http::HttpService`, advertise their supported encodings before they send.
 fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
     if !request.headers().contains_key(USER_AGENT) {
         request.headers_mut().insert(USER_AGENT, user_agent.clone());

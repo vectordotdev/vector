@@ -10,12 +10,12 @@
   {{- with .title }}
   {{- if $.href }}
   <a href="{{ $.href }}" class="group block underline decoration-primary/50 underline-offset-4 focus:outline-none focus:ring-2 focus:ring-primary hover:decoration-secondary">
-    <div class="prose dark:prose-invert max-w-none font-semibold [&>p]:m-0 [&>p]:text-primary-dark group-hover:[&>p]:text-secondary dark:[&>p]:text-primary dark:group-hover:[&>p]:text-secondary [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+    <div data-toc-title class="prose dark:prose-invert max-w-none font-semibold [&>p]:m-0 [&>p]:text-primary-dark group-hover:[&>p]:text-secondary dark:[&>p]:text-primary dark:group-hover:[&>p]:text-secondary [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
       {{ . | markdownify }}
     </div>
   </a>
   {{- else }}
-  <div class="prose dark:prose-invert max-w-none font-semibold [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+  <div data-toc-title class="prose dark:prose-invert max-w-none font-semibold [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
     {{ . | markdownify }}
   </div>
   {{- end }}

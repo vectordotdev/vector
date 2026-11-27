@@ -39,9 +39,13 @@ use crate::{
         },
         util::{
             BulkSizeBasedDefaultBatchSettings, Compression, HttpEndpoint, RequestBuilder,
-            ServiceBuilderExt, TowerRequestConfig, batch::BatchConfig,
-            metadata::RequestMetadataBuilder, partitioner::KeyPartitioner,
-            request_builder::EncodeResult, service::TowerRequestConfigDefaults, timezone_to_offset,
+            ServiceBuilderExt, TowerRequestConfig,
+            batch::BatchConfig,
+            metadata::RequestMetadataBuilder,
+            partitioner::KeyPartitioner,
+            request_builder::{EncodeResult, RequestParts},
+            service::TowerRequestConfigDefaults,
+            timezone_to_offset,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template, TemplateParseError},
@@ -405,7 +409,7 @@ struct RequestSettings {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
-    type Metadata = (String, EventFinalizers);
+    type Metadata = String;
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -423,21 +427,26 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     fn split_input(
         &self,
         input: (String, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
 
-        ((partition_key, finalizers), builder, events)
+        RequestParts {
+            metadata: partition_key,
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        gcp_metadata: Self::Metadata,
+        key: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (key, finalizers) = gcp_metadata;
         // TODO: pull the seconds from the last event
         let filename = {
             let seconds = match self.tz_offset {
@@ -559,7 +568,7 @@ mod tests {
             encoding::FramingConfig,
         },
         event::{BatchNotifier, BatchStatus},
-        partition::Partitioner,
+        partition::{PartitionDecision, Partitioner},
         request_metadata::GroupedCountByteSize,
     };
     use vrl::event_path;
@@ -683,11 +692,14 @@ mod tests {
             key_prefix: Some("key: {{ key }}".into()),
             ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
         };
-        let key = sink_config
+        let PartitionDecision::Route(key) = sink_config
             .key_partitioner()
             .unwrap()
             .partition(&Event::Log(event))
-            .expect("key wasn't provided");
+            .expect("key wasn't provided")
+        else {
+            panic!("expected the event to route");
+        };
 
         assert_eq!(key, "key: value");
     }
@@ -713,22 +725,29 @@ mod tests {
             )
         };
         let log = LogEvent::default().into();
-        let key = sink_config
+        let PartitionDecision::Route(key) = sink_config
             .key_partitioner()
             .unwrap()
             .partition(&log)
-            .expect("key wasn't provided");
+            .expect("key wasn't provided")
+        else {
+            panic!("expected the event to route");
+        };
 
         let mut byte_size = GroupedCountByteSize::new_untagged();
         byte_size.add_event(&log, log.estimated_json_encoded_size_of());
 
         let request_settings = request_settings(&sink_config, &context);
-        let (metadata, metadata_request_builder, _events) =
-            request_settings.split_input((key, vec![log]));
+        let RequestParts {
+            metadata,
+            request_metadata_builder: metadata_request_builder,
+            finalizers,
+            ..
+        } = request_settings.split_input((key, vec![log]));
         let payload = EncodeResult::uncompressed(Bytes::new(), byte_size);
         let request_metadata = metadata_request_builder.build(&payload);
 
-        request_settings.build_request(metadata, request_metadata, payload)
+        request_settings.build_request(metadata, finalizers, request_metadata, payload)
     }
 
     #[test]

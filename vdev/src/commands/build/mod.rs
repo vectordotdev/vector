@@ -8,6 +8,7 @@ mod manifests;
 mod publish_metadata;
 mod vector;
 mod vrl_docs;
+mod vrl_highlights;
 mod vrl_wasm;
 
 crate::cli_subcommands! {
@@ -22,5 +23,6 @@ crate::cli_subcommands! {
     publish_metadata,
     vector,
     vrl_docs,
+    vrl_highlights,
     vrl_wasm,
 }

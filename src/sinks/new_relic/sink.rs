@@ -57,7 +57,7 @@ struct NewRelicRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = Vec<Event>;
     type Encoder = NewRelicEncoder;
     type Payload = Bytes;
@@ -72,19 +72,22 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut input: Vec<Event>,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut input: Vec<Event>) -> RequestParts<Self::Metadata, Self::Events> {
         let builder = RequestMetadataBuilder::from_events(&input);
         let finalizers = input.take_finalizers();
 
-        (finalizers, builder, input)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events: input,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        finalizers: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {

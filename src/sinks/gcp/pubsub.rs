@@ -185,8 +185,7 @@ impl ValidatedSink for PubsubConfig {
             uri: uri_base.append_raw_suffix(":publish")?.into_uri(),
             auth,
         };
-        let service =
-            HttpService::new(client, service_request_builder).with_response_decompression();
+        let service = HttpService::new(client, service_request_builder);
         let service = ServiceBuilder::new()
             .settings(
                 request_settings,
@@ -388,7 +387,7 @@ struct PubsubRequestBuilder {
 }
 
 impl RequestBuilder<PubsubBatch> for PubsubRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = PubsubBatch;
     type Encoder = PubsubBatchEncoder;
     type Payload = Bytes;
@@ -403,26 +402,29 @@ impl RequestBuilder<PubsubBatch> for PubsubRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut batch: PubsubBatch,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut batch: PubsubBatch) -> RequestParts<Self::Metadata, Self::Events> {
         let finalizers = mem::take(&mut batch.finalizers);
         let builder = RequestMetadataBuilder::new(
             batch.event_count,
             batch.events_byte_size,
             batch.events_sent(),
         );
-        (finalizers, builder, batch)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events: batch,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
+        HttpRequest::new(payload.into_payload(), finalizers, request_metadata, ())
     }
 }
 
@@ -571,11 +573,20 @@ mod tests {
         let builder = PubsubRequestBuilder {
             encoder: PubsubBatchEncoder,
         };
-        let (finalizers, metadata, events) = builder.split_input(batch);
+        let RequestParts {
+            events,
+            finalizers,
+            request_metadata_builder,
+            ..
+        } = builder.split_input(batch);
         let payload = builder
             .encode_events(events)
             .expect("encoding into memory should succeed");
-        (finalizers, metadata.build(&payload), payload)
+        (
+            finalizers,
+            request_metadata_builder.build(&payload),
+            payload,
+        )
     }
 
     /// The legacy body: each message is `{"data": <base64>}` inside a `messages` array.
@@ -710,7 +721,7 @@ mod tests {
 
         let batches = batch(vec![message], size, 1000).await;
         assert_eq!(batches.len(), 1);
-        assert!(batches[0].messages.is_empty());
+        assert_eq!(batches[0].messages, [] as [std::string::String; 0]);
         assert_eq!(batches[0].event_count, 1);
 
         let message = encode(&mut encoder, log_event("message", None));
@@ -853,6 +864,7 @@ mod integration_tests {
                 run_and_assert_sink_error,
             },
             random_events_with_stream, random_metrics_with_stream, random_string, trace_init,
+            wait_for_duration,
         },
     };
 
@@ -964,6 +976,17 @@ mod integration_tests {
     }
 
     async fn create_topic_subscription() -> (String, String) {
+        let endpoint: Uri = gcp::PUBSUB_ADDRESS.parse().unwrap();
+        let address = endpoint.authority().unwrap().as_str().to_owned();
+        wait_for_duration(
+            move || {
+                let address = address.clone();
+                async move { tokio::net::TcpStream::connect(address).await.is_ok() }
+            },
+            Duration::from_secs(30),
+        )
+        .await;
+
         let topic = format!("topic-{}", random_string(10));
         let subscription = format!("subscription-{}", random_string(10));
         request(Method::PUT, &format!("topics/{topic}"), json!({}))

@@ -1353,7 +1353,7 @@ mod test {
         for content_type in content_types {
             frame.extend(ControlField::ContentType.to_u32().to_be_bytes());
             frame.extend((content_type.len() as u32).to_be_bytes());
-            frame.extend(content_type.clone());
+            frame.extend(content_type);
         }
         Bytes::from(frame)
     }

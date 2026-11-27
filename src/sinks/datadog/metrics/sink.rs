@@ -12,8 +12,8 @@ use tracing::Instrument;
 use vector_lib::{
     event::{Event, Metric, MetricValue},
     internal_event::emit,
-    partition::Partitioner,
-    sink::StreamSink,
+    partition::{PartitionDecision, Partitioner},
+    sink::{PreparationError, StreamSink},
     stream::{BatcherSettings, DriverResponse},
 };
 
@@ -44,8 +44,12 @@ struct DatadogMetricsTypePartitioner {
 impl Partitioner for DatadogMetricsTypePartitioner {
     type Item = Metric;
     type Key = (Option<Arc<str>>, DatadogMetricsEndpoint);
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
         let series = DatadogMetricsEndpoint::Series(self.series_api_version);
         let endpoint = match item.data().value() {
             MetricValue::Counter { .. }
@@ -57,7 +61,10 @@ impl Partitioner for DatadogMetricsTypePartitioner {
             | MetricValue::AggregatedHistogram { .. }
             | MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
         };
-        (item.metadata().datadog_api_key(), endpoint)
+        Ok(PartitionDecision::Route((
+            item.metadata().datadog_api_key(),
+            endpoint,
+        )))
     }
 }
 
@@ -135,6 +142,7 @@ where
                     }
                 },
             )
+            .unwrap_infallible()
             // Aggregate counters with identical timestamps, otherwise identical counters (same
             // series and same timestamp, when rounded to whole seconds) will be dropped in a
             // last-write-wins situation when they hit the DD metrics intake.

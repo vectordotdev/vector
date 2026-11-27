@@ -42,7 +42,7 @@ use crate::{
     format_vrl_diagnostics,
     internal_events::{RemapMappingAbort, RemapMappingError},
     schema,
-    transforms::{SyncTransform, Transform, TransformOutputsBuf},
+    transforms::{StatefulTransform, Transform, TransformOutputsBuf},
 };
 
 const DROPPED: &str = "dropped";
@@ -264,7 +264,7 @@ impl TransformConfig for RemapConfig {
             VrlRuntime::Ast => {
                 // Cloning clears the schema-compilation cache before binding runtime state.
                 let (remap, warnings) = Remap::new_ast(&self.clone(), context)?;
-                (Transform::synchronous(remap), warnings)
+                (Transform::stateful(remap), warnings)
             }
         };
 
@@ -404,6 +404,16 @@ impl TransformConfig for RemapConfig {
         true
     }
 
+    fn output_ports(&self) -> Option<Vec<(Option<String>, DataType)>> {
+        // The ports only depend on `reroute_dropped`, not on the program, so listing them does not
+        // require compiling VRL. Keep this in sync with `outputs`.
+        let mut ports = vec![(None, DataType::all_bits())];
+        if self.reroute_dropped {
+            ports.push((Some(DROPPED.to_owned()), DataType::all_bits()));
+        }
+        Some(ports)
+    }
+
     fn files_to_watch(&self) -> Vec<&PathBuf> {
         self.file
             .iter()
@@ -412,7 +422,7 @@ impl TransformConfig for RemapConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Remap<Runner>
 where
     Runner: VrlRunner,
@@ -423,14 +433,11 @@ where
     drop_on_error: bool,
     drop_on_abort: bool,
     reroute_dropped: bool,
-    runner: Runner,
+    runner: std::marker::PhantomData<fn() -> Runner>,
     metric_tag_values: MetricTagValues,
 }
 
-pub trait VrlRunner {
-    /// Creates a runner. Pass the transform build context for runner implementations that require it.
-    fn new(context: &TransformContext) -> Self;
-
+pub trait VrlRunner: Default {
     ///
     /// # Errors
     ///
@@ -443,26 +450,12 @@ pub trait VrlRunner {
     ) -> std::result::Result<Value, Terminate>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct AstRunner {
     pub runtime: Runtime,
 }
 
-impl Clone for AstRunner {
-    fn clone(&self) -> Self {
-        Self {
-            runtime: Runtime::default(),
-        }
-    }
-}
-
 impl VrlRunner for AstRunner {
-    fn new(_context: &TransformContext) -> Self {
-        Self {
-            runtime: Runtime::default(),
-        }
-    }
-
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -503,8 +496,6 @@ where
             context.merged_schema_definition.clone(),
         )?;
 
-        let runner = Runner::new(context);
-
         Ok((
             Remap {
                 component_key: context.key.clone(),
@@ -515,16 +506,11 @@ where
                 drop_on_error: config.drop_on_error,
                 drop_on_abort: config.drop_on_abort,
                 reroute_dropped: config.reroute_dropped,
-                runner,
+                runner: std::marker::PhantomData,
                 metric_tag_values: config.metric_tag_values,
             },
             warnings,
         ))
-    }
-
-    #[cfg(test)]
-    const fn runner(&self) -> &Runner {
-        &self.runner
     }
 
     fn dropped_data(&self, reason: &str, error: &ExpressionError) -> serde_json::Value {
@@ -588,16 +574,26 @@ where
         }
     }
 
-    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<Value, Terminate> {
-        self.runner.run(target, &self.program, &self.timezone)
+    fn run_vrl(
+        &self,
+        runner: &mut Runner,
+        target: &mut VrlTarget,
+    ) -> std::result::Result<Value, Terminate> {
+        runner.run(target, &self.program, &self.timezone)
     }
 }
 
-impl<Runner> SyncTransform for Remap<Runner>
+impl<Runner> StatefulTransform for Remap<Runner>
 where
-    Runner: VrlRunner + Clone + Send + Sync,
+    Runner: VrlRunner + Send + 'static,
 {
-    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
+    type State = Runner;
+
+    fn new_state(&self) -> Runner {
+        Runner::default()
+    }
+
+    fn transform(&self, runner: &mut Runner, event: Event, output: &mut TransformOutputsBuf) {
         // If a program can fail or abort at runtime and we know that we will still need to forward
         // the event in that case (either to the main output or `dropped`, depending on the
         // config), we need to clone the original event and keep it around, to allow us to discard
@@ -623,7 +619,7 @@ where
             .map_or(LogNamespace::Legacy, LogEvent::namespace);
 
         let mut target = VrlTarget::new(event, self.program.info(), self.metric_tag_values.into());
-        let result = self.run_vrl(&mut target);
+        let result = self.run_vrl(runner, &mut target);
 
         match result {
             Ok(_) => match target.into_events(log_namespace) {
@@ -645,6 +641,7 @@ where
                         if !self.reroute_dropped {
                             emit(RemapMappingAbort {
                                 event_dropped: self.drop_on_abort,
+                                error: &error,
                             });
                         }
                         ("abort", error, self.drop_on_abort)
@@ -709,7 +706,7 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::{config::GlobalOptions, event::EventMetadata, metric_tags};
-    use vrl::{btreemap, event_path, value::kind::Collection};
+    use vrl::{event_path, objectmap, value::kind::Collection};
 
     use super::*;
     use crate::{
@@ -761,18 +758,46 @@ mod tests {
         Remap::new(&config, &TransformContext::new_test(schema_definitions)).map(|(remap, _)| remap)
     }
 
+    #[test]
+    fn output_ports_match_outputs() {
+        let sources = [
+            ".foo = \"bar\"",
+            // The ports must not depend on whether the program compiles.
+            "this is not valid VRL",
+        ];
+        for reroute_dropped in [false, true] {
+            for source in sources {
+                let conf = RemapConfig {
+                    source: Some(source.to_string()),
+                    reroute_dropped,
+                    ..Default::default()
+                };
+                let expected = conf
+                    .outputs(
+                        &TransformContext::default(),
+                        &[(OutputId::dummy(), test_default_schema_definition())],
+                    )
+                    .into_iter()
+                    .map(|output| (output.port, output.ty))
+                    .collect::<Vec<_>>();
+
+                assert_eq!(
+                    conf.output_ports(),
+                    Some(expected),
+                    "reroute_dropped: {reroute_dropped}, source: {source}"
+                );
+            }
+        }
+    }
+
     fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
         remap_with_runner(config)
     }
 
-    #[derive(Clone)]
+    #[derive(Default)]
     struct InterruptingRunner;
 
     impl VrlRunner for InterruptingRunner {
-        fn new(_context: &TransformContext) -> Self {
-            Self
-        }
-
         fn run(
             &mut self,
             _: &mut VrlTarget,
@@ -791,7 +816,7 @@ mod tests {
     #[test]
     fn remap_trace_scalar_root_drops_trace_layout() {
         let event = {
-            let mut trace = TraceEvent::from(btreemap! {
+            let mut trace = TraceEvent::from(objectmap! {
                 "host" => "a_hostname",
             });
             trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
@@ -803,8 +828,9 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
-        let result = transform_one(&mut tform, event).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
+        let result = transform_one(&tform, &mut tform_state, event).unwrap();
         let log = result.as_log();
         assert_eq!(log.namespace(), LogNamespace::Legacy);
         assert_eq!(log.metadata().trace_layout(), None);
@@ -853,9 +879,14 @@ mod tests {
                 reroute_dropped,
                 ..Default::default()
             };
-            let mut transform = remap_with_runner::<InterruptingRunner>(config).unwrap();
+            let transform = remap_with_runner::<InterruptingRunner>(config).unwrap();
+            let mut transform_state = transform.new_state();
 
-            let output = collect_outputs(&mut transform, Event::from(LogEvent::from("message")));
+            let output = collect_outputs(
+                &transform,
+                &mut transform_state,
+                Event::from(LogEvent::from("message")),
+            );
 
             assert_eq!(output.primary.len(), 0);
             assert_eq!(
@@ -875,6 +906,73 @@ mod tests {
     }
 
     #[test]
+    fn clears_runtime_after_success_error_and_abort() {
+        let definition = remap(RemapConfig {
+            source: Some(
+                indoc! {r#"
+                scratch = "value"
+                if .action == "abort" { abort }
+                if .action == "error" { .parsed = parse_json!(.message) }
+                .scratch = scratch
+            "#}
+                .to_owned(),
+            ),
+            drop_on_error: true,
+            drop_on_abort: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let mut state = definition.new_state();
+        for action in ["success", "error", "success", "abort", "success"] {
+            let mut log = LogEvent::from("not json");
+            log.insert(event_path!("action"), action);
+            let result = transform_one(&definition, &mut state, log.into());
+            assert_eq!(result.is_some(), action == "success");
+            assert!(
+                state.runtime.is_empty(),
+                "runtime retained variables after {action}"
+            );
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_batches_share_remap_and_keep_variables_private() {
+        use crate::transforms::ErasedSyncTransform;
+
+        let definition = Arc::new(
+            remap(RemapConfig {
+                source: Some("scratch = .message\n.copied = scratch".to_owned()),
+                ..Default::default()
+            })
+            .unwrap(),
+        );
+        let mut tasks = tokio::task::JoinSet::new();
+        for index in 0..8 {
+            let shared = Arc::clone(&definition);
+            tasks.spawn(async move {
+                let message = format!("batch-{index}");
+                let arrays = vec![
+                    Event::from(LogEvent::from(message.clone())).into(),
+                    Event::from(LogEvent::from(message.clone())).into(),
+                ];
+                let mut output = TransformOutputsBuf::new_with_capacity(
+                    vec![TransformOutput::new(DataType::Log, HashMap::new())],
+                    2,
+                );
+                shared.transform_batch(arrays, &mut output);
+                let output = output.take_primary().into_events().collect::<Vec<_>>();
+                assert_eq!(output.len(), 2);
+                for event in output {
+                    assert_eq!(get_field_string(&event, "copied"), message);
+                }
+            });
+        }
+        while let Some(result) = tasks.join_next().await {
+            result.unwrap();
+        }
+    }
+
+    #[test]
     fn check_remap_doesnt_share_state_between_events() {
         let conf = RemapConfig {
             source: Some(".foo = .sentinel".to_string()),
@@ -883,27 +981,28 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
-        assert!(tform.runner().runtime.is_empty());
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
+        assert!(tform_state.runtime.is_empty());
 
         let event1 = {
             let mut event1 = LogEvent::from("event1");
             event1.insert(vrl::event_path!("sentinel"), "bar");
             Event::from(event1)
         };
-        let result1 = transform_one(&mut tform, event1).unwrap();
+        let result1 = transform_one(&tform, &mut tform_state, event1).unwrap();
         assert_eq!(get_field_string(&result1, "message"), "event1");
         assert_eq!(get_field_string(&result1, "foo"), "bar");
-        assert!(tform.runner().runtime.is_empty());
+        assert!(tform_state.runtime.is_empty());
 
         let event2 = {
             let event2 = LogEvent::from("event2");
             Event::from(event2)
         };
-        let result2 = transform_one(&mut tform, event2).unwrap();
+        let result2 = transform_one(&tform, &mut tform_state, event2).unwrap();
         assert_eq!(get_field_string(&result2, "message"), "event2");
         assert_eq!(result2.as_log().get(event_path!("foo")), Some(&Value::Null));
-        assert!(tform.runner().runtime.is_empty());
+        assert!(tform_state.runtime.is_empty());
     }
 
     #[test]
@@ -930,8 +1029,9 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf.clone()).unwrap();
-        let result = transform_one(&mut tform, event).unwrap();
+        let tform = remap(conf.clone()).unwrap();
+        let mut tform_state = tform.new_state();
+        let result = transform_one(&tform, &mut tform_state, event).unwrap();
         assert_eq!(get_field_string(&result, "."), "root string");
 
         let mut outputs = conf.outputs(
@@ -969,8 +1069,9 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
-        let result = transform_one(&mut tform, event).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
+        let result = transform_one(&tform, &mut tform_state, event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");
         assert_eq!(get_field_string(&result, "copy_from"), "buz");
         assert_eq!(get_field_string(&result, "foo"), "bar");
@@ -1001,9 +1102,10 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
 
-        let out = collect_outputs(&mut tform, event);
+        let out = collect_outputs(&tform, &mut tform_state, event);
         assert_eq!(2, out.primary.len());
         let mut result = out.primary.into_events();
 
@@ -1032,9 +1134,10 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
 
-        let event = transform_one(&mut tform, event).unwrap();
+        let event = transform_one(&tform, &mut tform_state, event).unwrap();
 
         assert_eq!(
             event.as_log().get(event_path!("bar")),
@@ -1063,9 +1166,10 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
 
-        assert!(transform_one(&mut tform, event).is_none());
+        assert!(transform_one(&tform, &mut tform_state, event).is_none());
     }
 
     #[test]
@@ -1086,9 +1190,10 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
 
-        let event = transform_one(&mut tform, event).unwrap();
+        let event = transform_one(&tform, &mut tform_state, event).unwrap();
 
         assert_eq!(
             event.as_log().get(event_path!("foo")),
@@ -1123,9 +1228,10 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
 
-        let event = transform_one(&mut tform, event).unwrap();
+        let event = transform_one(&tform, &mut tform_state, event).unwrap();
 
         assert_eq!(
             event.as_log().get(event_path!("bar")),
@@ -1154,9 +1260,50 @@ mod tests {
             drop_on_abort: true,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
 
-        assert!(transform_one(&mut tform, event).is_none());
+        assert!(transform_one(&tform, &mut tform_state, event).is_none());
+    }
+
+    #[test]
+    fn check_remap_abort_logs_message() {
+        use std::io::{Read as _, Seek as _, SeekFrom};
+
+        let conf = RemapConfig {
+            source: Some(r#"abort "col_ip invalid:\n" + "garbage""#.to_string()),
+            drop_on_abort: true,
+            ..Default::default()
+        };
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
+
+        let mut buffer = tempfile::tempfile().unwrap();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::DEBUG)
+            .with_writer(buffer.try_clone().unwrap())
+            .finish();
+        let output = tracing::subscriber::with_default(subscriber, || {
+            // Another test thread may have cached the callsite as disabled before this
+            // subscriber existed.
+            tracing::callsite::rebuild_interest_cache();
+            transform_one(
+                &tform,
+                &mut tform_state,
+                Event::Log(LogEvent::from("message")),
+            )
+        });
+
+        assert!(output.is_none());
+        let mut logs = String::new();
+        buffer.seek(SeekFrom::Start(0)).unwrap();
+        buffer.read_to_string(&mut logs).unwrap();
+        // The message is escaped, so event data cannot break the log line.
+        assert!(
+            logs.contains(r#"Event mapping aborted. error="col_ip invalid:\ngarbage""#),
+            "{logs}"
+        );
     }
 
     #[test]
@@ -1181,9 +1328,10 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
 
-        let result = transform_one(&mut tform, metric).unwrap();
+        let result = transform_one(&tform, &mut tform_state, metric).unwrap();
         assert_eq!(
             result,
             Event::Metric(
@@ -1203,6 +1351,160 @@ mod tests {
         );
     }
 
+    fn gauge(value: f64) -> Event {
+        Event::Metric(Metric::new(
+            "queue_depth",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value },
+        ))
+    }
+
+    #[test]
+    fn check_remap_metric_value_in_expression() {
+        let tform = remap(RemapConfig {
+            source: Some(".tags.scaled = to_string(float!(.gauge.value) * 100)".to_string()),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let mut state = tform.new_state();
+        let result = transform_one(&tform, &mut state, gauge(0.5)).unwrap();
+        assert_eq!(
+            result.as_metric().tag_value("scaled"),
+            Some("50".to_owned())
+        );
+        assert_eq!(
+            result.as_metric().value(),
+            &MetricValue::Gauge { value: 0.5 }
+        );
+    }
+
+    #[test]
+    fn check_remap_metric_value_write() {
+        // An integer is stored as a float. `assert_eq!` tells `100` apart from `100.0`, unlike
+        // `==`, so it fails if the next read sees the assigned integer instead of the stored value.
+        let tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r"
+                    .gauge.value = 100
+                    assert_eq!(.gauge.value, 100.0)
+                "}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let mut state = tform.new_state();
+        let result = transform_one(&tform, &mut state, gauge(0.5)).unwrap();
+        assert_eq!(
+            result.as_metric().value(),
+            &MetricValue::Gauge { value: 100.0 }
+        );
+    }
+
+    #[test]
+    fn check_remap_metric_value_special_values() {
+        // Reads of special values, and of the fields for other types.
+        let tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r"
+                    .tags.json = encode_json(.gauge)
+                    .tags.is_counter = to_string(exists(.counter))
+                "}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let mut state = tform.new_state();
+        let cases = [
+            (0.5, r#"{"value":0.5}"#),
+            // VRL floats can't hold NaN, so it reads as the string "NaN".
+            (f64::NAN, r#"{"value":"NaN"}"#),
+            // Infinity reads as a float, but `encode_json` writes non-finite floats as `null`.
+            (f64::INFINITY, r#"{"value":null}"#),
+        ];
+        for (value, json) in cases {
+            let result = transform_one(&tform, &mut state, gauge(value)).unwrap();
+            let metric = result.as_metric();
+            assert_eq!(metric.tag_value("json"), Some(json.to_owned()), "{value}");
+            assert_eq!(metric.tag_value("is_counter"), Some("false".to_owned()));
+        }
+    }
+
+    #[test]
+    fn check_remap_metric_value_get() {
+        // `get` with a dynamic path reads values from `.`, and `get` on another field still works.
+        let tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r#"
+                    .tags.value = to_string(float!(get!(., ["gauge", "value"])))
+                    .tags.copy = string!(get!(.tags, ["region"]))
+                "#}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let mut state = tform.new_state();
+        let metric = gauge(0.5)
+            .into_metric()
+            .with_tags(Some(vector_lib::metric_tags!(
+                "region" => "us-east-1"
+            )));
+        let result = transform_one(&tform, &mut state, Event::Metric(metric)).unwrap();
+        assert_eq!(
+            result.as_metric().tag_value("value"),
+            Some("0.5".to_owned())
+        );
+        assert_eq!(
+            result.as_metric().tag_value("copy"),
+            Some("us-east-1".to_owned())
+        );
+    }
+
+    #[test]
+    fn check_remap_metric_value_unnest() {
+        // `unnest` keeps the other fields of the metric around each element.
+        let tform = remap(RemapConfig {
+            source: Some(
+                indoc! {r"
+                    rows = unnest!(.distribution.samples)
+                    .tags.first_name = string!(rows[0].name)
+                    .tags.first_value = to_string(float!(rows[0].distribution.samples.value))
+                    .tags.first_type = string!(rows[0].type)
+                "}
+                .to_string(),
+            ),
+            drop_on_error: true,
+            ..Default::default()
+        })
+        .unwrap();
+        let mut state = tform.new_state();
+        let distribution = Event::Metric(Metric::new(
+            "observations",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_lib::samples![2.5 => 1, 4.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        ));
+        let result = transform_one(&tform, &mut state, distribution).unwrap();
+        let metric = result.as_metric();
+        assert_eq!(
+            metric.tag_value("first_name"),
+            Some("observations".to_owned())
+        );
+        assert_eq!(metric.tag_value("first_value"), Some("2.5".to_owned()));
+        assert_eq!(
+            metric.tag_value("first_type"),
+            Some("distribution".to_owned())
+        );
+    }
+
     #[test]
     fn check_remap_metric_type() {
         let conf = RemapConfig {
@@ -1212,7 +1514,8 @@ mod tests {
             drop_on_error: true,
             ..Default::default()
         };
-        let mut tform = remap(conf).unwrap();
+        let tform = remap(conf).unwrap();
+        let mut tform_state = tform.new_state();
 
         let distribution = MetricValue::Distribution {
             samples: vector_lib::samples![1.0 => 1],
@@ -1236,7 +1539,7 @@ mod tests {
 
         for (name, value, expected) in cases {
             let metric = Event::Metric(Metric::new(name, MetricKind::Absolute, value));
-            let result = transform_one(&mut tform, metric).unwrap();
+            let result = transform_one(&tform, &mut tform_state, metric).unwrap();
             let metric = result.as_metric();
             assert_eq!(metric.value(), &expected, "{name}");
             assert_eq!(metric.kind(), MetricKind::Absolute, "{name}");
@@ -1267,9 +1570,10 @@ mod tests {
             },
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let mut tform_state = tform.new_state();
 
-        let output = transform_one_fallible(&mut tform, error).unwrap();
+        let output = transform_one_fallible(&tform, &mut tform_state, error).unwrap();
         let log = output.as_log();
         assert_eq!(
             log["timestamp"],
@@ -1305,9 +1609,10 @@ mod tests {
             },
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let mut tform_state = tform.new_state();
 
-        let output = transform_one_fallible(&mut tform, error).unwrap();
+        let output = transform_one_fallible(&tform, &mut tform_state, error).unwrap();
         let log = output.as_log();
         assert_eq!(
             log["timestamp"],
@@ -1406,15 +1711,16 @@ mod tests {
             .with_event_field(&owned_value_path!("hello"), Kind::bytes(), None),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let mut tform_state = tform.new_state();
 
-        let output = transform_one_fallible(&mut tform, happy).unwrap();
+        let output = transform_one_fallible(&tform, &mut tform_state, happy).unwrap();
         let log = output.as_log();
         assert_eq!(log["hello"], "world".into());
         assert_eq!(log["foo"], "bar".into());
         assert!(!log.contains(event_path!("metadata")));
 
-        let output = transform_one_fallible(&mut tform, abort).unwrap_err();
+        let output = transform_one_fallible(&tform, &mut tform_state, abort).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], "goodbye".into());
         assert!(!log.contains(event_path!("foo")));
@@ -1433,7 +1739,7 @@ mod tests {
             .unwrap()
         );
 
-        let output = transform_one_fallible(&mut tform, error).unwrap_err();
+        let output = transform_one_fallible(&tform, &mut tform_state, error).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], 42.into());
         assert!(!log.contains(event_path!("foo")));
@@ -1452,7 +1758,7 @@ mod tests {
             .unwrap()
         );
 
-        let output = transform_one_fallible(&mut tform, happy_metric).unwrap();
+        let output = transform_one_fallible(&tform, &mut tform_state, happy_metric).unwrap();
         similar_asserts::assert_eq!(
             output,
             Event::Metric(
@@ -1472,7 +1778,7 @@ mod tests {
             )
         );
 
-        let output = transform_one_fallible(&mut tform, abort_metric).unwrap_err();
+        let output = transform_one_fallible(&tform, &mut tform_state, abort_metric).unwrap_err();
         similar_asserts::assert_eq!(
             output,
             Event::Metric(
@@ -1495,7 +1801,7 @@ mod tests {
             )
         );
 
-        let output = transform_one_fallible(&mut tform, error_metric).unwrap_err();
+        let output = transform_one_fallible(&tform, &mut tform_state, error_metric).unwrap_err();
         similar_asserts::assert_eq!(
             output,
             Event::Metric(
@@ -1539,10 +1845,15 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let mut tform_state = tform.new_state();
 
-        let output =
-            transform_one_fallible(&mut tform, error_trigger_assert_custom_message).unwrap_err();
+        let output = transform_one_fallible(
+            &tform,
+            &mut tform_state,
+            error_trigger_assert_custom_message,
+        )
+        .unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], 42.into());
         assert!(!log.contains(event_path!("foo")));
@@ -1561,8 +1872,12 @@ mod tests {
             .unwrap()
         );
 
-        let output =
-            transform_one_fallible(&mut tform, error_trigger_default_assert_message).unwrap_err();
+        let output = transform_one_fallible(
+            &tform,
+            &mut tform_state,
+            error_trigger_default_assert_message,
+        )
+        .unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], 0.into());
         assert!(!log.contains(event_path!("foo")));
@@ -1599,9 +1914,10 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let mut tform_state = tform.new_state();
 
-        let output = transform_one_fallible(&mut tform, error).unwrap_err();
+        let output = transform_one_fallible(&tform, &mut tform_state, error).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], 42.into());
         assert!(!log.contains(event_path!("foo")));
@@ -1684,19 +2000,20 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let tform = Remap::new_ast(&conf, &context).unwrap().0;
+        let mut tform_state = tform.new_state();
 
-        let output = transform_one_fallible(&mut tform, happy).unwrap();
+        let output = transform_one_fallible(&tform, &mut tform_state, happy).unwrap();
         let log = output.as_log();
         assert_eq!(log["hello"], "world".into());
         assert_eq!(log["foo"], "bar".into());
         assert!(!log.contains(event_path!("metadata")));
 
-        let out = collect_outputs(&mut tform, abort);
+        let out = collect_outputs(&tform, &mut tform_state, abort);
         assert!(out.primary.is_empty());
         assert!(out.named[DROPPED].is_empty());
 
-        let out = collect_outputs(&mut tform, error);
+        let out = collect_outputs(&tform, &mut tform_state, error);
         assert!(out.primary.is_empty());
         assert!(out.named[DROPPED].is_empty());
     }
@@ -1727,7 +2044,10 @@ mod tests {
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
-        assert!(tests.remove(0).run().await.errors.is_empty());
+        assert_eq!(
+            tests.remove(0).run().await.errors,
+            [] as [std::string::String; 0]
+        );
         // Check that metrics were emitted with output tag
         COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
     }
@@ -1737,7 +2057,11 @@ mod tests {
         named: HashMap<String, OutputBuffer>,
     }
 
-    fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOutput {
+    fn collect_outputs<T: StatefulTransform>(
+        ft: &T,
+        state: &mut T::State,
+        event: Event,
+    ) -> CollectedOutput {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 TransformOutput::new(DataType::all_bits(), HashMap::new()),
@@ -1746,7 +2070,7 @@ mod tests {
             1,
         );
 
-        ft.transform(event, &mut outputs);
+        ft.transform(state, event, &mut outputs);
 
         CollectedOutput {
             primary: outputs.take_primary(),
@@ -1754,15 +2078,20 @@ mod tests {
         }
     }
 
-    fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
-        let out = collect_outputs(ft, event);
+    fn transform_one<T: StatefulTransform>(
+        ft: &T,
+        state: &mut T::State,
+        event: Event,
+    ) -> Option<Event> {
+        let out = collect_outputs(ft, state, event);
         assert_eq!(0, out.named.values().map(OutputBuffer::len).sum::<usize>());
         assert!(out.primary.len() <= 1);
         out.primary.into_events().next()
     }
 
-    fn transform_one_fallible(
-        ft: &mut dyn SyncTransform,
+    fn transform_one_fallible<T: StatefulTransform>(
+        ft: &T,
+        state: &mut T::State,
         event: Event,
     ) -> std::result::Result<Event, Event> {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
@@ -1773,7 +2102,7 @@ mod tests {
             1,
         );
 
-        ft.transform(event, &mut outputs);
+        ft.transform(state, event, &mut outputs);
 
         let mut buf = outputs.drain().collect::<Vec<_>>();
         let mut err_buf = outputs.drain_named(DROPPED).collect::<Vec<_>>();
@@ -2134,8 +2463,9 @@ mod tests {
             drop_on_abort: false,
             ..Default::default()
         };
-        let mut tform = remap(conf.clone()).unwrap();
-        let result = transform_one(&mut tform, event).unwrap();
+        let tform = remap(conf.clone()).unwrap();
+        let mut tform_state = tform.new_state();
+        let result = transform_one(&tform, &mut tform_state, event).unwrap();
 
         // Legacy namespace nests this under "message", Vector should set it as the root
         assert_eq!(result.as_log().get(event_path!()), Some(&Value::Null));
@@ -2170,10 +2500,12 @@ mod tests {
             reroute_dropped: true,
             ..Default::default()
         };
-        let mut ast_runner = remap(config).unwrap();
+        let ast_runner = remap(config).unwrap();
+        let mut ast_runner_state = ast_runner.new_state();
         let input_event =
             Event::from_json_value(serde_json::json!({"a": 42}), LogNamespace::Vector).unwrap();
-        let dropped_event = transform_one_fallible(&mut ast_runner, input_event).unwrap_err();
+        let dropped_event =
+            transform_one_fallible(&ast_runner, &mut ast_runner_state, input_event).unwrap_err();
         let dropped_log = dropped_event.as_log();
         assert_eq!(dropped_log.get(event_path!("a")), Some(&Value::from(42)));
 

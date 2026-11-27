@@ -121,8 +121,7 @@ pub struct S3Options {
     ///
     /// Directly comparable to the `Content-Type` HTTP header.
     ///
-    /// If not specified, the compression scheme used dictates this value.
-    /// When `compression` is set to `none`, the value `text/x-log` is used.
+    /// Defaults to `text/x-log`, or `application/vnd.apache.parquet` when Parquet batch encoding is enabled.
     #[configurable(metadata(docs::examples = "application/gzip"))]
     pub content_type: Option<String>,
 }
@@ -397,7 +396,6 @@ pub enum HealthcheckError {
     UnknownStatus { status: StatusCode },
 }
 
-#[must_use]
 pub fn build_healthcheck(bucket: String, client: S3Client) -> Healthcheck {
     let healthcheck = async move {
         let req = client

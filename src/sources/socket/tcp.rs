@@ -11,7 +11,7 @@ use vector_lib::{
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 
-use super::{SocketConfig, default_host_key};
+use super::{HOST, PORT, SocketConfig, default_host_key};
 use crate::{
     codecs::Decoder,
     event::Event,
@@ -99,7 +99,7 @@ const fn default_shutdown_timeout_secs() -> Duration {
 }
 
 fn default_port_key() -> OptionalValuePath {
-    OptionalValuePath::from(owned_value_path!("port"))
+    OptionalValuePath::from(owned_value_path!(PORT))
 }
 
 impl TcpConfig {
@@ -262,7 +262,7 @@ impl TcpSource for RawTcpSource {
                     SocketConfig::NAME,
                     log,
                     legacy_host_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                    path!("host"),
+                    path!(HOST),
                     host.ip().to_string(),
                 );
 
@@ -272,7 +272,7 @@ impl TcpSource for RawTcpSource {
                     SocketConfig::NAME,
                     log,
                     legacy_port_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                    path!("port"),
+                    path!(PORT),
                     host.port(),
                 );
             }

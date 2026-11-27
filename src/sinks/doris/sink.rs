@@ -3,6 +3,8 @@ use crate::sinks::{
 };
 use vector_lib::internal_event::emit;
 
+use crate::sinks::util::partitioner::render_partition_value;
+
 pub(super) struct DorisSink<S> {
     batch_settings: BatcherSettings,
     service: S,
@@ -41,7 +43,7 @@ where
             .batched_partitioned(key_partitioner, batch_settings.timeout, |_| {
                 batch_settings.as_byte_size_config()
             })
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|result| async move { result.ok() })
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -94,28 +96,30 @@ impl DorisKeyPartitioner {
     const fn new(database: ConfinedTemplate, table: ConfinedTemplate) -> Self {
         Self { database, table }
     }
-
-    fn render(template: &ConfinedTemplate, item: &Event, field: &'static str) -> Option<String> {
-        template
-            .render_string(item)
-            .map_err(|error| {
-                emit(TemplateRenderingError {
-                    error,
-                    field: Some(field),
-                    drop_event: true,
-                });
-            })
-            .ok()
-    }
 }
 
 impl Partitioner for DorisKeyPartitioner {
     type Item = Event;
-    type Key = Option<DorisPartitionKey>;
+    type Key = DorisPartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        let database = Self::render(&self.database, item, "database_key")?;
-        let table = Self::render(&self.table, item, "table_key")?;
-        Some(DorisPartitionKey { database, table })
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        let PartitionDecision::Route(database) =
+            render_partition_value(self.database.render_string(item), "database_key")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
+        let PartitionDecision::Route(table) =
+            render_partition_value(self.table.render_string(item), "table_key")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
+        Ok(PartitionDecision::Route(DorisPartitionKey {
+            database,
+            table,
+        }))
     }
 }

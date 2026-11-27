@@ -246,8 +246,7 @@ pub struct CefSerializerOptions {
     /// The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
     /// The event can have any number of key-value pairs in any order.
     #[configurable(metadata(
-        docs::additional_props_description = "This is a path that points to the extension value of a log event.",
-        docs::required = true,
+        docs::additional_props_description = "This is a path that points to the extension value of a log event."
     ))]
     pub extensions: HashMap<String, ConfigTargetPath>,
     // TODO: use Template instead of ConfigTargetPath.
@@ -342,11 +341,11 @@ impl Encoder<Event> for CefSerializer {
 
         buffer.write_fmt(format_args!(
             "CEF:{}|{}|{}|{}|{}|{name}|{severity}",
-            &self.version,
-            &self.device.vendor,
-            &self.device.product,
-            &self.device.version,
-            &self.device.event_class_id,
+            self.version,
+            self.device.vendor,
+            self.device.product,
+            self.device.version,
+            self.device.event_class_id,
         ))?;
         if !formatted_extensions.is_empty() {
             formatted_extensions.sort();
@@ -405,6 +404,7 @@ mod tests {
     use ordered_float::NotNan;
     use vector_common::btreemap;
     use vector_core::event::{Event, LogEvent, Value};
+    use vrl::objectmap;
 
     use super::*;
 
@@ -483,7 +483,7 @@ mod tests {
 
     #[test]
     fn serialize_extensions() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+        let event = Event::Log(LogEvent::from(objectmap! {
             "cef" => Value::from(btreemap! {
                 "severity" => Value::from(1),
                 "name" => Value::from("Event name"),

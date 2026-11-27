@@ -1,4 +1,4 @@
-use strum::{AsRefStr, Display, EnumIter};
+use strum::{AsRefStr, Display, EnumIter, IntoEnumIterator as _};
 
 /// Canonical list of all per-component internal metric names emitted by Vector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -236,6 +236,7 @@ pub enum GaugeName {
     MemoryEnrichmentTableByteSize,
     TagCardinalityTrackedKeys,
     SecurityConfinementDisabled,
+    PrometheusKubernetesServiceDiscoveryTargetsDiscovered,
     // Data-plane gauge names emitted by the `host_metrics` source.
     Load1,
     Load5,
@@ -319,6 +320,9 @@ impl GaugeName {
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
             Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
             Self::SecurityConfinementDisabled => "security_confinement_disabled",
+            Self::PrometheusKubernetesServiceDiscoveryTargetsDiscovered => {
+                "prometheus_kubernetes_service_discovery_targets_discovered"
+            }
             Self::Load1 => "load1",
             Self::Load5 => "load5",
             Self::Load15 => "load15",
@@ -520,6 +524,21 @@ impl CounterName {
             Self::ProcessRuntimeTotal => "process_runtime_total",
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InternalMetricKind {
+    Counter,
+    Gauge,
+    Histogram,
+}
+
+/// Returns an iterator over every known Vector metric name paired with its kind.
+pub fn all_metrics() -> impl Iterator<Item = (&'static str, InternalMetricKind)> {
+    CounterName::iter()
+        .map(|n| (n.as_str(), InternalMetricKind::Counter))
+        .chain(GaugeName::iter().map(|n| (n.as_str(), InternalMetricKind::Gauge)))
+        .chain(HistogramName::iter().map(|n| (n.as_str(), InternalMetricKind::Histogram)))
 }
 
 #[cfg(test)]

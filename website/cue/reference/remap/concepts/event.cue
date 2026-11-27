@@ -4,7 +4,7 @@ remap: concepts: event: {
 		VRL programs operate on observability [events](\(urls.vector_data_model)). This VRL program,
 		for example, adds a field to a log event:
 
-		```coffee
+		```vrl
 		.new_field = "new value"
 		```
 
@@ -18,7 +18,7 @@ remap: concepts: event: {
 
 		This expression, for example...
 
-		```coffee
+		```vrl
 		. = ["hello", 1, true, { "foo": "bar" }]
 		```
 
@@ -39,7 +39,7 @@ remap: concepts: event: {
 				[Path expressions](\(urls.vrl_path_expressions)) enable you to access values inside
 				the event:
 
-				```coffee
+				```vrl
 				.kubernetes.pod_id
 				```
 				"""

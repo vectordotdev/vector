@@ -187,11 +187,14 @@ generated: components: transforms: lua: configuration: {
 			"""
 		required: true
 		type: string: enum: {
-			"1": """
-				Lua transform API version 1.
+			"1": {
+				deprecated: true
+				description: """
+					Lua transform API version 1.
 
-				This version is deprecated and will be removed in a future version.
-				"""
+					This version is deprecated and will be removed in a future version.
+					"""
+			}
 			"2": "Lua transform API version 2."
 		}
 	}

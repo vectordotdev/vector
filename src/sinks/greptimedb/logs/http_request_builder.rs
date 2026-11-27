@@ -21,6 +21,7 @@ use crate::{
         util::{
             HttpEndpoint,
             http::{HttpRequest, HttpServiceRequestBuilder},
+            partitioner::render_partition_value,
         },
     },
 };
@@ -56,29 +57,32 @@ impl KeyPartitioner {
             pipeline_version,
         }
     }
-
-    fn render(template: &ConfinedTemplate, item: &Event, field: &'static str) -> Option<String> {
-        template
-            .render_string(item)
-            .map_err(|error| {
-                emit(TemplateRenderingError {
-                    error,
-                    field: Some(field),
-                    drop_event: true,
-                });
-            })
-            .ok()
-    }
 }
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = Option<PartitionKey>;
+    type Key = PartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        let dbname = Self::render(&self.dbname, item, "dbname_key")?;
-        let table = Self::render(&self.table, item, "table_key")?;
-        let pipeline_name = Self::render(&self.pipeline_name, item, "pipeline_name")?;
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        let PartitionDecision::Route(dbname) =
+            render_partition_value(self.dbname.render_string(item), "dbname_key")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
+        let PartitionDecision::Route(table) =
+            render_partition_value(self.table.render_string(item), "table_key")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
+        let PartitionDecision::Route(pipeline_name) =
+            render_partition_value(self.pipeline_name.render_string(item), "pipeline_name")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
 
         // pipeline_version is optional: a Confined render error drops the event;
         // any other render error omits the field and continues.
@@ -92,7 +96,7 @@ impl Partitioner for KeyPartitioner {
                         field: Some("pipeline_version"),
                         drop_event: true,
                     });
-                    return None;
+                    return Ok(PartitionDecision::Discard);
                 }
                 Err(error) => {
                     emit(TemplateRenderingError {
@@ -105,12 +109,12 @@ impl Partitioner for KeyPartitioner {
             },
         };
 
-        Some(PartitionKey {
+        Ok(PartitionDecision::Route(PartitionKey {
             dbname,
             table,
             pipeline_name,
             pipeline_version,
-        })
+        }))
     }
 }
 
@@ -201,7 +205,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
 }
 
 impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBuilder {
-    type Metadata = (PartitionKey, EventFinalizers);
+    type Metadata = PartitionKey;
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -219,21 +223,26 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBui
     fn split_input(
         &self,
         input: (PartitionKey, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (key, mut events) = input;
 
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        ((key, finalizers), builder, events)
+        RequestParts {
+            metadata: key,
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        key: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (key, finalizers) = metadata;
         HttpRequest::new(
             payload.into_payload(),
             finalizers,

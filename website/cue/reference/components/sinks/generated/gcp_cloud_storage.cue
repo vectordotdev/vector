@@ -158,13 +158,19 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 	}
 	credentials_path: {
 		description: """
-			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
+			Path to a [service account][gcp_service_account_credentials] or
+			[Workload Identity Federation][gcp_workload_identity_federation] (`external_account`)
+			credentials JSON file.
 
 			If unset, the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is checked. If that
 			is also unset, Vector will attempt to fetch credentials from the Compute Engine metadata
 			service if running on a GCE instance.
 
+			Token requests for these credentials do not use the component's `proxy` settings. To send them
+			through a proxy, set the `HTTPS_PROXY` (or `HTTP_PROXY`) environment variable.
+
 			[gcp_service_account_credentials]: https://cloud.google.com/docs/authentication/production#manually
+			[gcp_workload_identity_federation]: https://cloud.google.com/iam/docs/workload-identity-federation
 			"""
 		required: false
 		type: string: {}

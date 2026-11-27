@@ -94,7 +94,7 @@ impl GenerateConfig for ExclusiveRouteConfig {
 impl TransformConfig for ExclusiveRouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let route = ExclusiveRoute::new(self, context)?;
-        Ok(Transform::synchronous(route))
+        Ok(Transform::stateless(route))
     }
 
     fn input(&self) -> Input {
