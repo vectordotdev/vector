@@ -326,6 +326,59 @@ mod tests {
             panic!("Test timed out");
         }
     }
+
+    #[tokio::test]
+    async fn components_sharing_file_through_symlink() {
+        trace_init();
+
+        let delay = Duration::from_secs(3);
+        let dir = temp_dir();
+        std::fs::create_dir(&dir).unwrap();
+        let file_path = dir.join("tls.cert");
+        let link_path = dir.join("tls-link.cert");
+        let mut file = File::create(&file_path).unwrap();
+        std::os::unix::fs::symlink(&file_path, &link_path).unwrap();
+
+        let direct_component = ComponentKey::from("direct");
+        let linked_component = ComponentKey::from("linked");
+        let component_configs = vec![
+            ComponentConfig::new(
+                vec![file_path],
+                direct_component.clone(),
+                ComponentKind::Sink,
+            ),
+            ComponentConfig::new(
+                vec![link_path],
+                linked_component.clone(),
+                ComponentKind::Sink,
+            ),
+        ];
+
+        let (signal_tx, signal_rx) = broadcast::channel(128);
+        spawn_thread(
+            WatcherConfig::RecommendedWatcher,
+            signal_tx,
+            &Vec::<PathBuf>::new(),
+            component_configs,
+            delay,
+        )
+        .unwrap();
+
+        if !test_signal(
+            &mut file,
+            crate::signal::SignalTo::ReloadComponents(HashSet::from([
+                direct_component,
+                linked_component,
+            ])),
+            delay * 5,
+            signal_rx,
+        )
+        .await
+        {
+            panic!("Test timed out");
+        }
+    }
+
     #[tokio::test]
     async fn file_directory_update() {
         trace_init();
@@ -403,6 +456,82 @@ mod tests {
         {
             panic!("Test timed out");
         }
+    }
+
+    /// Mimics kubelet's `AtomicWriter`: write a new timestamped directory, atomically repoint
+    /// `..data` at it, then delete the previous timestamped directory.
+    fn kubelet_projection_swap(dir: &Path, generation: usize) {
+        let timestamped = format!("..2026_01_01_00_00_{generation:02}.{generation}");
+        std::fs::create_dir(dir.join(&timestamped)).unwrap();
+        std::fs::write(
+            dir.join(&timestamped).join("table.csv"),
+            format!("id,value\n1,v{generation}\n"),
+        )
+        .unwrap();
+
+        let previous = std::fs::read_link(dir.join("..data")).ok();
+        std::os::unix::fs::symlink(&timestamped, dir.join("..data_tmp")).unwrap();
+        std::fs::rename(dir.join("..data_tmp"), dir.join("..data")).unwrap();
+        if let Some(previous) = previous {
+            std::fs::remove_dir_all(dir.join(previous)).unwrap();
+        }
+    }
+
+    async fn enrichment_table_kubelet_projection_swaps(watcher_conf: WatcherConfig) {
+        trace_init();
+
+        let delay = Duration::from_secs(1);
+        let dir = temp_dir();
+        std::fs::create_dir(&dir).unwrap();
+        kubelet_projection_swap(&dir, 1);
+        let table_path = dir.join("table.csv");
+        std::os::unix::fs::symlink("..data/table.csv", &table_path).unwrap();
+
+        let table_key = ComponentKey::from("table");
+        let component_config = ComponentConfig::new(
+            vec![table_path],
+            table_key.clone(),
+            ComponentKind::EnrichmentTable,
+        );
+
+        let (signal_tx, mut signal_rx) = broadcast::channel(128);
+        spawn_thread(
+            watcher_conf,
+            signal_tx,
+            &Vec::<PathBuf>::new(),
+            vec![component_config],
+            delay,
+        )
+        .unwrap();
+
+        for generation in 2..=4 {
+            tokio::time::sleep(delay * 2).await;
+            kubelet_projection_swap(&dir, generation);
+
+            match tokio::time::timeout(delay * 10, signal_rx.recv()).await {
+                Ok(Ok(signal)) => assert_eq!(
+                    signal,
+                    crate::signal::SignalTo::ReloadEnrichmentTables,
+                    "unexpected signal after swap {generation}"
+                ),
+                _ => panic!("no reload signal after swap {generation}"),
+            }
+        }
+
+        tokio::time::sleep(delay * 3).await;
+        while let Ok(signal) = signal_rx.try_recv() {
+            assert_eq!(signal, crate::signal::SignalTo::ReloadEnrichmentTables);
+        }
+    }
+
+    #[tokio::test]
+    async fn enrichment_table_kubelet_projection_swaps_recommended_watcher() {
+        enrichment_table_kubelet_projection_swaps(WatcherConfig::RecommendedWatcher).await;
+    }
+
+    #[tokio::test]
+    async fn enrichment_table_kubelet_projection_swaps_poll_watcher() {
+        enrichment_table_kubelet_projection_swaps(WatcherConfig::PollWatcher(1)).await;
     }
 
     #[tokio::test]
