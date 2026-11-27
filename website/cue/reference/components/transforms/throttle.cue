@@ -84,8 +84,8 @@ components: transforms: throttle: {
 		rate_limiting: {
 			title: "Rate Limiting"
 			body:  """
-				The `throttle` transform will spread load across the configured `window_secs`, ensuring that each bucket's
-				throughput averages out to the `threshold` per `window_secs`. It utilizes a [Generic Cell Rate Algorithm](\(urls.gcra)) to
+				With a fixed threshold, the `throttle` transform limits each bucket's average
+				throughput to `threshold` per `window_secs`. It utilizes a [Generic Cell Rate Algorithm](\(urls.gcra)) to
 				rate limit the event stream.
 				"""
 			sub_sections: [
@@ -103,16 +103,30 @@ components: transforms: throttle: {
 						pass through a rate limiter. Each event passing through the transform consumes an available cell,
 						if there is no available cell the event will be rate limited.
 
-						A rate limiter is created with a maximum number of cells equal to the `threshold`, and cells replenish
+						With a fixed threshold, the maximum number of cells equals `threshold`, and cells replenish
 						at a rate of `window_secs` divided by `threshold`. For example, a `window_secs` of 60 with a `threshold` of 10
 						replenishes a cell every 6 seconds and allows a burst of up to 10 events.
+
+						If an upstream transform sets `rate_limit` to 200 on each `api` log, this configuration allows
+						200 events per second for `api`. Events with missing or invalid limits use the fallback of 20.
+						Events for the same service share a bucket even if their thresholds change.
+
+						```yaml
+						transforms:
+						  service_throttle:
+						    type: throttle
+						    inputs: [enriched_logs]
+						    key_field: "{{ service }}"
+						    threshold_field: rate_limit
+						    threshold: 20
+						    window_secs: 1
+						```
 						"""
 				},
 				{
 					title: "Rate Limited Events"
 					body: """
-						The rate limiter will allow up to `threshold` number of events through and drop any further events
-						for that particular bucket when the rate limiter is at capacity. Any event passed when the rate
+						The rate limiter checks whether the bucket has enough capacity for each event. Any event passed when the rate
 						limiter is at capacity will be discarded and tracked by an `events_discarded_total` metric tagged
 						by the bucket's `key`.
 						"""

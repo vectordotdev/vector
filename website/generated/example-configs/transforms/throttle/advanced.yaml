@@ -6,4 +6,5 @@ transforms:
     key_field: "{{ message }}"
     measure_cpu_usage: false
     threshold: 100
+    threshold_field: rate_limit
     window_secs: 1.0

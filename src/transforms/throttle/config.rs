@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use governor::clock;
 use serde_with::serde_as;
-use vector_lib::{config::clone_input_definitions, configurable::configurable_component};
+use vector_lib::{
+    config::clone_input_definitions, configurable::configurable_component,
+    lookup::lookup_v2::ConfigTargetPath,
+};
 
 use super::transform::Throttle;
 use crate::{
@@ -48,10 +51,17 @@ pub struct ThrottleInternalMetricsConfig {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ThrottleConfig {
-    /// The number of events allowed for a given bucket per configured `window_secs`.
+    /// The default number of events allowed for a given bucket per configured `window_secs`.
     ///
     /// Each unique key has its own `threshold`.
     pub threshold: u32,
+
+    /// The path to the event or metadata field that overrides `threshold`, such as `rate_limit` or `%rate_limit`.
+    ///
+    /// The value must be an integer from 1 to 4,294,967,295 or a string that parses as one.
+    /// Missing or invalid values use the required positive `threshold`.
+    #[configurable(metadata(docs::examples = "rate_limit"))]
+    pub threshold_field: Option<ConfigTargetPath>,
 
     /// The time window in which the configured `threshold` is applied, in seconds.
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]

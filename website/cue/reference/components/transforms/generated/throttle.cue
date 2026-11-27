@@ -56,12 +56,22 @@ generated: components: transforms: throttle: configuration: {
 	}
 	threshold: {
 		description: """
-			The number of events allowed for a given bucket per configured `window_secs`.
+			The default number of events allowed for a given bucket per configured `window_secs`.
 
 			Each unique key has its own `threshold`.
 			"""
 		required: true
 		type: uint: {}
+	}
+	threshold_field: {
+		description: """
+			The path to the event or metadata field that overrides `threshold`, such as `rate_limit` or `%rate_limit`.
+
+			The value must be an integer from 1 to 4,294,967,295 or a string that parses as one.
+			Missing or invalid values use the required positive `threshold`.
+			"""
+		required: false
+		type: string: examples: ["rate_limit"]
 	}
 	window_secs: {
 		description: "The time window in which the configured `threshold` is applied, in seconds."

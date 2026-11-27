@@ -1,10 +1,10 @@
 use std::{hash::Hash, num::NonZeroU32, pin::Pin, time::Duration};
-use vector_lib::internal_event::emit;
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use governor::{Quota, clock};
 use snafu::Snafu;
+use vector_lib::{internal_event::emit, lookup::lookup_v2::ConfigTargetPath};
 
 use super::{
     config::{ThrottleConfig, ThrottleInternalMetricsConfig},
@@ -13,7 +13,7 @@ use super::{
 use crate::{
     conditions::Condition,
     config::TransformContext,
-    event::Event,
+    event::{Event, Value},
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     template::UnconfinedTemplate,
     transforms::TaskTransform,
@@ -21,9 +21,11 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
-    pub quota: Quota,
-    pub flush_keys_interval: Duration,
+    threshold: NonZeroU32,
+    static_quota: Option<Quota>,
+    window: Duration,
     key_field: Option<UnconfinedTemplate>,
+    threshold_field: Option<ConfigTargetPath>,
     exclude: Option<Condition>,
     pub clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,
@@ -34,26 +36,28 @@ where
     C: clock::Clock<Instant = I> + Clone + Send + Sync + 'static,
     I: clock::Reference,
 {
-    ///
     /// # Errors
     ///
-    /// Returns an error if the exclusion condition cannot be built.
+    /// Returns an error if the rate limit is invalid or the exclusion condition cannot be built.
     pub fn new(
         config: &ThrottleConfig,
         context: &TransformContext,
         clock: C,
     ) -> crate::Result<Self> {
-        let flush_keys_interval = config.window_secs;
-
-        let Some(threshold) = NonZeroU32::new(config.threshold) else {
+        let threshold = NonZeroU32::new(config.threshold).ok_or(ConfigError::NonZero)?;
+        let window = config.window_secs;
+        if window.is_zero() {
             return Err(Box::new(ConfigError::NonZero));
-        };
-
-        let quota = match Quota::with_period(Duration::from_secs_f64(
-            flush_keys_interval.as_secs_f64() / f64::from(threshold.get()),
-        )) {
-            Some(quota) => quota.allow_burst(threshold),
-            None => return Err(Box::new(ConfigError::NonZero)),
+        }
+        let static_quota = if config.threshold_field.is_none() {
+            let period = Duration::from_secs_f64(window.as_secs_f64() / f64::from(threshold.get()));
+            Some(
+                Quota::with_period(period)
+                    .ok_or(ConfigError::ZeroPeriod)?
+                    .allow_burst(threshold),
+            )
+        } else {
+            None
         };
         let exclude = config
             .exclude
@@ -62,10 +66,12 @@ where
             .transpose()?;
 
         Ok(Self {
-            quota,
+            threshold,
+            static_quota,
             clock,
-            flush_keys_interval,
+            window,
             key_field: config.key_field.clone(),
+            threshold_field: config.threshold_field.clone(),
             exclude,
             internal_metrics: config.internal_metrics.clone(),
         })
@@ -76,7 +82,17 @@ where
     where
         K: Hash + Eq + Clone + Send + Sync + 'static,
     {
-        RateLimiterRunner::start(self)
+        RateLimiterRunner::start(self.static_quota, self.window, self.clock.clone())
+    }
+
+    fn event_threshold(&self, event: &Event) -> Option<NonZeroU32> {
+        let path = self.threshold_field.as_ref()?;
+        match event.as_log().get(path)? {
+            Value::Integer(value) => u32::try_from(*value).ok().and_then(NonZeroU32::new),
+            Value::String(value) => value.parse::<NonZeroU32>().ok(),
+            Value::Bytes(bytes) => std::str::from_utf8(bytes).ok()?.parse::<NonZeroU32>().ok(),
+            _ => None,
+        }
     }
 
     pub fn emit_event_discarded(&self, key: String) {
@@ -124,7 +140,8 @@ where
                             .ok()
                     });
 
-                    if limiter.check_key(&key) {
+                    let threshold = self.event_threshold(&event).unwrap_or(self.threshold);
+                    if limiter.check_key(&key, threshold) {
                         Some(event)
                     } else {
                         self.emit_event_discarded(key.unwrap_or_else(|| "None".to_string()));
@@ -143,8 +160,10 @@ where
 
 #[derive(Debug, Snafu)]
 pub enum ConfigError {
-    #[snafu(display("`threshold`, and `window_secs` must be non-zero"))]
+    #[snafu(display("`threshold` and `window_secs` must be non-zero"))]
     NonZero,
+    #[snafu(display("`window_secs` divided by `threshold` must round to at least one nanosecond"))]
+    ZeroPeriod,
 }
 
 #[cfg(test)]
@@ -155,7 +174,7 @@ mod tests {
     use indoc::indoc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vrl::event_path;
+    use vrl::{event_path, metadata_path};
 
     use super::*;
     use crate::{
@@ -163,6 +182,138 @@ mod tests {
         test_util::components::assert_transform_compliance,
         transforms::{Transform, test::create_topology},
     };
+
+    async fn throttle_logs(config: &ThrottleConfig, logs: Vec<LogEvent>) -> Vec<Event> {
+        let throttle = Throttle::new(
+            config,
+            &TransformContext::default(),
+            clock::FakeRelativeClock::default(),
+        )
+        .unwrap();
+
+        Box::new(throttle)
+            .transform(Box::pin(futures::stream::iter(
+                logs.into_iter().map(Event::Log),
+            )))
+            .collect()
+            .await
+    }
+
+    #[tokio::test]
+    async fn threshold_field_overrides_static_threshold_or_falls_back() {
+        let config: ThrottleConfig = serde_yaml::from_str(indoc! {"
+            threshold: 2
+            threshold_field: limit
+            window_secs: 1
+        "})
+        .unwrap();
+
+        for (value, expected) in [
+            (Some(Value::Integer(1)), 1),
+            (Some(Value::Bytes("3".into())), 3),
+            (Some(Value::String("3".into())), 3),
+            (Some(Value::Integer(i64::from(u32::MAX))), 4),
+            (None, 2),
+            (Some(Value::Integer(0)), 2),
+            (Some(Value::Integer(-1)), 2),
+            (Some(Value::Integer(i64::from(u32::MAX) + 1)), 2),
+            (Some(Value::from(3.0)), 2),
+            (Some(Value::String("invalid".into())), 2),
+            (Some(Value::Bytes(vec![0xff].into())), 2),
+        ] {
+            let mut log = LogEvent::from("hello");
+            if let Some(value) = value.clone() {
+                log.insert(event_path!("limit"), value);
+            }
+            let output = throttle_logs(&config, vec![log.clone(); 4]).await;
+            assert_eq!(output, vec![Event::Log(log); expected], "value: {value:?}");
+        }
+    }
+
+    #[test]
+    fn rejects_template_as_threshold_field_path() {
+        let config = indoc! {r#"
+            threshold: 1
+            threshold_field: "{{ threshold }}"
+            window_secs: 1
+        "#};
+        let error = serde_yaml::from_str::<ThrottleConfig>(config).unwrap_err();
+        assert!(error.to_string().contains("{{ threshold }}"));
+    }
+
+    #[tokio::test]
+    async fn threshold_field_supports_event_and_metadata_paths() {
+        let mut log = LogEvent::from("hello");
+        log.insert(event_path!("limits", "rate"), 2);
+        log.insert(metadata_path!("limits", "rate"), 3);
+
+        for (path, expected) in [(".limits.rate", 2), ("%limits.rate", 3)] {
+            let config = ThrottleConfig {
+                threshold: 1,
+                threshold_field: Some(path.into()),
+                window_secs: Duration::from_secs(5),
+                ..Default::default()
+            };
+            assert_eq!(
+                throttle_logs(&config, vec![log.clone(); 4]).await.len(),
+                expected,
+                "path: {path}",
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn threshold_field_shares_usage_when_threshold_changes() {
+        let config = ThrottleConfig {
+            threshold: 2,
+            threshold_field: Some("limit".into()),
+            window_secs: Duration::from_secs(8),
+            ..Default::default()
+        };
+
+        for thresholds in [[2, 4, 4, 4], [4, 4, 2, 4], [4, 4, 0, 4]] {
+            let logs: Vec<_> = thresholds
+                .into_iter()
+                .map(|threshold| {
+                    let mut log = LogEvent::from("hello");
+                    log.insert(event_path!("limit"), threshold);
+                    log
+                })
+                .collect();
+            let expected: Vec<_> = logs[..3].iter().cloned().map(Event::Log).collect();
+
+            assert_eq!(throttle_logs(&config, logs).await, expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn threshold_field_rate_limits_buckets_independently() {
+        let config: ThrottleConfig = serde_yaml::from_str(indoc! {r#"
+            threshold: 2
+            threshold_field: limit
+            window_secs: 5
+            key_field: "{{ service }}"
+        "#})
+        .unwrap();
+        let logs = [("a", 1), ("b", 1), ("c", 3)]
+            .into_iter()
+            .cycle()
+            .take(12)
+            .map(|(service, limit)| {
+                let mut log = LogEvent::from(service);
+                log.insert(event_path!("service"), service);
+                log.insert(event_path!("limit"), limit);
+                log
+            })
+            .collect();
+
+        let services: Vec<_> = throttle_logs(&config, logs)
+            .await
+            .into_iter()
+            .map(|event| event.as_log()["service"].clone())
+            .collect();
+        assert_eq!(services, ["a", "b", "c", "c", "c"].map(Value::from));
+    }
 
     #[tokio::test]
     async fn throttle_events() {
@@ -365,6 +516,7 @@ mod tests {
         Box::pin(assert_transform_compliance(async move {
             let config = ThrottleConfig {
                 threshold: 1,
+                threshold_field: None,
                 window_secs: Duration::from_secs_f64(1.0),
                 key_field: None,
                 exclude: None,
