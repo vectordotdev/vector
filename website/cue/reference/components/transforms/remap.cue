@@ -115,7 +115,8 @@ components: transforms: "remap": {
 				`counter`, `gauge` | Read | The whole object that holds the value of the metric's current type.
 				`counter.value`, `gauge.value` | Read/write | You can assign an integer or a float, but only under the metric's current type.
 				`set` | Read | `.set.values`, an array of strings.
-				`distribution` | Read | `.distribution.samples`, an array of `{value, rate}` objects, and `.distribution.statistic`, either `histogram` or `summary`.
+				`distribution` | Read | The whole object. `.distribution.statistic` is either `histogram` or `summary`.
+				`distribution.samples` | Read/write | An array of `{value, rate}` objects. You can replace the whole array, but not a single sample.
 				`aggregated_histogram` | Read | `.aggregated_histogram.buckets`, an array of `{upper_limit, count}` objects, plus `.aggregated_histogram.count` and `.aggregated_histogram.sum`. `sum` is left out when it isn't set, so it reads as `null` and `exists(.aggregated_histogram.sum)` is `false`.
 				`aggregated_summary` | Read | `.aggregated_summary.quantiles`, an array of `{quantile, value}` objects, plus `.aggregated_summary.count` and `.aggregated_summary.sum`.
 				`sketch` | Read | Summary statistics only: `.sketch.count`, `.sketch.min`, `.sketch.max`, `.sketch.sum`, and `.sketch.avg`.
@@ -141,9 +142,17 @@ components: transforms: "remap": {
 				current type, for example, `.gauge.value = 100`. The value is stored as a float, so it reads back as
 				`100.0`, and integers larger than `9007199254740992` (2^53) in absolute value might be rounded.
 				Assigning anything else, such as a string, the field of another type, or a whole object like `.gauge`,
-				leaves the value unchanged and the program keeps running. The other value fields are read-only, and
-				`del()` on any value field returns `null` and leaves the value unchanged. To convert between counters
-				and gauges, set `type`.
+				leaves the value unchanged and the program keeps running. To convert between counters and gauges, set
+				`.type`.
+
+				You can replace `.distribution.samples` with a new array, for example,
+				`.distribution.samples = [{"value": 2.5, "rate": 1}]`. Each sample must be an object with exactly two
+				fields, `value` (an integer or a float) and `rate` (an integer from 1 to `4294967295`). The rates must also
+				add up to at most `4294967295`. An empty array removes all samples and keeps `.distribution.statistic`. If
+				any sample is invalid, the samples don't change. Individual samples and their fields are read-only.
+
+				The other value fields are read-only. `del()` on any value field returns `null` and leaves the value
+				unchanged.
 
 				Two kinds of numbers need special handling in VRL:
 

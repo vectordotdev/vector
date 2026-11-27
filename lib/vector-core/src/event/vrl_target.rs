@@ -365,31 +365,75 @@ fn set_metric_type(metric: &mut Metric, value: &Value) -> Result<(), String> {
     Ok(())
 }
 
-/// Sets the value of a counter or gauge, such as `.gauge.value = 100`.
+/// Sets `.counter.value`, `.gauge.value`, or `.distribution.samples` on a metric of that type.
 ///
-/// The value is converted before anything changes, so a rejected write leaves both the metric and
-/// the cached value as they were.
+/// Converts the new value before changing anything, so a rejected write leaves the metric and the
+/// cache unchanged. The cache gets the converted value, so an integer reads back as a float, like
+/// the output.
 fn set_metric_value(
     metric: &mut Metric,
     cached: &mut Value,
     path: &OwnedValuePath,
+    part: &str,
     value: &Value,
 ) -> Result<(), String> {
-    let (MetricValue::Counter { value: current } | MetricValue::Gauge { value: current }) =
-        metric.value_mut()
-    else {
-        return Err(MetricPathError::InvalidPath {
-            path: &path.to_string(),
-            expected: VALID_METRIC_PATHS_SET,
+    match (metric.value_mut(), part) {
+        (
+            MetricValue::Counter { value: current } | MetricValue::Gauge { value: current },
+            "value",
+        ) => {
+            let new_value = value.try_into_f64().map_err(|e| e.to_string())?;
+            *current = new_value;
+            cached.insert(path, metric_float_to_vrl_value(new_value));
         }
-        .to_string());
-    };
-    let new_value = value.try_into_f64().map_err(|e| e.to_string())?;
-    *current = new_value;
-    // Cache the converted float rather than `value`, so that `.gauge.value = 100` reads back as
-    // `100.0`, like the output.
-    cached.insert(path, metric_float_to_vrl_value(new_value));
+        (MetricValue::Distribution { samples, .. }, "samples") => {
+            let new_samples = value
+                .as_array()
+                .ok_or("distribution samples must be an array")?
+                .iter()
+                .map(sample_from_vrl_value)
+                .collect::<Result<Vec<_>, _>>()?;
+            // Statistics add up the rates as a `u32`, so the total must fit too.
+            new_samples
+                .iter()
+                .try_fold(0_u32, |total, sample| total.checked_add(sample.rate))
+                .ok_or("the sample rates must add up to at most 4294967295")?;
+            cached.insert(
+                path,
+                Value::Array(new_samples.iter().map(sample_to_vrl_value).collect()),
+            );
+            *samples = new_samples;
+        }
+        _ => {
+            return Err(MetricPathError::InvalidPath {
+                path: &path.to_string(),
+                expected: VALID_METRIC_PATHS_SET,
+            }
+            .to_string());
+        }
+    }
     Ok(())
+}
+
+/// Parses a sample that VRL assigns, which must have exactly a `value` and a `rate`.
+///
+/// The rate must be an integer of at least 1. A rate of 0 would be skipped by statistics but
+/// written as `@inf` by the StatsD encoder.
+fn sample_from_vrl_value(value: &Value) -> Result<Sample, String> {
+    const EXPECTED: &str = "a sample must be an object with exactly the `value` and `rate` fields";
+    let sample = value.as_object().ok_or(EXPECTED)?;
+    let (Some(sample_value), Some(rate), 2) =
+        (sample.get("value"), sample.get("rate"), sample.len())
+    else {
+        return Err(EXPECTED.to_owned());
+    };
+    let value = sample_value.try_into_f64().map_err(|e| e.to_string())?;
+    let rate = rate
+        .as_integer()
+        .and_then(|rate| u32::try_from(rate).ok())
+        .filter(|rate| *rate > 0)
+        .ok_or("a sample rate must be an integer from 1 to 4294967295")?;
+    Ok(Sample { value, rate })
 }
 
 impl Target for VrlTarget {
@@ -468,8 +512,8 @@ impl Target for VrlTarget {
                             }
                             // Only the value of the current type can be set. Returns early so that
                             // the raw value isn't cached below.
-                            [field, "value"] if *field == metric_value_field(metric.value()) => {
-                                return set_metric_value(metric, metric_value, path, &value);
+                            [field, part] if *field == metric_value_field(metric.value()) => {
+                                return set_metric_value(metric, metric_value, path, part, &value);
                             }
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
@@ -3158,23 +3202,34 @@ mod test {
             &MetricValue::Gauge { value: 1.0 }
         );
 
-        // Only counters and gauges have a writable value. Each input is valid for its path, so the
-        // write is rejected because of the path rather than the shape of the value.
-        let mut target = metric_target_with_queries(distribution_with_samples(), &[]);
-        for (path, value) in [
-            (owned_value_path!("distribution", "value"), Value::from(1.0)),
+        // Other types have no writable `value`, and histogram buckets stay read-only. Each input is
+        // valid for its path, so the write is rejected because of the path rather than the shape of
+        // the value.
+        let histogram = MetricValue::AggregatedHistogram {
+            buckets: crate::buckets![1.0 => 1],
+            count: 1,
+            sum: None,
+        };
+        for (value, path, new_value) in [
             (
-                owned_value_path!("distribution", "samples"),
+                distribution_with_samples(),
+                owned_value_path!("distribution", "value"),
+                Value::from(1.0),
+            ),
+            (
+                histogram,
+                owned_value_path!("aggregated_histogram", "buckets"),
                 Value::from(vec![Value::from(
-                    objectmap! { "value" => 2.5, "rate" => 1 },
+                    objectmap! { "upper_limit" => 2.0, "count" => 1 },
                 )]),
             ),
         ] {
+            let mut target = metric_target_with_queries(value.clone(), &[]);
             target
-                .target_insert(&OwnedTargetPath::event(path.clone()), value)
+                .target_insert(&OwnedTargetPath::event(path.clone()), new_value)
                 .expect_err(&path.to_string());
+            assert_eq!(into_metric(target).value(), &value);
         }
-        assert_eq!(into_metric(target).value(), &distribution_with_samples());
     }
 
     #[test]
@@ -3225,5 +3280,119 @@ mod test {
             into_metric(target).value(),
             &MetricValue::Counter { value: 5.0 }
         );
+    }
+
+    fn sample(value: impl Into<Value>, rate: impl Into<Value>) -> Value {
+        Value::from(objectmap! { "value" => value.into(), "rate" => rate.into() })
+    }
+
+    #[test]
+    fn metric_value_write_replaces_distribution_samples() {
+        let mut target = metric_target_with_queries(
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 1],
+                statistic: StatisticKind::Summary,
+            },
+            &[
+                OwnedTargetPath::event(owned_value_path!("distribution", "samples")),
+                OwnedTargetPath::event(owned_value_path!("distribution", "statistic")),
+            ],
+        );
+        let samples = OwnedTargetPath::event(owned_value_path!("distribution", "samples"));
+
+        // An integer value reads back as a float, and rates that add up to exactly the largest
+        // total are accepted.
+        target
+            .target_insert(
+                &samples,
+                Value::from(vec![sample(2, 1), sample(4.5, i64::from(u32::MAX - 1))]),
+            )
+            .unwrap();
+        assert_eq!(
+            get(&target, owned_value_path!("distribution", "samples")),
+            Some(Value::from(vec![
+                sample(2.0, 1),
+                sample(4.5, i64::from(u32::MAX - 1))
+            ]))
+        );
+
+        // An empty array removes the samples and keeps the statistic.
+        target
+            .target_insert(&samples, Value::from(Vec::<Value>::new()))
+            .unwrap();
+        assert_eq!(
+            get(&target, owned_value_path!("distribution", "samples")),
+            Some(Value::from(Vec::<Value>::new()))
+        );
+        assert_eq!(
+            get(&target, owned_value_path!("distribution", "statistic")),
+            Some(Value::from("summary"))
+        );
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Distribution {
+                samples: vec![],
+                statistic: StatisticKind::Summary,
+            }
+        );
+    }
+
+    #[test]
+    fn metric_value_rejected_samples_keep_value() {
+        // The first sample is valid and the second isn't, so a write that replaces samples while
+        // parsing them would change the value.
+        let mut target = metric_target_with_queries(
+            distribution_with_samples(),
+            &[OwnedTargetPath::event(owned_value_path!("distribution"))],
+        );
+        let cached = get(&target, owned_value_path!("distribution"));
+        let samples = OwnedTargetPath::event(owned_value_path!("distribution", "samples"));
+        for invalid in [
+            Value::from(2.0),
+            Value::from(objectmap! { "value" => 2.0 }),
+            Value::from(objectmap! { "rate" => 1 }),
+            Value::from(objectmap! { "value" => 2.0, "rate" => 1, "extra" => 1 }),
+            sample("high", 1),
+            sample(2.0, 1.0),
+            sample(2.0, 0),
+            sample(2.0, -1),
+            sample(2.0, i64::from(u32::MAX) + 1),
+            // Valid on its own, but the rates of both samples add up to more than a `u32`.
+            sample(2.0, i64::from(u32::MAX)),
+        ] {
+            target
+                .target_insert(&samples, Value::from(vec![sample(1.5, 1), invalid.clone()]))
+                .expect_err(&format!("{invalid:?}"));
+        }
+        target
+            .target_insert(&samples, Value::from(2.0))
+            .expect_err("not an array");
+
+        // Only the whole array can be replaced. Each input is valid for its path, so the write is
+        // rejected because of the path rather than the shape of the value.
+        for (path, value) in [
+            (
+                owned_value_path!("distribution", "samples", 0, "value"),
+                Value::from(1.0),
+            ),
+            (
+                owned_value_path!("distribution", "statistic"),
+                Value::from("summary"),
+            ),
+            (
+                owned_value_path!("distribution"),
+                Value::from(objectmap! {
+                    "samples" => vec![sample(1.5, 1)],
+                    "statistic" => "summary",
+                }),
+            ),
+        ] {
+            target
+                .target_insert(&OwnedTargetPath::event(path.clone()), value)
+                .expect_err(&path.to_string());
+        }
+
+        assert_eq!(get(&target, owned_value_path!("distribution")), cached);
+        assert_eq!(into_metric(target).value(), &distribution_with_samples());
     }
 }
