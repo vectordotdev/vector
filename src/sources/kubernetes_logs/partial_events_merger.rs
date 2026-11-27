@@ -1,11 +1,12 @@
 #![deny(missing_docs)]
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     time::{Duration, Instant},
 };
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use vector_lib::codecs::OversizedAction;
 use vector_lib::{
@@ -31,7 +32,7 @@ const EXPIRATION_TIME: Duration = Duration::from_secs(30);
 const TRUNCATED_SUFFIX: &[u8] = b"..TRUNCATED";
 
 struct PartialEventMergeState {
-    buckets: HashMap<String, Bucket>,
+    buckets: HashMap<Bytes, Bucket>,
     maybe_max_merged_line_bytes: Option<usize>,
     oversized_action: OversizedAction,
 }
@@ -40,11 +41,10 @@ impl PartialEventMergeState {
     fn add_event(
         &mut self,
         event: LogEvent,
-        file: &str,
+        file: &Bytes,
         message_path: &OwnedTargetPath,
         expiration_time: Duration,
     ) {
-        let mut bytes_mut = BytesMut::new();
         if let Some(bucket) = self.buckets.get_mut(file) {
             if bucket.exceeds_max_merged_line_limit {
                 if !bucket.truncated {
@@ -56,94 +56,95 @@ impl PartialEventMergeState {
                 return;
             }
 
-            if let (Some(prev_value), Some(new_value)) = (
-                bucket.event.get_mut(message_path),
-                event.get(message_path).and_then(Value::as_bytes),
-            ) && let Some(prev_bytes) = prev_value.as_bytes()
-            {
-                bytes_mut.extend_from_slice(prev_bytes);
-                bytes_mut.extend_from_slice(new_value);
+            let Some(new_value) = event.get(message_path).and_then(Value::as_bytes) else {
+                return;
+            };
 
-                if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes
-                    && bytes_mut.len() > max_merged_line_bytes
-                {
-                    bucket.exceeds_max_merged_line_limit = true;
-                    match self.oversized_action {
-                        OversizedAction::Drop => {
-                            emit(KubernetesMergedLineTooBigError {
-                                event: &Value::Bytes(new_value.clone()),
-                                configured_limit: max_merged_line_bytes,
-                                encountered_size_so_far: bytes_mut.len(),
-                            });
+            let Some(mut message) = bucket.take_message(message_path) else {
+                return;
+            };
+
+            // Append in place: rebuilding the merged message from scratch on every partial
+            // event copies the whole accumulated message each time.
+            message.extend_from_slice(new_value);
+
+            if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes
+                && message.len() > max_merged_line_bytes
+            {
+                bucket.exceeds_max_merged_line_limit = true;
+                match self.oversized_action {
+                    OversizedAction::Drop => {
+                        emit(KubernetesMergedLineTooBigError {
+                            event: &Value::Bytes(new_value.clone()),
+                            configured_limit: max_merged_line_bytes,
+                            encountered_size_so_far: message.len(),
+                        });
+                        // Return before the accumulator is stored: the previous behaviour
+                        // emptied the bucket's message here, and keeping the over-limit
+                        // buffer would retain it until the bucket is removed or expires.
+                        return;
+                    }
+                    OversizedAction::Truncate => {
+                        let original_size = message.len();
+                        if max_merged_line_bytes >= TRUNCATED_SUFFIX.len() {
+                            message.truncate(max_merged_line_bytes - TRUNCATED_SUFFIX.len());
+                            message.extend_from_slice(TRUNCATED_SUFFIX);
+                        } else {
+                            message.truncate(max_merged_line_bytes);
                         }
-                        OversizedAction::Truncate => {
-                            let original_size = bytes_mut.len();
-                            if max_merged_line_bytes >= TRUNCATED_SUFFIX.len() {
-                                bytes_mut.truncate(max_merged_line_bytes - TRUNCATED_SUFFIX.len());
-                                bytes_mut.extend_from_slice(TRUNCATED_SUFFIX);
-                            } else {
-                                bytes_mut.truncate(max_merged_line_bytes);
-                            }
-                            bucket.truncated = true;
-                            emit(KubernetesMergedLineTruncated {
-                                configured_limit: max_merged_line_bytes,
-                                original_size,
-                            });
-                        }
+                        bucket.truncated = true;
+                        emit(KubernetesMergedLineTruncated {
+                            configured_limit: max_merged_line_bytes,
+                            original_size,
+                        });
                     }
                 }
-
-                if !bucket.exceeds_max_merged_line_limit || bucket.truncated {
-                    *prev_value = Value::Bytes(bytes_mut.freeze());
-                } else {
-                    *prev_value = Value::Bytes(bytes::Bytes::new());
-                }
             }
+
+            bucket.message = Some(message);
         } else {
+            let mut event = event;
             let mut exceeds_max_merged_line_limit = false;
             let mut truncated = false;
 
-            if let Some(event_bytes) = event.get(message_path).and_then(Value::as_bytes) {
-                bytes_mut.extend_from_slice(event_bytes);
-                if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes
-                    && bytes_mut.len() > max_merged_line_bytes
-                {
-                    exceeds_max_merged_line_limit = true;
-                    match self.oversized_action {
-                        OversizedAction::Drop => {
-                            emit(KubernetesMergedLineTooBigError {
-                                event: &Value::Bytes(event_bytes.clone()),
-                                configured_limit: max_merged_line_bytes,
-                                encountered_size_so_far: bytes_mut.len(),
-                            });
+            if let Some(event_bytes) = event.get(message_path).and_then(Value::as_bytes)
+                && let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes
+                && event_bytes.len() > max_merged_line_bytes
+            {
+                exceeds_max_merged_line_limit = true;
+                match self.oversized_action {
+                    OversizedAction::Drop => {
+                        emit(KubernetesMergedLineTooBigError {
+                            event: &Value::Bytes(event_bytes.clone()),
+                            configured_limit: max_merged_line_bytes,
+                            encountered_size_so_far: event_bytes.len(),
+                        });
+                    }
+                    OversizedAction::Truncate => {
+                        let original_size = event_bytes.len();
+                        let mut truncated_bytes = BytesMut::from(event_bytes.as_ref());
+                        if max_merged_line_bytes >= TRUNCATED_SUFFIX.len() {
+                            truncated_bytes
+                                .truncate(max_merged_line_bytes - TRUNCATED_SUFFIX.len());
+                            truncated_bytes.extend_from_slice(TRUNCATED_SUFFIX);
+                        } else {
+                            truncated_bytes.truncate(max_merged_line_bytes);
                         }
-                        OversizedAction::Truncate => {
-                            let original_size = bytes_mut.len();
-                            if max_merged_line_bytes >= TRUNCATED_SUFFIX.len() {
-                                bytes_mut.truncate(max_merged_line_bytes - TRUNCATED_SUFFIX.len());
-                                bytes_mut.extend_from_slice(TRUNCATED_SUFFIX);
-                            } else {
-                                bytes_mut.truncate(max_merged_line_bytes);
-                            }
-                            truncated = true;
-                            emit(KubernetesMergedLineTruncated {
-                                configured_limit: max_merged_line_bytes,
-                                original_size,
-                            });
-                        }
+                        truncated = true;
+                        event.insert(message_path, Value::Bytes(truncated_bytes.freeze()));
+                        emit(KubernetesMergedLineTruncated {
+                            configured_limit: max_merged_line_bytes,
+                            original_size,
+                        });
                     }
                 }
             }
 
-            let mut event = event;
-            if truncated {
-                event.insert(message_path, Value::Bytes(bytes_mut.freeze()));
-            }
-
             self.buckets.insert(
-                file.to_owned(),
+                file.clone(),
                 Bucket {
                     event,
+                    message: None,
                     expiration: Instant::now() + expiration_time,
                     exceeds_max_merged_line_limit,
                     truncated,
@@ -156,28 +157,34 @@ impl PartialEventMergeState {
         !bucket.exceeds_max_merged_line_limit || bucket.truncated
     }
 
-    fn remove_event(&mut self, file: &str) -> Option<LogEvent> {
+    fn remove_event(&mut self, file: &Bytes, message_path: &OwnedTargetPath) -> Option<LogEvent> {
         self.buckets
             .remove(file)
             .filter(Self::should_emit)
-            .map(|bucket| bucket.event)
+            .map(|bucket| bucket.into_event(message_path))
     }
 
-    fn emit_expired_events(&mut self, emitter: &mut Emitter<LogEvent>) {
+    fn emit_expired_events(
+        &mut self,
+        emitter: &mut Emitter<LogEvent>,
+        message_path: &OwnedTargetPath,
+    ) {
         let now = Instant::now();
-        self.buckets.retain(|_key, bucket| {
-            let expired = now >= bucket.expiration;
-            if expired && Self::should_emit(bucket) {
-                emitter.emit(bucket.event.clone());
+
+        for (_, bucket) in self
+            .buckets
+            .extract_if(|_, bucket| now >= bucket.expiration)
+        {
+            if Self::should_emit(&bucket) {
+                emitter.emit(bucket.into_event(message_path));
             }
-            !expired
-        });
+        }
     }
 
-    fn flush_events(&mut self, emitter: &mut Emitter<LogEvent>) {
+    fn flush_events(&mut self, emitter: &mut Emitter<LogEvent>, message_path: &OwnedTargetPath) {
         for (_, bucket) in self.buckets.drain() {
             if Self::should_emit(&bucket) {
-                emitter.emit(bucket.event);
+                emitter.emit(bucket.into_event(message_path));
             }
         }
     }
@@ -185,9 +192,38 @@ impl PartialEventMergeState {
 
 struct Bucket {
     event: LogEvent,
+    /// Accumulated message of the partial events merged into this bucket, if any. Until the
+    /// first merge the message field of `event` holds the message and is left untouched.
+    message: Option<BytesMut>,
     expiration: Instant,
     exceeds_max_merged_line_limit: bool,
     truncated: bool,
+}
+
+impl Bucket {
+    /// Take the accumulated message, seeding it from the event's own message field the first
+    /// time a partial event is merged into the bucket. Returns `None`, leaving the event
+    /// untouched, when the message field is missing or not bytes.
+    fn take_message(&mut self, message_path: &OwnedTargetPath) -> Option<BytesMut> {
+        if let Some(message) = self.message.take() {
+            return Some(message);
+        }
+        // Replace the field in place: removing it would shift the following elements when
+        // the message path indexes into an array. `into_event` overwrites the placeholder.
+        let value = self.event.get_mut(message_path)?;
+        let message = BytesMut::from(value.as_bytes()?.as_ref());
+        *value = Value::Null;
+        Some(message)
+    }
+
+    /// Materialize the accumulated message into the event.
+    fn into_event(mut self, message_path: &OwnedTargetPath) -> LogEvent {
+        if let Some(message) = self.message {
+            self.event
+                .insert(message_path, Value::Bytes(message.freeze()));
+        }
+        self.event
+    }
 }
 
 /// Merges partial events from a stream, with support for size limits and oversized behavior.
@@ -235,6 +271,9 @@ fn merge_partial_events_with_custom_expiration(
 
     let message_path = get_message_path(log_namespace);
 
+    let message_path_for_expiration = message_path.clone();
+    let message_path_for_flush = message_path.clone();
+
     map_with_expiration(
         state,
         stream.map(Event::into_log),
@@ -248,24 +287,31 @@ fn merge_partial_events_with_custom_expiration(
                 .and_then(Value::as_boolean)
                 .unwrap_or(false);
 
+            // Buckets stay keyed by the lossy UTF-8 rendering of the `file` field, as
+            // before, so that values which rendered identically still share a bucket. Use
+            // the field's own bytes when they are already valid UTF-8 (no allocation) and
+            // only allocate when the lossy conversion changes the bytes.
             let file = event
                 .get(&file_path)
-                .and_then(Value::to_str_lossy)
-                .map(|x| x.to_string())
+                .and_then(|value| match (value.as_bytes(), value.to_str_lossy()) {
+                    (Some(bytes), Some(Cow::Borrowed(_))) => Some(bytes.clone()),
+                    (_, Some(Cow::Owned(lossy))) => Some(Bytes::from(lossy)),
+                    _ => None,
+                })
                 .unwrap_or_default();
 
             state.add_event(event, &file, &message_path, expiration_time);
-            if !is_partial && let Some(log_event) = state.remove_event(&file) {
+            if !is_partial && let Some(log_event) = state.remove_event(&file, &message_path) {
                 emitter.emit(log_event);
             }
         },
-        |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
+        move |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
             // check for expired events
-            state.emit_expired_events(emitter);
+            state.emit_expired_events(emitter, &message_path_for_expiration);
         },
-        |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
+        move |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
             // the source is ending, flush all pending events
-            state.flush_events(emitter);
+            state.flush_events(emitter, &message_path_for_flush);
         },
     )
     // LogEvent -> Event
@@ -278,6 +324,37 @@ mod test {
     use vrl::{event_path, metadata_path, value};
 
     use super::*;
+
+    fn bucket(event: LogEvent) -> Bucket {
+        Bucket {
+            event,
+            message: None,
+            expiration: Instant::now(),
+            exceeds_max_merged_line_limit: false,
+            truncated: false,
+        }
+    }
+
+    #[test]
+    fn merging_into_array_element_preserves_siblings() {
+        let path = OwnedTargetPath::event(owned_value_path!("payload", 0));
+
+        let mut merged = bucket(LogEvent::from(value!({"payload": ["hello ", "keep"]})));
+        let mut message = merged.take_message(&path).unwrap();
+        message.extend_from_slice(b"world");
+        merged.message = Some(message);
+        assert_eq!(
+            merged.into_event(&path).value(),
+            &value!({"payload": ["hello world", "keep"]})
+        );
+
+        let mut non_bytes = bucket(LogEvent::from(value!({"payload": [1, "keep"]})));
+        assert!(non_bytes.take_message(&path).is_none());
+        assert_eq!(
+            non_bytes.into_event(&path).value(),
+            &value!({"payload": [1, "keep"]})
+        );
+    }
 
     #[tokio::test]
     async fn merge_single_event_legacy() {
@@ -687,6 +764,67 @@ mod test {
         assert_eq!(
             output[0].as_log().get(event_path!("message")),
             Some(&value!("test mess..TRUNCATED"))
+        );
+    }
+
+    /// In Drop mode the over-limit accumulator must not be stored back into the bucket:
+    /// it would stay alive until the bucket is removed or expires.
+    #[test]
+    fn drop_mode_releases_the_oversized_accumulator() {
+        let file = Bytes::from("file");
+        let message_path = get_message_path(LogNamespace::Legacy);
+        let mut state = PartialEventMergeState {
+            buckets: HashMap::new(),
+            maybe_max_merged_line_bytes: Some(6),
+            oversized_action: OversizedAction::Drop,
+        };
+
+        let mut e_1 = LogEvent::from("aaaa");
+        e_1.insert(event_path!(FILE_KEY), file.clone());
+        e_1.insert(event_path!("_partial"), true);
+        state.add_event(e_1, &file, &message_path, EXPIRATION_TIME);
+
+        let mut e_2 = LogEvent::from("bbbb");
+        e_2.insert(event_path!(FILE_KEY), file.clone());
+        e_2.insert(event_path!("_partial"), true);
+        state.add_event(e_2, &file, &message_path, EXPIRATION_TIME);
+
+        let bucket = state.buckets.get(&file).expect("bucket exists");
+        assert!(bucket.exceeds_max_merged_line_limit);
+        assert!(
+            bucket.message.is_none(),
+            "the over-limit accumulator must be released"
+        );
+    }
+
+    /// A partial run that expires is emitted as one event with the merged message.
+    #[tokio::test]
+    async fn merged_partials_expire_as_single_event_legacy() {
+        let mut e_1 = LogEvent::from("hello ");
+        e_1.insert(event_path!(FILE_KEY), "file");
+        e_1.insert(event_path!("_partial"), true);
+
+        let mut e_2 = LogEvent::from("world");
+        e_2.insert(event_path!(FILE_KEY), "file");
+        e_2.insert(event_path!("_partial"), true);
+
+        // and input stream that never ends
+        let input_stream =
+            futures::stream::iter([e_1.into(), e_2.into()]).chain(futures::stream::pending());
+
+        let output_stream = merge_partial_events_with_custom_expiration(
+            input_stream,
+            LogNamespace::Legacy,
+            Duration::from_secs(1),
+            None,
+            OversizedAction::Drop,
+        );
+
+        let output: Vec<Event> = output_stream.take(1).collect().await;
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0].as_log().get(event_path!("message")),
+            Some(&value!("hello world"))
         );
     }
 }
