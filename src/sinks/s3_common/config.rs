@@ -14,6 +14,7 @@ use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
 use super::service::{S3Request, S3Response, S3Service};
+pub use crate::sinks::util::s3::S3StorageClass;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client, is_retriable_error},
     common::s3::S3ClientBuilder,
@@ -132,44 +133,6 @@ fn example_tags() -> HashMap<String, String> {
         ("Classification".to_string(), "confidential".to_string()),
         ("PHI".to_string(), "True".to_string()),
     ])
-}
-
-/// S3 storage classes.
-///
-/// More information on each storage class can be found in the [AWS documentation][aws_docs].
-///
-/// [aws_docs]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum S3StorageClass {
-    /// Standard Redundancy.
-    #[default]
-    Standard,
-
-    /// Reduced Redundancy.
-    ReducedRedundancy,
-
-    /// Intelligent Tiering.
-    IntelligentTiering,
-
-    /// Infrequently Accessed.
-    StandardIa,
-
-    /// High Performance (single Availability zone).
-    ExpressOnezone,
-
-    /// Infrequently Accessed (single Availability zone).
-    OnezoneIa,
-
-    /// Glacier Flexible Retrieval.
-    Glacier,
-
-    /// Glacier Instant Retrieval.
-    GlacierIr,
-
-    /// Glacier Deep Archive.
-    DeepArchive,
 }
 
 impl From<S3StorageClass> for StorageClass {
