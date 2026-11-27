@@ -1,10 +1,38 @@
 {{ $iconSizes := dict "1" "7" "2" "6" "3" "5" "4" "4" "5" "3" "6" "3" }}
 {{ $n := index $iconSizes (.Level | string) }}
-<h{{ .Level }} x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ .Anchor | safeURL }}">
-  {{ .Text | safeHTML }}
-  <a class="ml-2 relative" x-cloak x-show="show" href="#{{ .Anchor | safeURL }}">
+{{ $namedAnchor := `(?i)<a[[:space:]]+name=("[^"]*"|'[^']*')[[:space:]]*>[[:space:]]*</a>` }}
+{{ $text := replaceRE $namedAnchor "" .Text }}
+{{ $hasLink := findRE `(?i)<a[[:space:]>]` $text }}
+{{ $fragment := printf "#%s" .Anchor }}
+{{ $hasSelfLink := or (in $text (printf ` href="%s"` $fragment)) (in $text (printf ` href='%s'` $fragment)) }}
+{{ $needsPermalink := and $hasLink (not $hasSelfLink) }}
+{{ if $needsPermalink }}
+<div class="heading-permalink-group flex items-baseline gap-2">
+  <h{{ .Level }} id="{{ .Anchor | safeURL }}">
+    {{ .Text | safeHTML }}
+  </h{{ .Level }}>
+  <a class="heading-permalink inline-block h-5 w-5 shrink-0 align-middle" href="#{{ .Anchor | safeURL }}" aria-label="Permalink to {{ .PlainText }}">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+    </svg>
+  </a>
+</div>
+{{ else }}
+<h{{ .Level }} x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" x-on:focusin="show = true" x-on:focusout="show = false" id="{{ .Anchor | safeURL }}">
+  {{ if $hasLink }}
+    {{ .Text | safeHTML }}
+  {{ else }}
+    <a href="#{{ .Anchor | safeURL }}">
+      {{ $text | safeHTML }}
+    </a>
+    {{ range findRE $namedAnchor .Text }}
+      {{ . | safeHTML }}
+    {{ end }}
+  {{ end }}
+  <a class="ml-2 relative" x-cloak x-show="show" href="#{{ .Anchor | safeURL }}" tabindex="-1" aria-hidden="true">
     <svg xmlns="http://www.w3.org/2000/svg" class="absolute inset-0 h-full h-{{ $n }} w-{{ $n }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
     </svg>
   </a>
 </h{{ .Level }}>
+{{ end }}

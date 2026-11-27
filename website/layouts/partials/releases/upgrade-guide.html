@@ -15,13 +15,13 @@
 {{ end }}
 {{ $parts = $parts | append $part }}
 {{ end }}
-{{ $content = delimit $parts `href="#` | replaceRE `<h2(\s|>)` `<!-- upgrade-guide-entry --><h2${1}` }}
+{{ $content = delimit $parts `href="#` | replaceRE `(<div class="heading-permalink-group[^>]*>\s*)?<h2(\s|>)` `<!-- upgrade-guide-entry -->${0}` }}
 {{ range slice 5 4 3 2 }}
 {{ $content = $content | replaceRE (printf `<(/?)h%d(\s|>)` .) (printf `<${1}h%d${2}` (add . 1)) }}
 {{ end }}
 <section class="upgrade-guide mt-8" aria-labelledby="upgrade-guide">
   <div class="prose dark:prose-invert max-w-none">
-    {{ partial "heading.html" (dict "text" "Upgrade guide" "level" 2) }}
+    {{ partial "heading.html" (dict "text" "Upgrade guide" "level" 2 "anchor" true) }}
   </div>
   <ul class="mt-6 grid min-w-0 list-none gap-3 p-0">
     {{ range split $content "<!-- upgrade-guide-entry -->" }}

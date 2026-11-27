@@ -1,10 +1,10 @@
 {{ $roles := site.Data.docs.administration.roles }}
 {{ range $k, $v := $roles }}
-{{ partial "heading.html" (dict "text" $v.title "level" 2) }}
+{{ partial "heading.html" (dict "text" $v.title "level" 2 "anchor" true) }}
 
 {{ with $v.sub_roles }}
 {{ range . }}
-{{ partial "heading.html" (dict "text" .title "level" 3) }}
+{{ partial "heading.html" (dict "text" .title "level" 3 "anchor" true) }}
 {{ template "role-image" .name }}
 {{ template "role-description" .description }}
 {{ end }}

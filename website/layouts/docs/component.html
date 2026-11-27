@@ -49,20 +49,20 @@
 
           {{/* Component requirements */}}
           {{ with $config.support.requirements }}
-          {{ partial "heading.html" (dict "text" "Requirements" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Requirements" "level" 2 "anchor" true) }}
           {{ partial "data.html" (dict "component_requirements" .) }}
           {{ end }}
 
           {{/* Component warnings */}}
           {{ with $config.support.warnings }}
-          {{ partial "heading.html" (dict "text" "Warnings" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Warnings" "level" 2 "anchor" true) }}
           {{ partial "data.html" (dict "component_warnings" .) }}
           {{ end }}
 
           {{/* Component configuration */}}
           {{ with $config.configuration }}
           {{ if gt (len .) 1 }} {{/* Don't display if only the "type" config is present */}}
-          {{ partial "heading.html" (dict "text" "Configuration" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Configuration" "level" 2 "anchor" true) }}
 
           {{ partial "components/example-configs.html" (dict "examples" $exampleConfigs) }}
 
@@ -72,43 +72,43 @@
 
           {{/* Component environment variables */}}
           {{ with $config.env_vars }}
-          {{ partial "heading.html" (dict "text" "Environment variables" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Environment variables" "level" 2 "anchor" true) }}
           {{ partial "data.html" (dict "component_env_vars" . ) }}
           {{ end }}
 
           {{/* Component log/metric/trace input types */}}
           {{ with $config.input }}
-          {{ partial "heading.html" (dict "text" "Input Types" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Input Types" "level" 2 "anchor" true) }}
           {{ partial "data.html" (dict "component_input_types" . ) }}
           {{ end }}
 
           {{/* Component outputs */}}
           {{ with $config.outputs }}
-          {{ partial "heading.html" (dict "text" "Outputs" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Outputs" "level" 2 "anchor" true) }}
           {{ partial "data.html" (dict "component_outputs" . ) }}
           {{ end }}
 
           {{/* Component log/metric/trace output types */}}
           {{ with $config.output }}
-          {{ partial "heading.html" (dict "text" "Output Types" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Output Types" "level" 2 "anchor" true) }}
           {{ partial "data.html" (dict "component_output_types" . ) }}
           {{ end }}
 
           {{/* Component telemetry output */}}
           {{ with $config.telemetry }}
-          {{ partial "heading.html" (dict "text" "Telemetry" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Telemetry" "level" 2 "anchor" true) }}
           {{ partial "data.html" (dict "component_telemetry" . ) }}
           {{ end }}
 
           {{/* Component examples */}}
           {{ with $config.examples }}
-          {{ partial "heading.html" (dict "text" "Examples" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Examples" "level" 2 "anchor" true) }}
           {{ partial "data.html" (dict "component_examples" . ) }}
           {{ end }}
 
           {{/* Cloud platform permissions */}}
           {{ with $config.permissions }}
-          {{ partial "heading.html" (dict "text" "Permissions" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Permissions" "level" 2 "anchor" true) }}
           {{ partial "data.html" (dict "component_permissions" .) }}
           {{ end }}
 
@@ -116,14 +116,20 @@
           {{ with $config.how_it_works }}
           <div class="no-prose mt-12">
             <span>
-              {{ partial "heading.html" (dict "text" "How it works" "level" 2) }}
+              {{ partial "heading.html" (dict "text" "How it works" "level" 2 "anchor" true) }}
             </span>
 
+            {{ $reserved := slice "requirements" "warnings" "configuration" "environment-variables" "input-types" "outputs" "output-types" "telemetry" "examples" "permissions" "how-it-works" }}
             <div class="mt-8 flex flex-col space-y-6">
               {{ range $k, $v := . }}
               <div>
                 <span>
-                  {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
+                  {{ $slug := $v.title | urlize }}
+                  {{ $id := $v.title }}
+                  {{ if or (in $reserved $slug) (and $config.configuration (index $config.configuration $slug)) (and $config.env_vars (index $config.env_vars $slug)) }}
+                    {{ $id = printf "how-it-works-%s" $slug }}
+                  {{ end }}
+                  {{ partial "heading.html" (dict "text" $v.title "level" 3 "anchor" true "id" $id) }}
                 </span>
 
                 {{ with .svg }}
@@ -138,7 +144,12 @@
                 <div class="mt-2">
                   {{ range . }}
                   <span>
-                    {{ partial "heading.html" (dict "text" .title "level" 4) }}
+                    {{ $subSlug := .title | urlize }}
+                    {{ $subId := .title }}
+                    {{ if or (in $reserved $subSlug) (and $config.configuration (index $config.configuration $subSlug)) (and $config.env_vars (index $config.env_vars $subSlug)) }}
+                      {{ $subId = printf "how-it-works-%s" $subSlug }}
+                    {{ end }}
+                    {{ partial "heading.html" (dict "text" .title "level" 4 "anchor" true "id" $subId) }}
                   </span>
 
                   {{ with .svg }}

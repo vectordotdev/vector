@@ -107,7 +107,7 @@
       {{ if gt (len $release.changelog) 0 }}
       <div class="mt-8">
         <div class="prose dark:prose-invert max-w-none">
-          {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2 "anchor" true) }}
         </div>
 
         {{ if and (gt (len $breakingTitled) 0) $hasUpgradeGuide }}
@@ -116,7 +116,7 @@
             {{ $numBreaking := len $breakingTitled }}
             {{ $breakingWord := cond (eq $numBreaking 1) "breaking change" "breaking changes" }}
             {{ $breakingHeading := printf "%d %s" $numBreaking $breakingWord }}
-            {{ partial "heading.html" (dict "text" $breakingHeading "id" "breaking changes" "level" 3 "icon" false) }}
+            {{ partial "heading.html" (dict "text" $breakingHeading "id" "breaking changes" "level" 3 "icon" false "anchor" true) }}
           </div>
 
           <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
@@ -147,7 +147,7 @@
           {{ $heading := printf "%d %s" $numChanges $label }}
           <div>
             <div class="prose dark:prose-invert max-w-none">
-              {{ partial "heading.html" (dict "text" $heading "id" $value "level" 3 "icon" false) }}
+              {{ partial "heading.html" (dict "text" $heading "id" $value "level" 3 "icon" false "anchor" true) }}
             </div>
 
             <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
@@ -167,7 +167,7 @@
       {{ if gt (len $release.commits) 0 }}
       <div class="mt-8">
         <div class="prose dark:prose-invert max-w-none">
-          {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Changelog" "level" 2 "anchor" true) }}
         </div>
 
         <div class="mt-6 flex flex-col space-y-8">
@@ -181,7 +181,7 @@
           {{ $heading := printf "%d %s" $numCommits $label }}
           <div class="ml-6">
             <div class="prose dark:prose-invert max-w-none">
-              {{ partial "heading.html" (dict "text" $heading "id" $value "level" 3 "icon" false) }}
+              {{ partial "heading.html" (dict "text" $heading "id" $value "level" 3 "icon" false "anchor" true) }}
             </div>
 
             <div class="mt-4 flex flex-col space-y-2">
@@ -201,7 +201,7 @@
       {{ if ne . "" }}
       <div class="mt-8">
         <div class="prose dark:prose-invert max-w-none">
-          {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2 "anchor" true) }}
         </div>
 
         <div class="vrl-changelog mt-6 prose dark:prose-invert max-w-none [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
@@ -220,7 +220,7 @@
       {{ with $release.whats_next }}
       <div class="mt-8">
         <span class="prose dark:prose-invert max-w-none">
-          {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "What's next" "level" 2 "anchor" true) }}
         </span>
 
         <div class="mt-6 flex flex-col space-y-6">
@@ -244,7 +244,7 @@
       <div class="lg:grid lg:grid-cols-3 gap-8">
         <div class="col-span-2">
           <div class="prose">
-            {{ partial "heading.html" (dict "text" (print "Download Version " $version) "level" 2) }}
+            {{ partial "heading.html" (dict "text" (print "Download Version " $version) "level" 2 "anchor" true) }}
           </div>
 
           <div class="changelog-card mt-2 border bg-gray-50/50 px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">

@@ -166,3 +166,14 @@ test("mobile Updates modal covers the sidebar control and dismisses from the bot
   await sidebarToggle.click();
   await expect(sidebar).toBeVisible();
 });
+
+test("content headings are keyboard-focusable and navbar has no tabindex", async ({ page }) => {
+  await page.goto(quickstart);
+  const navbar = page.locator("nav:has(#site-search)");
+  await expect(navbar).not.toHaveAttribute("tabindex");
+
+  const headingLink = page.getByRole("heading", { name: "Configure Vector", exact: true }).getByRole("link");
+  await expect(headingLink).toHaveAttribute("href", "#configure-vector");
+  await headingLink.focus();
+  await expect(headingLink).toBeFocused();
+});

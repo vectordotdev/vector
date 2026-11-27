@@ -70,7 +70,7 @@ Download | {{ site.Title }}
     <div class="lg:grid lg:grid-cols-3 gap-8">
       <div class="col-span-2">
         <div class="prose">
-          {{ partial "heading.html" (dict "text" "Downloads" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Downloads" "level" 2 "anchor" true) }}
         </div>
 
         <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
@@ -95,7 +95,7 @@ Download | {{ site.Title }}
 {{ define "methods" }}
 <div class="col-span-1 mt-6 lg:mt-0">
   <div class="prose">
-    {{ partial "heading.html" (dict "text" "Other methods" "level" 2) }}
+    {{ partial "heading.html" (dict "text" "Other methods" "level" 2 "anchor" true) }}
   </div>
 
   <div class="mt-2 flex flex-col divide-y divide-gray-200 border rounded-md dark:border-gray-700">

@@ -1,13 +1,13 @@
 {{ $topologies := sort site.Data.docs.administration.topologies ".order" }}
 {{ range $topologies }}
-{{ partial "heading.html" (dict "text" .title "level" 2) }}
+{{ partial "heading.html" (dict "text" .title "level" 2 "anchor" true) }}
 {{ template "topology-image" .title }}
 
 <div class="mt-5">
   {{ .description | markdownify }}
 </div>
 
-{{ partial "heading.html" (dict "text" "Pros" "level" 3 "id" (printf "pros-%s" (.title | urlize))) }}
+{{ partial "heading.html" (dict "text" "Pros" "level" 3 "id" (printf "pros-%s" (.title | urlize)) "anchor" true) }}
 <ul>
   {{ range .pros }}
   <li>
@@ -16,7 +16,7 @@
   {{ end }}
 </ul>
 
-{{ partial "heading.html" (dict "text" "Cons" "level" 3 "id" (printf "cons-%s" (.title | urlize))) }}
+{{ partial "heading.html" (dict "text" "Cons" "level" 3 "id" (printf "cons-%s" (.title | urlize)) "anchor" true) }}
 <ul>
   {{ range .cons }}
   <li>

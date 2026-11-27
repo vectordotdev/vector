@@ -3,9 +3,7 @@
 <div class="no-prose flex flex-col border dark:border-gray-700 rounded-md divide-y dark:divide-gray-700">
   <div class="py-4 px-6">
     <span class="flex justify-between items-center">
-      <h3 id="{{ $cli.name }}" class="font-mono">
-        {{ $cli.name }}
-      </h3>
+      {{ partial "heading.html" (dict "text" $cli.name "level" 3 "mono" true "id" $cli.name "anchor" true) }}
     </span>
 
     <div class="mt-2">
@@ -31,7 +29,7 @@
   {{ range $k, $v := $cli.commands }}
   <div class="py-4 px-6">
     <span>
-      {{ partial "heading.html" (dict "text" (printf "vector %s" $k) "level" 3 "mono" true "id" $k) }}
+      {{ partial "heading.html" (dict "text" (printf "vector %s" $k) "level" 3 "mono" true "id" $k "anchor" true) }}
     </span>
 
     <div class="mt-4">

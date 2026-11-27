@@ -31,8 +31,22 @@
 {{ if or $release.description $highlights }}
 <div class="border-l border-gray-100 dark:border-gray-800 pl-8 flex flex-col space-y-4 py-2">
   {{ with $release.description }}
+  {{ $dups := partialCached "releases/duplicate-description-ids.html" "releases" }}
+  {{ $prefix := printf "%s-" ($version | urlize) }}
+  {{ $desc := . | markdownify }}
+  {{ range findRE `<h[1-6][^>]*\sid="[^"]+"` $desc }}
+  {{ $hid := replaceRE `(?s)^.*\sid="([^"]+)"$` "${1}" . }}
+  {{ if isset $dups $hid }}
+  {{ $prefixedTag := replace . (printf `id="%s"` $hid) (printf `id="%s%s"` $prefix $hid) }}
+  {{ $desc = replace $desc (printf `id="%s"` $hid) (printf `id="%s%s"` $prefix $hid) }}
+  {{ $desc = replace $desc (printf `href="#%s"` $hid) (printf `href="#%s%s"` $prefix $hid) }}
+  {{ if eq (index $dups $hid) $version }}
+  {{ $desc = replace $desc $prefixedTag (printf `<span id="%s" aria-hidden="true"></span>%s` $hid $prefixedTag) }}
+  {{ end }}
+  {{ end }}
+  {{ end }}
   <div class="release-description prose dark:prose-invert max-w-none">
-    {{ . | markdownify }}
+    {{ $desc | safeHTML }}
     <p><a href="{{ $.RelPermalink }}">View the full release notes.</a></p>
   </div>
   {{ end }}
@@ -41,7 +55,7 @@
   {{ $id := printf "highlights-%s" $version }}
   <div class="flex flex-col space-y-2">
     <span class="prose dark:prose-invert max-w-none">
-      {{ partial "heading.html" (dict "text" "Highlights" "level" 3 "id" $id) }}
+      {{ partial "heading.html" (dict "text" "Highlights" "level" 3 "id" $id "anchor" true) }}
     </span>
 
     <div class="flex flex-col space-y-1">

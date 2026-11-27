@@ -22,7 +22,7 @@
       {{ if gt (len $pending) 0 }}
       <div>
         <div class="prose dark:prose-invert max-w-none">
-          {{ partial "heading.html" (dict "text" "Active Deprecations" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Active Deprecations" "level" 2 "anchor" true) }}
           <p>The current Vector release is <strong>v{{ $latest }}</strong>. Deprecations become eligible for removal two minor versions after their announcement.</p>
         </div>
 
@@ -33,7 +33,7 @@
       {{ if gt (len $enacted) 0 }}
       <div class="mt-12">
         <div class="prose dark:prose-invert max-w-none">
-          {{ partial "heading.html" (dict "text" "Past Deprecations" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Past Deprecations" "level" 2 "anchor" true) }}
           <p>These features have been removed from Vector as of version <strong>v{{ $latest }}</strong>.</p>
         </div>
 
