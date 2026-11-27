@@ -26,6 +26,19 @@ generated: components: sinks: azure_blob: configuration: {
 		required: false
 		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
+	api_version: {
+		description: """
+			The Azure Blob Storage service API version to use for requests.
+
+			This sets the `x-ms-version` request header. If unset, Shared Key authentication uses
+			`2025-11-05`, and other authentication methods use the version selected by the Azure SDK.
+			Setting an older version can be useful with Azure Stack or other storage services that do
+			not support the default version. The configured version must support every operation and
+			option used by this sink.
+			"""
+		required: false
+		type: string: examples: ["2021-08-06"]
+	}
 	auth: {
 		description: "Azure service principal authentication."
 		required:    false
