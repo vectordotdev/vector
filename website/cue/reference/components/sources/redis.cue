@@ -79,6 +79,14 @@ components: sources: redis: {
 						default: null
 					}
 				}
+				redis_channel: {
+					description: "The concrete Redis channel that matched the subscribed pattern. Only populated for the `pchannel` data type when `redis_channel` is configured."
+					required:    false
+					type: string: {
+						examples: ["some_channel"]
+						default: null
+					}
+				}
 			}
 		}
 		metrics: "": {
