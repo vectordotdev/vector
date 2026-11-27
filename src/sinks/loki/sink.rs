@@ -534,7 +534,8 @@ impl LokiSink {
                 client,
                 validated.endpoint.clone(),
                 validated.auth.clone(),
-            ));
+                config.keep_alive_requests,
+            )?);
 
         let batch_encoder = match config.compression {
             Compression::Snappy => LokiBatchEncoder(LokiBatchEncoding::Protobuf),
