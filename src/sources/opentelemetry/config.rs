@@ -27,7 +27,8 @@ use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
 use serde::{Deserialize, Deserializer, Serialize, de};
 use tokio::sync::Semaphore;
-use tonic::service::RoutesBuilder;
+use tonic::{server::NamedService, service::RoutesBuilder};
+use tonic_health::server::health_reporter;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
     codecs::decoding::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType},
@@ -382,7 +383,7 @@ impl OpentelemetryConfig {
     ///
     /// Returns an error if TLS, decoding, request limits, or header matching cannot be configured.
     /// Build the source serving runtime-swappable TLS acceptors for the gRPC and/or HTTP listeners.
-    pub fn build_with_tls_reloaders(
+    pub async fn build_with_tls_reloaders(
         &self,
         cx: SourceContext,
         grpc_tls_reloader: Option<TlsAcceptorReloader>,
@@ -451,7 +452,7 @@ impl OpentelemetryConfig {
         })
         .max_decoding_message_size(max_decompressed_size_bytes());
 
-        let mut builder = RoutesBuilder::default();
+        let mut builder = routes_with_health_service().await;
         builder
             .add_service(log_service)
             .add_service(metrics_service)
@@ -505,11 +506,36 @@ impl OpentelemetryConfig {
     }
 }
 
+// Serve the standard `grpc.health.v1.Health` service, as the `vector` source does, so a health check
+// on this port gets a real gRPC status instead of the bare HTTP 404 that an unrouted method returns.
+// The reporter already reports the aggregate (empty) service name as serving, and that is the name a
+// probe sends unless it is told otherwise.
+async fn routes_with_health_service() -> RoutesBuilder {
+    let (health_reporter, health_service) = health_reporter();
+
+    // Report each OTLP service by name as well, so a probe can target a single signal. The names
+    // come from the generated `NamedService` implementations because a hand-written string could
+    // drift from the routes the source registers.
+    for service_name in [
+        <LogsServiceServer<Service> as NamedService>::NAME,
+        <MetricsServiceServer<Service> as NamedService>::NAME,
+        <TraceServiceServer<Service> as NamedService>::NAME,
+    ] {
+        health_reporter
+            .set_service_status(service_name, tonic_health::ServingStatus::Serving)
+            .await;
+    }
+
+    let mut builder = RoutesBuilder::default();
+    builder.add_service(health_service);
+    builder
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "opentelemetry")]
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        self.build_with_tls_reloaders(cx, None, None)
+        self.build_with_tls_reloaders(cx, None, None).await
     }
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",
