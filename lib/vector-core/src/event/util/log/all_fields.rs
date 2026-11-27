@@ -270,24 +270,13 @@ mod test {
         assert_eq!(collected, expected);
     }
 
-    #[test]
-    fn keys_quoted_at_charset_edges() {
-        let fields = fields_from_json(json!({
-            "": 1,
-            "_0": 2,
-            "é": 3,
-        }));
-        let expected: Vec<_> = vec![
-            ("\"\"", &Value::Integer(1)),
-            ("_0", &Value::Integer(2)),
-            ("\"é\"", &Value::Integer(3)),
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.into(), v))
-        .collect();
-
-        let collected: Vec<_> = all_fields(&fields).collect();
-        assert_eq!(collected, expected);
+    proptest::proptest! {
+        // Each accepted range's end bytes and the bytes just outside them.
+        #[test]
+        fn is_valid_path_segment_agrees_with_regex(key in r"[/09:@AZ\[^_`az{é\n]{0,5}") {
+            let regex = regex::Regex::new(r"^[a-zA-Z0-9_]+$").unwrap();
+            proptest::prop_assert_eq!(is_valid_path_segment(&key), regex.is_match(&key));
+        }
     }
 
     #[test]
