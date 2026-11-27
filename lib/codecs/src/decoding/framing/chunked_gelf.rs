@@ -139,6 +139,8 @@ impl ChunkedGelfDecompressionConfig {
         clippy::trivially_copy_pass_by_ref,
         reason = "Keep the existing borrowed receiver API during the lint rollout."
     )]
+    /// Returns the decompression algorithm to use for `data`; `Auto` detects it from
+    /// the leading magic bytes.
     pub fn get_decompression(&self, data: &Bytes) -> ChunkedGelfDecompression {
         match self {
             Self::Auto => ChunkedGelfDecompression::from_magic(data),
@@ -244,14 +246,19 @@ impl PendingMessages {
     }
 }
 
+/// Compression algorithm of a GELF message.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChunkedGelfDecompression {
+    /// Decompress the message as Gzip.
     Gzip,
+    /// Decompress the message as Zlib.
     Zlib,
+    /// Pass the message through unchanged.
     None,
 }
 
 impl ChunkedGelfDecompression {
+    /// Detects the compression algorithm from the leading magic bytes of `data`.
     pub fn from_magic(data: &Bytes) -> Self {
         if data.starts_with(GZIP_MAGIC) {
             trace!("Detected Gzip compression");
@@ -277,6 +284,12 @@ impl ChunkedGelfDecompression {
         Self::None
     }
 
+    /// Decompresses `data` according to this algorithm; uncompressed data is passed through.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the compressed stream cannot be fully decompressed, or exceeds the
+    /// shared decompressed-size cap.
     pub fn decompress(&self, data: Bytes) -> Result<Bytes, ChunkedGelfDecompressionError> {
         let decompressed = match self {
             Self::Gzip => CappedDecoder::gzip(data.reader())
@@ -293,12 +306,21 @@ impl ChunkedGelfDecompression {
     }
 }
 
+/// An error that can occur while decompressing a GELF message.
 #[derive(Debug, Snafu)]
 pub enum ChunkedGelfDecompressionError {
+    /// The Gzip stream could not be decompressed.
     #[snafu(display("Gzip decompression error: {source}"))]
-    GzipDecompression { source: std::io::Error },
+    GzipDecompression {
+        /// The underlying decompression error.
+        source: std::io::Error,
+    },
+    /// The Zlib stream could not be decompressed.
     #[snafu(display("Zlib decompression error: {source}"))]
-    ZlibDecompression { source: std::io::Error },
+    ZlibDecompression {
+        /// The underlying decompression error.
+        source: std::io::Error,
+    },
 }
 
 #[derive(Debug, Snafu)]
