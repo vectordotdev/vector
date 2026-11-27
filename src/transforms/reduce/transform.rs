@@ -8,7 +8,7 @@ use std::{
 use vector_lib::internal_event::emit;
 
 use async_stream::stream;
-use futures::{Stream, StreamExt, future, stream};
+use futures::{FutureExt as _, Stream, StreamExt, future, stream};
 use indexmap::IndexMap;
 use tokio::{sync::mpsc, task::JoinSet};
 use tokio_stream::wrappers::ReceiverStream;
@@ -367,6 +367,14 @@ const SHARD_QUEUE_BATCHES: usize = 4;
 /// output. It bounds each shard queue to `SHARD_QUEUE_BATCHES * BATCH_EVENTS` events.
 pub const BATCH_EVENTS: usize = 100;
 
+/// The longest the router keeps an event in a partial batch while its input stays ready.
+///
+/// The router sends every partial batch as soon as its input has nothing ready. Under sustained
+/// load the input may never pause, so this bounds the wait of the shards that get few events, such
+/// as next to a hot key. `expire_after_ms` and `end_every_period_ms` cap it, so that shards don't
+/// see events much later than a single task would.
+const MAX_BATCH_DELAY: Duration = Duration::from_millis(5);
+
 // All shards send into one shared output channel, which holds
 // `shards * OUTPUT_QUEUE_BATCHES_PER_SHARD` batches. Only there to absorb bursts.
 const OUTPUT_QUEUE_BATCHES_PER_SHARD: usize = 1;
@@ -409,7 +417,17 @@ impl TaskTransform<Event> for ShardedReduce {
 
         drop(output_tx);
 
-        tasks.spawn_timed(route(self.reduce.group_by, shards_senders, input_rx));
+        let max_batch_delay = [Some(self.reduce.expire_after), self.reduce.end_every_period]
+            .into_iter()
+            .flatten()
+            .fold(MAX_BATCH_DELAY, Duration::min);
+
+        tasks.spawn_timed(route(
+            self.reduce.group_by,
+            shards_senders,
+            max_batch_delay,
+            input_rx,
+        ));
 
         stream! {
             let mut output = std::pin::pin!(ReceiverStream::new(output_rx));
@@ -451,44 +469,127 @@ async fn run_shard(
     }
 }
 
+/// Sends each event to the shard of its group, in batches of up to `BATCH_EVENTS` events per shard.
+///
+/// Each shard's batch fills across input arrays, so its size doesn't depend on the shard count.
 async fn route(
     group_by: Vec<String>,
     shard_senders: Vec<mpsc::Sender<Vec<Event>>>,
-    input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    max_batch_delay: Duration,
+    mut input: Pin<Box<dyn Stream<Item = Event> + Send>>,
 ) {
     let hasher = RandomState::new();
+    let shards = shard_senders.len();
+    let mut batches = ShardBatches::new(shard_senders, max_batch_delay);
 
-    let mut input = input_rx.ready_chunks(BATCH_EVENTS);
+    loop {
+        let event = if let Some(event) = input.next().now_or_never() {
+            event
+        } else {
+            // Nothing is ready: send the partial batches instead of holding them while waiting.
+            if batches.send_partial().await.is_err() {
+                return;
+            }
+            input.next().await
+        };
+        let Some(event) = event else {
+            break;
+        };
 
-    while let Some(events) = input.next().await {
-        let mut per_shard: Vec<Vec<Event>> = vec![Vec::new(); shard_senders.len()];
-
-        for event in events {
-            let log = event.as_log();
-            let mut state = hasher.build_hasher();
-            group_by
-                .iter()
-                .map(|field| log.parse_path_and_get_value(field).ok().flatten())
-                .for_each(|value| value.hash(&mut state));
-
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "deterministic: the same hash always maps to the same shard, and the low bits stay uniform"
-            )]
-            let shard_number = (state.finish() as usize) % shard_senders.len();
-            per_shard[shard_number].push(event);
-        }
-
-        let sends = shard_senders
-            .iter()
-            .zip(per_shard)
-            .filter(|(_, shard_batch)| !shard_batch.is_empty())
-            .map(|(shard_tx, shard_batch)| shard_tx.send(shard_batch));
-
-        // Fails only if a shard stopped after the output stream was dropped.
-        if future::try_join_all(sends).await.is_err() {
+        let shard = shard_of(&hasher, &group_by, &event, shards);
+        if batches.push(shard, event).await.is_err() {
             return;
         }
+    }
+
+    // The input ended: send what is left.
+    _ = batches.send_partial().await;
+}
+
+/// The shard of an event's group: all the events of a group get the same one.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "deterministic: the same hash always maps to the same shard, and the low bits stay uniform"
+)]
+fn shard_of(hasher: &RandomState, group_by: &[String], event: &Event, shards: usize) -> usize {
+    let log = event.as_log();
+    let mut state = hasher.build_hasher();
+    group_by
+        .iter()
+        .map(|field| log.parse_path_and_get_value(field).ok().flatten())
+        .for_each(|value| value.hash(&mut state));
+
+    (state.finish() as usize) % shards
+}
+
+/// A shard stopped, which happens only after the topology dropped the output stream.
+#[derive(Debug)]
+struct ShardStopped;
+
+/// The router's batch for each shard.
+struct ShardBatches {
+    senders: Vec<mpsc::Sender<Vec<Event>>>,
+    batches: Vec<Vec<Event>>,
+    max_delay: Duration,
+    /// When the router got its first event since it last sent the partial batches, so no event in a
+    /// partial batch is older.
+    oldest: Option<tokio::time::Instant>,
+}
+
+impl ShardBatches {
+    fn new(senders: Vec<mpsc::Sender<Vec<Event>>>, max_delay: Duration) -> Self {
+        let batches = senders.iter().map(|_| Vec::new()).collect();
+        Self {
+            senders,
+            batches,
+            max_delay,
+            oldest: None,
+        }
+    }
+
+    /// Adds an event to its shard's batch, and sends the batch once it is full.
+    async fn push(&mut self, shard: usize, event: Event) -> Result<(), ShardStopped> {
+        self.oldest.get_or_insert_with(tokio::time::Instant::now);
+
+        let batch = &mut self.batches[shard];
+        batch.push(event);
+        if batch.len() < BATCH_EVENTS {
+            return Ok(());
+        }
+
+        let full = std::mem::replace(batch, Vec::with_capacity(BATCH_EVENTS));
+        self.senders[shard]
+            .send(full)
+            .await
+            .map_err(|_| ShardStopped)?;
+
+        // `route` sends the partial batches only when its input pauses, which may not happen
+        // under sustained load.
+        if self
+            .oldest
+            .is_some_and(|oldest| oldest.elapsed() >= self.max_delay)
+        {
+            self.send_partial().await?;
+        }
+        Ok(())
+    }
+
+    /// Sends every partial batch, concurrently so that a full shard queue doesn't hold back the
+    /// others.
+    async fn send_partial(&mut self) -> Result<(), ShardStopped> {
+        self.oldest = None;
+
+        let sends = self
+            .senders
+            .iter()
+            .zip(&mut self.batches)
+            .filter(|(_, batch)| !batch.is_empty())
+            .map(|(sender, batch)| sender.send(std::mem::take(batch)));
+
+        future::try_join_all(sends)
+            .await
+            .map(drop)
+            .map_err(|_| ShardStopped)
     }
 }
 
@@ -1035,6 +1136,117 @@ mod test {
             assert_eq!(out.recv().await, None);
         }))
         .await;
+    }
+
+    fn keyed_event(key: i64, seq: i64) -> Event {
+        let mut log = LogEvent::default();
+        log.insert(event_path!("key"), key);
+        log.insert(event_path!("seq"), seq);
+        log.into()
+    }
+
+    type ShardChannels = (
+        Vec<mpsc::Sender<Vec<Event>>>,
+        Vec<mpsc::Receiver<Vec<Event>>>,
+    );
+
+    fn shard_channels(shards: usize) -> ShardChannels {
+        (0..shards)
+            .map(|_| mpsc::channel(SHARD_QUEUE_BATCHES))
+            .unzip()
+    }
+
+    #[tokio::test]
+    async fn router_sends_full_batches_whatever_the_shard_count() {
+        const KEYS: i64 = 64;
+        let (senders, receivers) = shard_channels(8);
+        // The input is always ready, and holds several full batches for every shard.
+        let input = stream::iter((0..KEYS * 50).map(|seq| keyed_event(seq % KEYS, seq))).boxed();
+
+        let ((), received) = tokio::join!(
+            route(vec!["key".to_string()], senders, Duration::MAX, input),
+            future::join_all(
+                receivers
+                    .into_iter()
+                    .map(|rx| ReceiverStream::new(rx).collect::<Vec<_>>())
+            ),
+        );
+
+        let mut shard_by_key = HashMap::new();
+        let mut last_seq_by_key = HashMap::new();
+        for (shard, batches) in received.iter().enumerate() {
+            let Some((last, full)) = batches.split_last() else {
+                continue;
+            };
+            // Only the batch sent when the input ended can be partial.
+            assert!(full.iter().all(|batch| batch.len() == BATCH_EVENTS));
+            assert!(last.len() <= BATCH_EVENTS);
+
+            for event in batches.iter().flatten() {
+                let key = event.as_log()["key"].as_integer().unwrap();
+                let seq = event.as_log()["seq"].as_integer().unwrap();
+                // A group's events all reach the same shard, in arrival order.
+                assert_eq!(*shard_by_key.entry(key).or_insert(shard), shard);
+                if let Some(previous) = last_seq_by_key.insert(key, seq) {
+                    assert!(previous < seq);
+                }
+            }
+        }
+        assert_eq!(i64::try_from(last_seq_by_key.len()).unwrap(), KEYS);
+    }
+
+    #[tokio::test]
+    async fn router_sends_partial_batches_while_input_waits() {
+        let (input_tx, input_rx) = mpsc::channel(10);
+        let (senders, receivers) = shard_channels(4);
+        let router = tokio::spawn(route(
+            vec!["key".to_string()],
+            senders,
+            Duration::MAX,
+            ReceiverStream::new(input_rx).boxed(),
+        ));
+
+        for seq in 0..3 {
+            input_tx.send(keyed_event(seq, seq)).await.unwrap();
+        }
+
+        // The input stays open with nothing ready: the router must not wait to fill the batches.
+        let mut received = stream::select_all(receivers.into_iter().map(ReceiverStream::new))
+            .flat_map(stream::iter);
+        for _ in 0..3 {
+            tokio::time::timeout(Duration::from_secs(10), received.next())
+                .await
+                .expect("the router held an event back")
+                .unwrap();
+        }
+
+        drop(input_tx);
+        router.await.unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn partial_batches_wait_at_most_the_max_delay() {
+        async fn fill_batch(batches: &mut ShardBatches, shard: usize) {
+            for _ in 0..BATCH_EVENTS {
+                batches.push(shard, keyed_event(0, 0)).await.unwrap();
+            }
+        }
+
+        let max_delay = Duration::from_millis(5);
+        let (senders, mut receivers) = shard_channels(2);
+        let mut batches = ShardBatches::new(senders, max_delay);
+        batches.push(1, keyed_event(1, 0)).await.unwrap();
+
+        // Under sustained load, shard 0 fills a batch before the delay: shard 1's event waits.
+        fill_batch(&mut batches, 0).await;
+        assert_eq!(receivers[0].try_recv().unwrap().len(), BATCH_EVENTS);
+        assert!(receivers[1].try_recv().is_err());
+
+        // Once it has waited for the delay, the next full batch sends it too.
+        tokio::time::advance(max_delay).await;
+        fill_batch(&mut batches, 0).await;
+        assert_eq!(receivers[0].try_recv().unwrap().len(), BATCH_EVENTS);
+        assert_eq!(receivers[1].try_recv().unwrap().len(), 1);
     }
 
     #[tokio::test]
