@@ -1,8 +1,692 @@
 use crate::sources::docker_logs::*;
 
 #[test]
+fn completed_only_attachment_does_not_guard_new_partials() {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let completed = "2026-11-06T21:03:17Z done\n";
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, completed).is_some());
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, completed).is_none());
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:17Z new-prefix").is_none());
+    let log = event(
+        &mut info,
+        &mut state,
+        "2026-11-06T21:03:17.000000001Z suffix\n",
+    )
+    .unwrap();
+    assert_eq!(
+        log.get(vrl::event_path!("message"))
+            .unwrap()
+            .coerce_to_bytes()
+            .as_ref(),
+        b"new-prefixsuffix",
+    );
+}
+
+#[test]
+fn delayed_restart_events_preserve_current_run_partial_on_second_reattachment() {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:17Z old-prefix").is_none());
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+
+    // Docker is already in run 2, while main still considers this generation 0.
+    let mut state = LogStreamState::new(&info);
+    let prefix = "2026-11-06T21:03:18Z new-prefix";
+    assert!(event(&mut info, &mut state, prefix).is_none());
+    assert_eq!(info.generation, 0);
+
+    // The delayed events arrive after the replacement task buffers run 2's
+    // prefix. They cannot clear it because the task still owns the information.
+    container.stopped();
+    container.running();
+    assert_eq!(container.generation, 1);
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+
+    // The second attachment rebuilds the prefix instead of suppressing it.
+    assert!(event(&mut info, &mut state, prefix).is_none());
+    let log = event(&mut info, &mut state, "2026-11-06T21:03:18Z suffix\n").unwrap();
+    assert_eq!(
+        log.get(vrl::event_path!("message"))
+            .unwrap()
+            .coerce_to_bytes()
+            .as_ref(),
+        b"new-prefixsuffix",
+        "delayed lifecycle events must not discard a current-run partial",
+    );
+}
+
+fn container_log_info() -> ContainerLogInfo {
+    let created = DateTime::parse_from_rfc3339("2026-11-06T21:03:14Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    ContainerLogInfo::new(
+        ContainerId::new("probe".to_owned()),
+        ContainerMetadata {
+            labels: HashMap::new(),
+            name: "probe".into(),
+            name_str: "probe".to_owned(),
+            image: "probe".into(),
+            created_at: created,
+        },
+        created,
+    )
+}
+
+#[rstest::rstest]
+#[case(LogNamespace::Legacy)]
+#[case(LogNamespace::Vector)]
+fn completed_cursor_excludes_unfinished_frames_at_same_timestamp(
+    #[case] log_namespace: LogNamespace,
+) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: format!("2026-11-06T21:03:17Z {message}").into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            log_namespace,
+        )
+    };
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "done\n").is_some());
+    let completed = info.last_log;
+    assert!(event(&mut info, &mut state, "prefix").is_none());
+    assert_eq!(info.last_log, completed);
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "done\n").is_none());
+    assert!(event(&mut info, &mut state, "prefix").is_none());
+    let actual = event(&mut info, &mut state, "suffix\n").unwrap();
+
+    let mut uninterrupted = container_log_info();
+    let mut state = LogStreamState::new(&uninterrupted);
+    assert!(event(&mut uninterrupted, &mut state, "prefix").is_none());
+    let expected = event(&mut uninterrupted, &mut state, "suffix\n").unwrap();
+    assert_eq!(actual.value(), expected.value());
+
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    for message in ["done\n", "prefix", "suffix\n"] {
+        assert!(event(&mut info, &mut state, message).is_none());
+    }
+    assert!(event(&mut info, &mut state, "unseen\n").is_some());
+}
+
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn reattached_stream_does_not_repeat_last_timestamp(#[case] container_restarted: bool) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, timestamp: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: format!("{timestamp} last\n").into(),
+            },
+            None,
+            false,
+            state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let last = "2026-11-06T21:03:17.556996444Z";
+    let mut state = LogStreamState::new(&info);
+    // Distinct records may legitimately share a timestamp within one stream.
+    assert!(event(&mut info, &mut state, last).is_some());
+    assert!(event(&mut info, &mut state, last).is_some());
+
+    let mut container = ContainerState::new_running();
+    // The follow stream finishes before the main loop receives `die`.
+    assert!(container.return_info(info));
+    if container_restarted {
+        container.stopped();
+        container.running();
+    }
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:16Z").is_none());
+    assert!(event(&mut info, &mut state, last).is_none());
+    assert!(event(&mut info, &mut state, last).is_none());
+    // An unseen complete record is valid even at the replay boundary, including
+    // when the main loop has advanced the container generation.
+    assert!(event(&mut info, &mut state, last).is_some());
+    let next = "2026-11-06T21:03:17.556996445Z";
+    assert!(event(&mut info, &mut state, next).is_some());
+    assert!(event(&mut info, &mut state, next).is_some());
+
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, next).is_none());
+}
+
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+#[tokio::test]
+async fn attachment_rebuilds_partial_without_inspection(#[case] prefix_rotated_out: bool) {
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers};
+
+    let server = MockServer::start().await;
+    let prefix = "2026-11-06T21:03:17Z prefix";
+    let mut body = Vec::new();
+    let frames = std::iter::once("2026-11-06T21:03:16Z already-delivered\n")
+        .chain((!prefix_rotated_out).then_some(prefix))
+        .chain([
+            "2026-11-06T21:03:17Z suffix\n",
+            "2026-11-06T21:03:18Z next\n",
+        ]);
+    for frame in frames {
+        body.extend_from_slice(&[1, 0, 0, 0]);
+        body.extend_from_slice(&u32::try_from(frame.len()).unwrap().to_be_bytes());
+        body.extend_from_slice(frame.as_bytes());
+    }
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path_regex(".*/containers/probe/logs"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path_regex(".*/containers/probe/json"))
+        .respond_with(ResponseTemplate::new(500))
+        .expect(0)
+        .mount(&server)
+        .await;
+    let mut info = container_log_info();
+    let mut state = LogStreamState::new(&info);
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    assert!(
+        info.new_event(
+            LogOutput::StdOut {
+                message: "2026-11-06T21:03:16Z already-delivered\n".into(),
+            },
+            None,
+            true,
+            &mut state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+        .is_some()
+    );
+    assert!(
+        info.new_event(
+            LogOutput::StdOut {
+                message: prefix.into()
+            },
+            None,
+            true,
+            &mut state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+        .is_none()
+    );
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    let info = container.take_info().unwrap();
+    // The replacement task owns info before lifecycle events reach main.
+    container.stopped();
+    container.running();
+    let (out, receiver) = SourceSender::new_test();
+    let (main_send, mut main_receive) = mpsc::unbounded_channel();
+    let builder = EventStreamBuilder {
+        host_key: OptionalValuePath::default(),
+        hostname: None,
+        core: Arc::new(DockerLogsSourceCore {
+            config: DockerLogsConfig::default(),
+            line_agg_config: None,
+            docker: Docker::connect_with_http(&server.uri(), 5, bollard::API_DEFAULT_VERSION)
+                .unwrap(),
+            now_timestamp: info.created,
+        }),
+        out,
+        main_send,
+        shutdown: ShutdownSignal::noop(),
+        log_namespace: LogNamespace::Legacy,
+    };
+    tokio::time::timeout(Duration::from_secs(5), builder.run_event_stream(info))
+        .await
+        .unwrap();
+    assert!(main_receive.recv().await.unwrap().is_ok());
+    let events = receiver.collect::<Vec<_>>().await;
+    let messages = events
+        .iter()
+        .map(|event| event.as_log().get_message().unwrap().coerce_to_bytes())
+        .collect::<Vec<_>>();
+    // If rotation removed the prefix, it cannot be rebuilt from Docker.
+    let first = if prefix_rotated_out {
+        "suffix"
+    } else {
+        "prefixsuffix"
+    };
+    assert_eq!(messages, [Bytes::from(first), Bytes::from("next")]);
+    let requests = server.received_requests().await.unwrap();
+    assert!(requests[0].url.path().ends_with("/logs"));
+    assert_eq!(requests.len(), 1);
+}
+
+#[test]
 fn generate_config() {
     crate::test_util::test_generate_config::<DockerLogsConfig>();
+}
+
+#[test]
+fn reattached_stream_rebuilds_partial_across_interrupted_replay() {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: format!("2026-11-06T21:03:17Z {message}").into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "prefix").is_none());
+    assert!(event(&mut info, &mut state, "middle").is_none());
+    let mut container = ContainerState::new_running();
+
+    // Repeated attachments end after replaying only part of the boundary.
+    for _ in 0..2 {
+        assert!(container.return_info(info));
+        info = container.take_info().unwrap();
+        let mut state = LogStreamState::new(&info);
+        assert!(event(&mut info, &mut state, "prefix").is_none());
+    }
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "prefix").is_none());
+    assert!(event(&mut info, &mut state, "middle").is_none());
+    let log = event(&mut info, &mut state, "suffix\n").unwrap();
+    assert_eq!(
+        log.get(vrl::event_path!("message"))
+            .unwrap()
+            .coerce_to_bytes()
+            .as_ref(),
+        b"prefixmiddlesuffix",
+    );
+
+    // All three consumed chunks are skipped on the next attachment; a fourth
+    // frame at the same timestamp must still be delivered exactly once.
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    for chunk in ["prefix", "middle", "suffix\n"] {
+        assert!(event(&mut info, &mut state, chunk).is_none());
+    }
+    let log = event(&mut info, &mut state, "next\n").unwrap();
+    assert_eq!(
+        log.get(vrl::event_path!("message"))
+            .unwrap()
+            .coerce_to_bytes()
+            .as_ref(),
+        b"next",
+    );
+}
+
+#[rstest::rstest]
+#[case(LogNamespace::Legacy, false, false)]
+#[case(LogNamespace::Vector, false, false)]
+#[case(LogNamespace::Legacy, true, false)]
+#[case(LogNamespace::Vector, true, false)]
+#[case(LogNamespace::Legacy, false, true)]
+#[case(LogNamespace::Vector, false, true)]
+#[case(LogNamespace::Legacy, true, true)]
+#[case(LogNamespace::Vector, true, true)]
+fn reattached_stream_preserves_partial_message(
+    #[case] log_namespace: LogNamespace,
+    #[case] container_restarted: bool,
+    #[case] same_timestamp: bool,
+) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            log_namespace,
+        )
+    };
+    let partial = "2026-11-06T21:03:17.556996444Z prefix";
+    let final_chunk = if same_timestamp {
+        "2026-11-06T21:03:17.556996444Z suffix\n"
+    } else {
+        "2026-11-06T21:03:17.556996445Z suffix\n"
+    };
+    // Reattachment must produce the same message as an uninterrupted stream.
+    let mut uninterrupted = container_log_info();
+    let mut uninterrupted_state = LogStreamState::new(&uninterrupted);
+    if same_timestamp {
+        assert!(event(&mut uninterrupted, &mut uninterrupted_state, partial).is_none());
+    }
+    let expected = event(&mut uninterrupted, &mut uninterrupted_state, final_chunk).unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, partial).is_none());
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    if container_restarted {
+        container.stopped();
+        container.running();
+    }
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    // Unfinished chunks are rebuilt, not appended to a retained prefix.
+    assert!(event(&mut info, &mut state, partial).is_none());
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, partial).is_none());
+    let log = event(&mut info, &mut state, final_chunk).unwrap();
+    assert_eq!(log.value(), expected.value());
+    if log_namespace == LogNamespace::Legacy {
+        let expected: &[u8] = if same_timestamp {
+            b"prefixsuffix"
+        } else {
+            b"suffix"
+        };
+        assert_eq!(
+            log.get(vrl::event_path!("message"))
+                .unwrap()
+                .coerce_to_bytes()
+                .as_ref(),
+            expected,
+        );
+    }
+    // Once emitted, neither the merged event nor its final chunk is repeated.
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, partial).is_none());
+    assert!(event(&mut info, &mut state, final_chunk).is_none());
+    let log = event(&mut info, &mut state, "2026-11-06T21:03:18Z next\n").unwrap();
+    let message = match log_namespace {
+        LogNamespace::Legacy => log.get(vrl::event_path!("message")),
+        LogNamespace::Vector => log.get(vrl::event_path!()),
+    }
+    .unwrap();
+    assert_eq!(message.coerce_to_bytes().as_ref(), b"next");
+}
+
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn reattached_stream_does_not_merge_partial_from_restarted_container_before_die(
+    #[case] replay_old_run_partial: bool,
+) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:17Z old-prefix").is_none());
+
+    let mut container = ContainerState::new_running();
+    // Docker has restarted, but Vector processes the clean stream return before
+    // the queued `die` and `start` events and immediately reattaches.
+    assert!(container.return_info(info));
+    let mut reattached = container.take_info().unwrap();
+    assert_eq!(reattached.generation, 0);
+
+    // The replacement task has its own empty buffer when these events arrive.
+    let mut state = LogStreamState::new(&reattached);
+    assert!(container.info.is_none());
+    container.stopped();
+    container.running();
+    assert_eq!(container.generation, 1);
+
+    if replay_old_run_partial {
+        // Rebuilding the old prefix must not attach it to the new run's line.
+        assert!(
+            event(
+                &mut reattached,
+                &mut state,
+                "2026-11-06T21:03:17Z old-prefix"
+            )
+            .is_none()
+        );
+    }
+
+    // The old partial has rotated out of Docker's replay. Only a complete line
+    // from the new run arrives, with a later timestamp to isolate the run race
+    // from the separate equal-timestamp replay issue.
+    let log = event(
+        &mut reattached,
+        &mut state,
+        "2026-11-06T21:03:18Z new-run\n",
+    )
+    .unwrap();
+    assert_eq!(
+        log.get(vrl::event_path!("message"))
+            .unwrap()
+            .coerce_to_bytes()
+            .as_ref(),
+        b"new-run",
+        "a new container run must not inherit the previous run's partial message",
+    );
+}
+
+#[test]
+fn uninterrupted_stream_preserves_cross_timestamp_partial_merging() {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:17Z prefix").is_none());
+    let log = event(&mut info, &mut state, "2026-11-06T21:03:18Z suffix\n").unwrap();
+    assert_eq!(
+        log.get(vrl::event_path!("message"))
+            .unwrap()
+            .coerce_to_bytes()
+            .as_ref(),
+        b"prefixsuffix",
+    );
+}
+
+#[test]
+fn completed_rebuild_restores_normal_cross_timestamp_merging() {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:17Z old-prefix").is_none());
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:17Z old-prefix").is_none());
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:17Z old-suffix\n").is_some());
+    // This is new work in this attachment, even though its first chunk shares
+    // the replay timestamp. The reconstruction guard must no longer apply.
+    assert!(event(&mut info, &mut state, "2026-11-06T21:03:17Z new-prefix").is_none());
+    let log = event(&mut info, &mut state, "2026-11-06T21:03:18Z new-suffix\n").unwrap();
+    assert_eq!(
+        log.get(vrl::event_path!("message"))
+            .unwrap()
+            .coerce_to_bytes()
+            .as_ref(),
+        b"new-prefixnew-suffix",
+    );
+}
+
+#[test]
+fn interrupted_replay_preserves_read_high_water_mark() {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let event = |info: &mut ContainerLogInfo, state: &mut LogStreamState, message: &str| {
+        info.new_event(
+            LogOutput::StdOut {
+                message: message.to_owned().into(),
+            },
+            None,
+            true,
+            state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+    };
+    let first = "2026-11-06T21:03:17Z old-prefix";
+    let second = "2026-11-06T21:03:18Z old-tail";
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, first).is_none());
+    assert!(event(&mut info, &mut state, second).is_none());
+    let high_water = info.last_read;
+    let mut container = ContainerState::new_running();
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, first).is_none());
+    assert_eq!(info.last_read, high_water);
+    // Replay ends before reaching the previous attachment's final chunk.
+    assert!(container.return_info(info));
+    let mut info = container.take_info().unwrap();
+    let mut state = LogStreamState::new(&info);
+    assert!(event(&mut info, &mut state, first).is_none());
+    assert!(event(&mut info, &mut state, second).is_none());
+    let log = event(&mut info, &mut state, "2026-11-06T21:03:19Z new-run\n").unwrap();
+    assert_eq!(
+        log.get(vrl::event_path!("message"))
+            .unwrap()
+            .coerce_to_bytes()
+            .as_ref(),
+        b"new-run",
+    );
+}
+
+#[rstest::rstest]
+#[case(true)]
+#[case(false)]
+fn stopped_container_releases_partial_message(#[case] stop_before_return: bool) {
+    let mut info = container_log_info();
+    let bytes_received = register(BytesReceived::from(Protocol::HTTP));
+    let mut state = LogStreamState::new(&info);
+    assert!(
+        info.new_event(
+            LogOutput::StdOut {
+                message: "2026-11-06T21:03:17.556996444Z unfinished".into(),
+            },
+            None,
+            true,
+            &mut state,
+            &bytes_received,
+            LogNamespace::Legacy,
+        )
+        .is_none()
+    );
+    assert!(state.partial_event_merge_state.is_some());
+    drop(state);
+    let last_log = info.last_log;
+    let mut container = ContainerState::new_running();
+    if stop_before_return {
+        // `die` arrives while the follow stream is still draining.
+        container.stopped();
+        assert!(!container.return_info(info));
+    } else {
+        assert!(container.return_info(info));
+        // A new attachment cannot inherit the old payload.
+        let info = container.take_info().unwrap();
+        assert!(
+            LogStreamState::new(&info)
+                .partial_event_merge_state
+                .is_none()
+        );
+        container.stopped();
+        assert!(!container.return_info(info));
+    }
+    let parked = container.info.as_ref().unwrap();
+    assert!(
+        LogStreamState::new(parked)
+            .partial_event_merge_state
+            .is_none()
+    );
+    assert_eq!(parked.last_log, last_log);
 }
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
