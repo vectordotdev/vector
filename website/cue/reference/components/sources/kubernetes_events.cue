@@ -20,10 +20,17 @@ components: sources: kubernetes_events: {
 		auto_generated:   true
 		acknowledgements: false
 		collect: {
+			checkpoint: enabled: false
 			from: {
 				service: services.kubernetes
-				interface: api: {
-					endpoint: "events.k8s.io"
+				interface: socket: {
+					api: {
+						title: "Kubernetes API"
+						url:   urls.kubernetes_api
+					}
+					direction: "outgoing"
+					protocols: ["http"]
+					ssl: "optional"
 				}
 			}
 		}
@@ -45,7 +52,6 @@ components: sources: kubernetes_events: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	installation: {
@@ -91,11 +97,20 @@ components: sources: kubernetes_events: {
 					examples: ["6b6890ca-47f8-4b04-ae15-986bfdcae4d5"]
 				}
 			}
+			old_event: {
+				description: """
+					The previous version of the Kubernetes event payload. Only present on updates when
+					`deduplication.include_previous_event` is `true` and the previous version is still in the
+					deduplication cache.
+					"""
+				required: false
+				type: object: options: {}
+			}
 			message: {
 				description: "Human-readable description of what happened."
 				required:    false
 				type: string: {
-					examples: ["Created pod: convexio-argo-workflows-server-686559bfd5-wt4n2"]
+					examples: ["Created pod: web-7c5ddbdf54-x2v9k"]
 				}
 			}
 			namespace: {
@@ -133,7 +148,13 @@ components: sources: kubernetes_events: {
 					examples: ["kubernetes_events"]
 				}
 			}
-			timestamp: fields._current_timestamp
+			timestamp: fields._current_timestamp & {
+				description: """
+					The time the Kubernetes event occurred, taken from `series.lastObservedTime`, `eventTime`,
+					`deprecatedLastTimestamp`, `deprecatedFirstTimestamp`, or `metadata.creationTimestamp`, in
+					that order. Falls back to the time Vector received the event.
+					"""
+			}
 			type: {
 				description: "Event type (for example `Normal` or `Warning`)."
 				required:    false
