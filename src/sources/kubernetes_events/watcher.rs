@@ -258,7 +258,7 @@ mod tests {
     use super::*;
     use crate::sources::kubernetes_events::test_util::make_event;
     use chrono::Utc;
-    use http_1::{Request, Response, header::CONTENT_TYPE};
+    use http::{Request, Response, header::CONTENT_TYPE};
     use kube::{Client, client::Body};
     use std::sync::{
         Arc, Mutex,

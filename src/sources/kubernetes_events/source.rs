@@ -8,7 +8,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt, stream::SelectAll};
-use http_1::{HeaderName, HeaderValue};
+use http::{HeaderName, HeaderValue};
 use k8s_openapi::api::events::v1::Event as KubeEvent;
 use kube::{
     Api, Client, Config as ClientConfig,
@@ -21,7 +21,7 @@ use tokio::select;
 use tokio::time::{Interval, MissedTickBehavior, interval};
 use vector_lib::{
     config::{LegacyKey, LogNamespace, log_schema},
-    internal_event::{ComponentEventsDropped, INTENTIONAL},
+    internal_event::{ComponentEventsDropped, INTENTIONAL, emit},
     lookup::{event_path, path},
 };
 
@@ -145,7 +145,11 @@ impl SourceConfig for KubernetesEventsConfig {
 
         let source = KubernetesEventsSource::new(client, self.clone())?;
 
-        Ok(Box::pin(source.run(cx.out, cx.shutdown, log_namespace)))
+        Ok(crate::sources::opaque_source(source.run(
+            cx.out,
+            cx.shutdown,
+            log_namespace,
+        )))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -308,7 +312,7 @@ impl KubernetesEventsSource {
                             }
                         }
                         Some((_, _, Err(error))) => {
-                            emit!(KubernetesEventsWatchError { error });
+                            emit(KubernetesEventsWatchError { error });
                         }
                         None => break,
                     }
@@ -337,7 +341,7 @@ impl KubernetesEventsSource {
                 break;
             };
 
-            emit!(KubernetesEventsLeaderAcquired {
+            emit(KubernetesEventsLeaderAcquired {
                 identity: coordinator.settings.identity.clone(),
                 lease_namespace: coordinator.settings.lease_namespace.clone(),
                 lease_name: coordinator.settings.lease_name.clone(),
@@ -359,7 +363,7 @@ impl KubernetesEventsSource {
                 LeadershipEnd::RestartWatch => {}
                 LeadershipEnd::Lost(reason) => {
                     deduper.invalidate_previous_events();
-                    emit!(KubernetesEventsLeaderLost {
+                    emit(KubernetesEventsLeaderLost {
                         identity: coordinator.settings.identity.clone(),
                         reason,
                     });
@@ -427,7 +431,7 @@ impl KubernetesEventsSource {
                             }
                         }
                         Some((_, _, Err(error))) => {
-                            emit!(KubernetesEventsWatchError { error });
+                            emit(KubernetesEventsWatchError { error });
                         }
                         None => return Ok(LeadershipEnd::RestartWatch),
                     }
@@ -488,9 +492,9 @@ impl KubernetesEventsSource {
                     event: Some(event),
                 });
             }
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
-                reason: "filtered"
+                reason: "filtered",
             });
             return Ok(None);
         }
@@ -505,9 +509,9 @@ impl KubernetesEventsSource {
                     event: Some(event),
                 });
             }
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
-                reason: "expired"
+                reason: "expired",
             });
             return Ok(None);
         }
@@ -522,9 +526,9 @@ impl KubernetesEventsSource {
 
         let (verb, previous) = match dedup_result {
             DedupResult::Duplicate => {
-                emit!(ComponentEventsDropped::<INTENTIONAL> {
+                emit(ComponentEventsDropped::<INTENTIONAL> {
                     count: 1,
-                    reason: "duplicate"
+                    reason: "duplicate",
                 });
                 return Ok(None);
             }
@@ -572,7 +576,7 @@ impl KubernetesEventsSource {
         match serde_json::to_value(&event).map(|value| log.insert(event_path!("event"), value)) {
             Ok(_) => {}
             Err(error) => {
-                emit!(KubernetesEventsSerializationError { error });
+                emit(KubernetesEventsSerializationError { error });
                 return Ok(None);
             }
         }
@@ -581,11 +585,11 @@ impl KubernetesEventsSource {
             && let Err(error) =
                 serde_json::to_value(&prev).map(|value| log.insert(event_path!("old_event"), value))
         {
-            emit!(KubernetesEventsSerializationError { error });
+            emit(KubernetesEventsSerializationError { error });
         }
 
         let byte_size = log.estimated_json_encoded_size_of();
-        emit!(KubernetesEventsReceived { byte_size });
+        emit(KubernetesEventsReceived { byte_size });
 
         Ok(Some(ProcessedEvent {
             event: Event::from(log),
@@ -699,7 +703,7 @@ struct ProcessedEvent {
 
 async fn send_event(out: &mut SourceSender, event: Event) -> Result<(), ()> {
     if out.send_event(event).await.is_err() {
-        emit!(StreamClosedError { count: 1 });
+        emit(StreamClosedError { count: 1 });
         return Err(());
     }
 
@@ -723,7 +727,7 @@ async fn send_event_with_leadership(
             _ = &mut *shutdown => return Ok(Some(LeadershipEnd::Shutdown)),
             result = &mut send => {
                 if result.is_err() {
-                    emit!(StreamClosedError { count: 1 });
+                    emit(StreamClosedError { count: 1 });
                     return Err(());
                 }
                 return Ok(None);
@@ -758,9 +762,9 @@ fn event_identity(event: &KubeEvent) -> Option<EventIdentity> {
     let uid = match event.metadata.uid.clone() {
         Some(uid) => uid,
         None => {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
-                reason: "missing_uid"
+                reason: "missing_uid",
             });
             return None;
         }
@@ -769,9 +773,9 @@ fn event_identity(event: &KubeEvent) -> Option<EventIdentity> {
     let resource_version = match event.metadata.resource_version.clone() {
         Some(resource_version) => resource_version,
         None => {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
+            emit(ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
-                reason: "missing_resource_version"
+                reason: "missing_resource_version",
             });
             return None;
         }

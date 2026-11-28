@@ -20,6 +20,7 @@ use kube::{Api, Client, Error as KubeError, api::PostParams};
 use serde::{Deserialize, Serialize};
 use tokio::select;
 use tokio::time::sleep;
+use vector_lib::internal_event::emit;
 
 use super::config::{self, FALLBACK_IDENTITY_ENV_VAR, KubernetesEventsLeaderElectionConfig};
 #[cfg(test)]
@@ -173,7 +174,7 @@ impl LeaseCoordinator {
                     });
                 }
                 Ok(LeaseUpdate::HeldByOther) => {}
-                Err(error) => emit!(KubernetesEventsLeaderElectionError { error }),
+                Err(error) => emit(KubernetesEventsLeaderElectionError { error }),
             }
 
             select! {
@@ -321,7 +322,7 @@ pub(super) async fn renew_leadership(
         }
         Ok(LeaseUpdate::HeldByOther) => Some(LeadershipEnd::Lost("lease_taken_by_another_holder")),
         Err(error) => {
-            emit!(KubernetesEventsLeaderElectionError { error });
+            emit(KubernetesEventsLeaderElectionError { error });
             (last_renewal.elapsed() >= coordinator.settings.renew_deadline)
                 .then_some(LeadershipEnd::Lost("renew_deadline_exceeded"))
         }
@@ -448,7 +449,7 @@ fn set_checkpoint_annotation(metadata: &mut ObjectMeta, checkpoints: &ResourceVe
         annotations.insert(CHECKPOINTS_ANNOTATION.to_string(), serialized);
     } else {
         annotations.remove(CHECKPOINTS_ANNOTATION);
-        emit!(KubernetesEventsCheckpointTooLarge {
+        emit(KubernetesEventsCheckpointTooLarge {
             size,
             limit: KUBERNETES_ANNOTATIONS_SIZE_LIMIT_BYTES,
         });
@@ -502,7 +503,7 @@ fn kube_micro_time(timestamp: DateTime<Utc>) -> MicroTime {
 mod tests {
     use super::*;
     use chrono::{Duration as ChronoDuration, TimeZone};
-    use http_1::{Request, Response, StatusCode, header::CONTENT_TYPE};
+    use http::{Request, Response, StatusCode, header::CONTENT_TYPE};
     use kube::client::Body;
     use std::sync::{
         Arc,

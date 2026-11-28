@@ -1,14 +1,15 @@
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{
-        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+        error_type,
     },
     json_size::JsonSize,
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesEventsReceived {
-    pub byte_size: JsonSize,
+pub(crate) struct KubernetesEventsReceived {
+    pub(crate) byte_size: JsonSize,
 }
 
 impl InternalEvent for KubernetesEventsReceived {
@@ -26,8 +27,8 @@ impl InternalEvent for KubernetesEventsReceived {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesEventsWatchError<E> {
-    pub error: E,
+pub(crate) struct KubernetesEventsWatchError<E> {
+    pub(crate) error: E,
 }
 
 impl<E: std::fmt::Display> InternalEvent for KubernetesEventsWatchError<E> {
@@ -48,8 +49,8 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesEventsWatchError<E> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesEventsSerializationError<E> {
-    pub error: E,
+pub(crate) struct KubernetesEventsSerializationError<E> {
+    pub(crate) error: E,
 }
 
 impl<E: std::fmt::Display> InternalEvent for KubernetesEventsSerializationError<E> {
@@ -66,20 +67,20 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesEventsSerializationError<
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+        emit(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
-            reason: "serialization_failed"
+            reason: "serialization_failed",
         });
     }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesEventsLeaderAcquired {
-    pub identity: String,
-    pub lease_namespace: String,
-    pub lease_name: String,
+pub(crate) struct KubernetesEventsLeaderAcquired {
+    pub(crate) identity: String,
+    pub(crate) lease_namespace: String,
+    pub(crate) lease_name: String,
     /// Number of watch streams with a resource-version checkpoint on the Lease.
-    pub checkpoint_streams: usize,
+    pub(crate) checkpoint_streams: usize,
 }
 
 impl InternalEvent for KubernetesEventsLeaderAcquired {
@@ -95,9 +96,9 @@ impl InternalEvent for KubernetesEventsLeaderAcquired {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesEventsLeaderLost {
-    pub identity: String,
-    pub reason: &'static str,
+pub(crate) struct KubernetesEventsLeaderLost {
+    pub(crate) identity: String,
+    pub(crate) reason: &'static str,
 }
 
 impl InternalEvent for KubernetesEventsLeaderLost {
@@ -111,14 +112,14 @@ impl InternalEvent for KubernetesEventsLeaderLost {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesEventsLeaderElectionError<E> {
-    pub error: E,
+pub(crate) struct KubernetesEventsLeaderElectionError<E> {
+    pub(crate) error: E,
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct KubernetesEventsCheckpointTooLarge {
-    pub size: usize,
-    pub limit: usize,
+pub(crate) struct KubernetesEventsCheckpointTooLarge {
+    pub(crate) size: usize,
+    pub(crate) limit: usize,
 }
 
 impl InternalEvent for KubernetesEventsCheckpointTooLarge {
