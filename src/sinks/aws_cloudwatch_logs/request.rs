@@ -14,7 +14,7 @@ use aws_sdk_cloudwatchlogs::{
         put_log_events::{PutLogEventsError, PutLogEventsOutput},
         put_retention_policy::PutRetentionPolicyError,
     },
-    types::InputLogEvent,
+    types::{InputLogEvent, LogGroupClass},
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::{FutureExt, future::BoxFuture};
@@ -44,6 +44,7 @@ struct RequestClient {
     retention_days: u32,
     kms_key: Option<String>,
     tags: Option<HashMap<String, String>>,
+    log_group_class: Option<LogGroupClass>,
 }
 
 type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E, HttpResponse>>>;
@@ -69,6 +70,7 @@ impl CloudwatchFuture {
         retention: &Retention,
         kms_key: Option<String>,
         tags: Option<HashMap<String, String>>,
+        log_group_class: Option<LogGroupClass>,
         mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
@@ -82,6 +84,7 @@ impl CloudwatchFuture {
             retention_days,
             kms_key,
             tags,
+            log_group_class,
         };
 
         let state = if let Some(token) = token {
@@ -299,12 +302,14 @@ impl RequestClient {
         let group_name = self.group_name.clone();
         let kms_key = self.kms_key.clone();
         let tags = self.tags.clone();
+        let log_group_class = self.log_group_class.clone();
         Box::pin(async move {
             client
                 .create_log_group()
                 .log_group_name(group_name)
                 .set_kms_key_id(kms_key)
                 .set_tags(tags)
+                .set_log_group_class(log_group_class)
                 .send()
                 .await?;
             Ok(())

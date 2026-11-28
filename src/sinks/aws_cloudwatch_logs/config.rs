@@ -178,8 +178,27 @@ pub struct CloudwatchLogsSinkConfig {
     ))]
     pub tags: Option<HashMap<String, String>>,
 
+    /// The [Log group class][log_group_class] to be set on the log group when a new group gets created. Falls back to `LogGroupClass::Standard` if omitted.
+    ///
+    /// [log_group_class]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html
+    #[serde(default)]
+    pub log_group_class: Option<CloudWatchLogGroupClass>,
+
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
+}
+
+/// Class of a CloudWatch log group.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CloudWatchLogGroupClass {
+    /// Standard log group class with the full set of CloudWatch Logs features.
+    #[default]
+    Standard,
+
+    /// Infrequent Access log group class with a lower ingestion cost and a reduced feature set.
+    InfrequentAccess,
 }
 
 impl CloudwatchLogsSinkConfig {
@@ -309,6 +328,7 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
         confinement: ConfinementConfig::default(),
     }
 }

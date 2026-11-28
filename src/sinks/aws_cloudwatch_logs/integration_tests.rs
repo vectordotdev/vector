@@ -10,6 +10,7 @@ use vector_lib::{codecs::TextSerializerConfig, lookup};
 use vrl::event_path;
 
 use super::*;
+use crate::sinks::aws_cloudwatch_logs::config::CloudWatchLogGroupClass;
 use crate::{
     aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
     config::{AcknowledgementsConfig, ProxyConfig, SinkConfig, SinkContext, log_schema},
@@ -72,6 +73,7 @@ async fn cloudwatch_insert_log_event() {
         acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
         confinement: ConfinementConfig::default(),
     };
 
@@ -126,6 +128,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
         confinement: ConfinementConfig::default(),
     };
 
@@ -205,6 +208,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
         confinement: ConfinementConfig::default(),
     };
 
@@ -285,6 +289,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
         confinement: ConfinementConfig::default(),
     };
 
@@ -374,6 +379,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
             "key".to_string(),
             "value".to_string(),
         )])),
+        log_group_class: Some(CloudWatchLogGroupClass::InfrequentAccess),
         confinement: ConfinementConfig::default(),
     };
 
@@ -420,6 +426,9 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
 
     let kms_key = log_group.kms_key_id().unwrap();
     assert_eq!(kms_key, config.kms_key.unwrap());
+
+    let log_group_class = log_group.log_group_class().unwrap();
+    assert_eq!(log_group_class, config.log_group_class.unwrap());
 }
 
 #[tokio::test]
@@ -451,6 +460,7 @@ async fn cloudwatch_insert_log_event_batched() {
         acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
         confinement: ConfinementConfig::default(),
     };
 
@@ -505,6 +515,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
         confinement: ConfinementConfig::default(),
     };
 
@@ -600,6 +611,7 @@ async fn cloudwatch_healthcheck() {
         acknowledgements: AcknowledgementsConfig::default(),
         kms_key: None,
         tags: None,
+        log_group_class: None,
         confinement: ConfinementConfig::default(),
     };
 
