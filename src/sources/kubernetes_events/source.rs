@@ -30,8 +30,8 @@ use super::config::{self, KubernetesEventsConfig};
 use super::deduper::{DedupResult, Deduper, PendingDedupeRecord};
 use super::kube_timestamp_to_chrono;
 use super::leader_election::{
-    LeaderElectionSettings, LeadershipEnd, LeaseCoordinator, ResourceVersionCheckpoints,
-    renew_leadership,
+    AcquiredLeadership, LeaderElectionSettings, LeadershipEnd, LeaseCoordinator,
+    ResourceVersionCheckpoints, renew_leadership,
 };
 use super::watcher::{self as checkpoint_watcher, ApplyKind};
 use crate::{
@@ -350,7 +350,7 @@ impl KubernetesEventsSource {
                     log_namespace,
                     deduper,
                     &coordinator,
-                    acquired.checkpoints,
+                    acquired,
                 )
                 .await?
             {
@@ -376,12 +376,13 @@ impl KubernetesEventsSource {
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
         coordinator: &LeaseCoordinator,
-        mut checkpoints: ResourceVersionCheckpoints,
+        acquired: AcquiredLeadership,
     ) -> Result<LeadershipEnd, ()> {
+        let mut checkpoints = acquired.checkpoints;
         let mut streams = self.build_streams(Some(&checkpoints));
         let mut renew_interval = interval(coordinator.settings.retry_period);
         renew_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
-        let mut last_renewal = Instant::now();
+        let mut last_renewal = acquired.acquired_at;
 
         loop {
             select! {

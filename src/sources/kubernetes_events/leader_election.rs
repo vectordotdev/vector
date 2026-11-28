@@ -19,7 +19,7 @@ use k8s_openapi::jiff::Timestamp as KubeTimestamp;
 use kube::{Api, Client, Error as KubeError, api::PostParams};
 use serde::{Deserialize, Serialize};
 use tokio::select;
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 use vector_lib::internal_event::emit;
 
 use super::config::{self, FALLBACK_IDENTITY_ENV_VAR, KubernetesEventsLeaderElectionConfig};
@@ -213,8 +213,22 @@ impl LeaseCoordinator {
         checkpoint_configuration_hash: &str,
     ) -> Option<AcquiredLeadership> {
         loop {
-            match self.try_acquire_or_renew(None).await {
-                Ok(LeaseUpdate::Held { prior_checkpoints }) => {
+            // The Lease is written with the time the attempt started, so that is when the lease
+            // term begins. Bounding the request by the renew deadline keeps a stalled API call
+            // from returning a lease that has already expired, and selecting on shutdown keeps
+            // it from blocking shutdown.
+            let started = Instant::now();
+            let attempt = timeout(
+                self.settings.renew_deadline,
+                self.try_acquire_or_renew(None),
+            );
+            let result = select! {
+                _ = &mut *shutdown => return None,
+                result = attempt => result,
+            };
+
+            match result {
+                Ok(Ok(LeaseUpdate::Held { prior_checkpoints })) => {
                     let (checkpoints, checkpoint_resume) = ResourceVersionCheckpoints::resume(
                         prior_checkpoints,
                         checkpoint_configuration_hash,
@@ -222,10 +236,14 @@ impl LeaseCoordinator {
                     return Some(AcquiredLeadership {
                         checkpoints,
                         checkpoint_resume,
+                        acquired_at: started,
                     });
                 }
-                Ok(LeaseUpdate::HeldByOther) => {}
-                Err(error) => emit(KubernetesEventsLeaderElectionError { error }),
+                Ok(Ok(LeaseUpdate::HeldByOther)) => {}
+                Ok(Err(error)) => emit(KubernetesEventsLeaderElectionError { error }),
+                Err(_) => emit(KubernetesEventsLeaderElectionError {
+                    error: "Lease acquisition request timed out",
+                }),
             }
 
             select! {
@@ -352,6 +370,8 @@ enum LeaseUpdate {
 pub(super) struct AcquiredLeadership {
     pub(super) checkpoints: ResourceVersionCheckpoints,
     pub(super) checkpoint_resume: CheckpointResume,
+    /// When the successful acquisition attempt started; the renew deadline counts from here.
+    pub(super) acquired_at: Instant,
 }
 
 pub(super) enum LeadershipEnd {
@@ -365,16 +385,42 @@ pub(super) async fn renew_leadership(
     last_renewal: &mut Instant,
     checkpoints: &ResourceVersionCheckpoints,
 ) -> Option<LeadershipEnd> {
-    match coordinator.try_acquire_or_renew(Some(checkpoints)).await {
-        Ok(LeaseUpdate::Held { .. }) => {
-            *last_renewal = Instant::now();
+    let started = Instant::now();
+    let Some(remaining) = coordinator
+        .settings
+        .renew_deadline
+        .checked_sub(started.saturating_duration_since(*last_renewal))
+        .filter(|remaining| !remaining.is_zero())
+    else {
+        return Some(LeadershipEnd::Lost("renew_deadline_exceeded"));
+    };
+
+    // Bound the request by the time left before the renew deadline so a stalled API call cannot
+    // keep this replica acting as leader (and blocking event processing) past the deadline.
+    match timeout(
+        remaining,
+        coordinator.try_acquire_or_renew(Some(checkpoints)),
+    )
+    .await
+    {
+        Ok(Ok(LeaseUpdate::Held { .. })) => {
+            // The renewed term starts when the request was issued, not when it returned.
+            *last_renewal = started;
             None
         }
-        Ok(LeaseUpdate::HeldByOther) => Some(LeadershipEnd::Lost("lease_taken_by_another_holder")),
-        Err(error) => {
+        Ok(Ok(LeaseUpdate::HeldByOther)) => {
+            Some(LeadershipEnd::Lost("lease_taken_by_another_holder"))
+        }
+        Ok(Err(error)) => {
             emit(KubernetesEventsLeaderElectionError { error });
             (last_renewal.elapsed() >= coordinator.settings.renew_deadline)
                 .then_some(LeadershipEnd::Lost("renew_deadline_exceeded"))
+        }
+        Err(_) => {
+            emit(KubernetesEventsLeaderElectionError {
+                error: "Lease renewal request timed out",
+            });
+            Some(LeadershipEnd::Lost("renew_deadline_exceeded"))
         }
     }
 }
@@ -570,6 +616,62 @@ mod tests {
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(value.into()))
             .unwrap()
+    }
+
+    fn stalled_coordinator() -> LeaseCoordinator {
+        let service = service_fn(|_request: Request<Body>| {
+            futures::future::pending::<Result<Response<Body>, std::io::Error>>()
+        });
+        LeaseCoordinator::new(Client::new(service, "default"), leader_settings("vector-0"))
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stalled_renewal_is_bounded_by_renew_deadline() {
+        let coordinator = stalled_coordinator();
+        let checkpoints = checkpoints("config", &[]);
+        let last_renewal_before = Instant::now();
+        let mut last_renewal = last_renewal_before;
+
+        let end = renew_leadership(&coordinator, &mut last_renewal, &checkpoints).await;
+
+        assert!(matches!(
+            end,
+            Some(LeadershipEnd::Lost("renew_deadline_exceeded"))
+        ));
+        assert_eq!(
+            last_renewal, last_renewal_before,
+            "a timed out renewal must not extend leadership"
+        );
+    }
+
+    #[tokio::test]
+    async fn renewal_after_renew_deadline_is_not_attempted() {
+        let coordinator = stalled_coordinator();
+        let checkpoints = checkpoints("config", &[]);
+        let mut last_renewal = Instant::now()
+            .checked_sub(coordinator.settings.renew_deadline)
+            .expect("renew deadline fits before the current instant");
+
+        let end = renew_leadership(&coordinator, &mut last_renewal, &checkpoints).await;
+
+        assert!(matches!(
+            end,
+            Some(LeadershipEnd::Lost("renew_deadline_exceeded"))
+        ));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stalled_acquisition_is_cancelled_on_shutdown() {
+        let coordinator = stalled_coordinator();
+        let (trigger, mut shutdown, _done) = ShutdownSignal::new_wired();
+        drop(trigger);
+
+        assert!(
+            coordinator
+                .wait_for_leadership(&mut shutdown, "config")
+                .await
+                .is_none()
+        );
     }
 
     fn leader_settings(identity: &str) -> LeaderElectionSettings {
