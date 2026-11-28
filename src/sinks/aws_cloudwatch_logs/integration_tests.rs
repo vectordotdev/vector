@@ -2,6 +2,7 @@ use std::{collections::HashMap, convert::TryFrom};
 
 use aws_config::Region;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::types::LogGroupClass;
 use aws_sdk_kms::Client as KMSClient;
 use chrono::Duration;
 use futures::{StreamExt, stream};
@@ -378,7 +379,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
             "key".to_string(),
             "value".to_string(),
         )])),
-        log_group_class: Some(CloudWatchLogGroupClass::InfrequentAccess),
+        log_group_class: Some(CloudWatchLogGroupClass::Standard),
         confinement: ConfinementConfig::default(),
     };
 
@@ -427,7 +428,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
     assert_eq!(kms_key, config.kms_key.unwrap());
 
     let log_group_class = log_group.log_group_class().unwrap();
-    assert_eq!(log_group_class, config.log_group_class.unwrap());
+    assert_eq!(log_group_class, LogGroupClass::Standard);
 }
 
 #[tokio::test]
