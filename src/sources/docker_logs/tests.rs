@@ -5,6 +5,163 @@ fn generate_config() {
     crate::test_util::test_generate_config::<DockerLogsConfig>();
 }
 
+mod mock_docker {
+    use std::time::Duration;
+
+    use chrono::{SecondsFormat, Utc};
+    use wiremock::{
+        Mock, MockServer, Request, ResponseTemplate,
+        matchers::{method, path_regex},
+    };
+
+    use crate::{
+        SourceSender,
+        config::{SourceConfig, SourceContext},
+        sources::docker_logs::DockerLogsConfig,
+    };
+
+    const ID: &str = "0123456789ab";
+
+    fn stdout_frame(line: &str) -> Vec<u8> {
+        let mut frame = vec![1, 0, 0, 0];
+        frame.extend_from_slice(&u32::try_from(line.len()).unwrap().to_be_bytes());
+        frame.extend_from_slice(line.as_bytes());
+        frame
+    }
+
+    fn inspect_ok() -> ResponseTemplate {
+        ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "Id": ID,
+            "Name": "/mock",
+            "Created": "2026-01-01T00:00:00Z",
+            "Config": { "Image": "mock:latest", "Labels": {} },
+        }))
+    }
+
+    fn server_error() -> ResponseTemplate {
+        ResponseTemplate::new(500).set_body_json(serde_json::json!({ "message": "stream cut" }))
+    }
+
+    fn since(request: &Request) -> i64 {
+        request
+            .url
+            .query_pairs()
+            .find(|(key, _)| key == "since")
+            .and_then(|(_, value)| value.parse().ok())
+            .expect("logs request has a since parameter")
+    }
+
+    #[tokio::test]
+    async fn transient_error_resumes_from_last_log() {
+        let server = MockServer::start().await;
+        let logs = format!("/containers/{ID}/logs$");
+        let inspect = format!("/containers/{ID}/json$");
+
+        // Far enough after the source starts that `since` tells the two positions apart.
+        let logged_at = Utc::now() + chrono::Duration::hours(1);
+        let line = format!(
+            "{} hello\n",
+            logged_at.to_rfc3339_opts(SecondsFormat::Nanos, true)
+        );
+
+        Mock::given(method("GET"))
+            .and(path_regex("/containers/json$"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!([{ "Id": ID, "Names": ["/mock"] }])),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex("/events$"))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(3600)))
+            .mount(&server)
+            .await;
+
+        // Initial start, then a failed inspect on the first transient retry, then success.
+        Mock::given(method("GET"))
+            .and(path_regex(inspect.as_str()))
+            .respond_with(inspect_ok())
+            .up_to_n_times(1)
+            .with_priority(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(inspect.as_str()))
+            .respond_with(server_error())
+            .up_to_n_times(1)
+            .with_priority(2)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(inspect.as_str()))
+            .respond_with(inspect_ok())
+            .with_priority(3)
+            .mount(&server)
+            .await;
+
+        // One line then a clean end, then a transient error, then a stream that stays open.
+        Mock::given(method("GET"))
+            .and(path_regex(logs.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                stdout_frame(&line),
+                "application/vnd.docker.multiplexed-stream",
+            ))
+            .up_to_n_times(1)
+            .with_priority(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(logs.as_str()))
+            .respond_with(server_error())
+            .up_to_n_times(1)
+            .with_priority(2)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(logs.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(3600)))
+            .with_priority(3)
+            .mount(&server)
+            .await;
+
+        let (sender, _recv) = SourceSender::new_test();
+        let config = DockerLogsConfig {
+            docker_host: Some(server.uri()),
+            retry_backoff_secs: Duration::ZERO,
+            ..DockerLogsConfig::default()
+        };
+        let source = config
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        let source = tokio::spawn(source);
+
+        let logs_requests = tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let requests: Vec<Request> = server
+                    .received_requests()
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .filter(|request| request.url.path().ends_with("/logs"))
+                    .collect();
+                if requests.len() >= 3 {
+                    return requests;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("source reattached after the transient error");
+        source.abort();
+
+        let resume_since = logged_at.timestamp() - 1;
+        assert_eq!(since(&logs_requests[1]), resume_since);
+        assert_eq!(since(&logs_requests[2]), resume_since);
+    }
+}
+
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
     #[test]
