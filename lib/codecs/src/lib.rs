@@ -33,7 +33,8 @@ pub use encoding::{BatchEncoder, BatchSerializer};
 pub use encoding::{
     BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
     CsvSerializer, CsvSerializerConfig, Encoder, EncoderKind, EncodingConfig,
-    EncodingConfigWithFraming, GelfSerializer, GelfSerializerConfig, JsonSerializer,
+    EncodingConfigWithFraming, GelfSerializer, GelfSerializerConfig, InfluxLineProtocolSerializer,
+    InfluxLineProtocolSerializerConfig, InfluxLineProtocolSerializerError, JsonSerializer,
     JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
     NativeSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,

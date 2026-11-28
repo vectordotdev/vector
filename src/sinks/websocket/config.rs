@@ -108,7 +108,7 @@ impl WebSocketSinkConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use vector_lib::codecs::encoding::SerializerConfig;
+    use vector_lib::codecs::{InfluxLineProtocolSerializerConfig, encoding::SerializerConfig};
 
     use crate::config::ValidatedSink;
 
@@ -168,5 +168,16 @@ mod test {
             config.validate().is_err(),
             "a URI without a host should fail validation"
         );
+    }
+
+    #[test]
+    fn influxdb_encoding_requires_metrics() {
+        let config = WebSocketSinkConfig {
+            common: WebSocketCommonConfig::default(),
+            encoding: InfluxLineProtocolSerializerConfig::default().into(),
+            acknowledgements: AcknowledgementsConfig::default(),
+        };
+
+        assert_eq!(config.input(), Input::metric());
     }
 }

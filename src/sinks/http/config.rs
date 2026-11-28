@@ -234,6 +234,7 @@ fn effective_framer_config(encoding: &EncodingConfigWithFraming) -> FramingConfi
             }
             SerializerConfig::Cef(_)
             | SerializerConfig::Csv(_)
+            | SerializerConfig::Influxdb(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
@@ -382,9 +383,9 @@ impl ValidatedSink for HttpSinkConfig {
             use FramingConfig::{CharacterDelimited, NewlineDelimited};
             #[cfg(feature = "codecs-opentelemetry")]
             use SerializerConfig::Otlp;
-            use SerializerConfig::{Json, RawMessage, Text};
+            use SerializerConfig::{Influxdb, Json, RawMessage, Text};
             match (serializer_config, &framer_config) {
-                (RawMessage | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
+                (RawMessage | Text(_) | Influxdb(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
                 (Json(_), NewlineDelimited) => Some(CONTENT_TYPE_NDJSON.to_owned()),
                 (Json(_), CharacterDelimited(cfg))
                     if cfg.character_delimited.delimiter.as_byte() == b',' =>

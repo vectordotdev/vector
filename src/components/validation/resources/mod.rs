@@ -192,8 +192,7 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::NativeJson { .. } => SerializerConfig::NativeJson,
         DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf(Default::default()),
         DeserializerConfig::Avro { avro } => SerializerConfig::Avro { avro: avro.into() },
-        // TODO: Influxdb has no serializer yet
-        DeserializerConfig::Influxdb { .. } => unimplemented!(),
+        DeserializerConfig::Influxdb { .. } => SerializerConfig::Influxdb(Default::default()),
         DeserializerConfig::Vrl { .. } => unimplemented!(),
         #[cfg(feature = "codecs-opentelemetry")]
         DeserializerConfig::Otlp { .. } => SerializerConfig::Otlp,
@@ -265,6 +264,7 @@ fn serializer_config_to_deserializer(
                 },
             })
         }
+        SerializerConfig::Influxdb(_) => DeserializerConfig::Influxdb(Default::default()),
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
         #[cfg(feature = "codecs-opentelemetry")]
         SerializerConfig::Otlp => unimplemented!(),

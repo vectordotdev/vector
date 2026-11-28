@@ -14,10 +14,14 @@ use serde::{Deserialize, de};
 use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     codecs::{
-        JsonSerializerConfig, NativeJsonDeserializerConfig, NewlineDelimitedEncoderConfig,
-        TextSerializerConfig, decoding::format::Deserializer as _, encoding::FramingConfig,
+        InfluxLineProtocolSerializerConfig, JsonSerializerConfig, NativeJsonDeserializerConfig,
+        NewlineDelimitedEncoderConfig, TextSerializerConfig, decoding::format::Deserializer as _,
+        encoding::FramingConfig,
     },
-    event::{BatchNotifier, BatchStatus, Event, LogEvent, MetricValue, Value},
+    event::{
+        BatchNotifier, BatchStatus, Event, LogEvent, MetricValue, Value,
+        metric::{Metric, MetricKind},
+    },
     finalization::AddBatchNotifier,
     metrics::Controller,
     serde::AsciiChar,
@@ -133,6 +137,94 @@ fn http_encode_event_ndjson() {
     let output = serde_json::from_slice::<ExpectedEvent>(&output_buffer[..]).unwrap();
 
     assert_eq!(output.message, "hello world".to_string());
+}
+
+#[test]
+fn http_encode_event_influxdb() {
+    let metric = Metric::new(
+        "cpu_usage",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 42.0 },
+    )
+    .into();
+
+    let cfg = default_cfg(
+        (
+            None::<FramingConfig>,
+            InfluxLineProtocolSerializerConfig::default(),
+        )
+            .into(),
+    );
+    let encoder = cfg.build_encoder().unwrap();
+    let transformer = cfg.encoding.transformer();
+
+    let encoder = HttpEncoder::new(encoder, transformer, String::new(), String::new());
+
+    let mut output_buffer = vec![];
+    encoder
+        .encode_input(vec![metric], &mut output_buffer)
+        .unwrap();
+
+    let payload = String::from_utf8(output_buffer).unwrap();
+    assert!(payload.ends_with('\n'));
+    let line = payload.trim_end();
+    assert!(line.starts_with("cpu_usage,metric_type=gauge"));
+    assert!(line.contains("value=42"));
+}
+
+#[test]
+fn http_encode_influxdb_skips_metrics_without_fields() {
+    init_test();
+    let controller = Controller::get().unwrap();
+    controller.reset();
+
+    // A distribution with no positive-rate samples has no fields to encode in line protocol.
+    let empty_distribution = Metric::new(
+        "latency",
+        MetricKind::Absolute,
+        MetricValue::Distribution {
+            samples: vector_lib::samples![1.0 => 0],
+            statistic: vector_lib::event::StatisticKind::Summary,
+        },
+    )
+    .into();
+    let gauge = Metric::new(
+        "cpu_usage",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 42.0 },
+    )
+    .into();
+
+    let cfg = default_cfg(
+        (
+            None::<FramingConfig>,
+            InfluxLineProtocolSerializerConfig::default(),
+        )
+            .into(),
+    );
+    let encoder = HttpEncoder::new(
+        cfg.build_encoder().unwrap(),
+        cfg.encoding.transformer(),
+        String::new(),
+        String::new(),
+    );
+
+    let mut output_buffer = vec![];
+    encoder
+        .encode_input(vec![empty_distribution, gauge], &mut output_buffer)
+        .expect("valid metrics in the batch must still be encoded");
+
+    let payload = String::from_utf8(output_buffer).unwrap();
+    assert!(!payload.contains("latency"));
+    let lines: Vec<_> = payload.lines().filter(|line| !line.is_empty()).collect();
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].starts_with("cpu_usage,metric_type=gauge value=42 "));
+
+    let metrics = controller.capture_metrics();
+    for name in ["component_errors_total", "component_discarded_events_total"] {
+        let metric = metrics.iter().find(|metric| metric.name() == name).unwrap();
+        assert_eq!(metric.value(), &MetricValue::Counter { value: 1.0 });
+    }
 }
 
 #[test]

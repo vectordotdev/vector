@@ -46,6 +46,11 @@ _schemaDefinitions: "codecs::encoding::config::EncodingConfig": object: options:
 				[gelf]: https://docs.graylog.org/docs/gelf
 				[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 				"""
+			influxdb: """
+				Encodes a metric as an [InfluxDB Line Protocol][ilp] message.
+
+				[ilp]: https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/
+				"""
 			json: """
 				Encodes an event as [JSON][json].
 
@@ -119,6 +124,12 @@ _schemaDefinitions: "codecs::encoding::config::EncodingConfig": object: options:
 		required:      true
 		type:          _schemaDefinitions["codecs::encoding::format::csv::CsvSerializerOptions"]
 	}
+	default_namespace: {
+		description:   "A default namespace applied when metrics do not specify one."
+		relevant_when: "codec = \"influxdb\""
+		required:      false
+		type: string: {}
+	}
 	except_fields: {
 		description: "List of fields that are excluded from the encoded event."
 		required:    false
@@ -174,11 +185,42 @@ _schemaDefinitions: "codecs::encoding::config::EncodingConfig": object: options:
 		required:      true
 		type:          _schemaDefinitions["codecs::encoding::format::protobuf::ProtobufSerializerOptions"]
 	}
+	protocol_version: {
+		description:   "The protocol version to encode fields with."
+		relevant_when: "codec = \"influxdb\""
+		required:      false
+		type: string: {
+			default: "v2"
+			enum: {
+				v1: "Line protocol for InfluxDB v1.x."
+				v2: "Line protocol for InfluxDB v2.x."
+			}
+		}
+	}
+	quantiles: {
+		description:   "Quantiles to calculate when encoding distribution metrics."
+		relevant_when: "codec = \"influxdb\""
+		required:      false
+		type: array: {
+			default: [0.5, 0.75, 0.9, 0.95, 0.99]
+			items: type: float: {}
+		}
+	}
 	syslog: {
 		description:   "Options for the Syslog serializer."
 		relevant_when: "codec = \"syslog\""
 		required:      false
 		type:          _schemaDefinitions["codecs::encoding::format::syslog::SyslogSerializerOptions"]
+	}
+	tags: {
+		description:   "Additional tags that are appended to every encoded metric."
+		relevant_when: "codec = \"influxdb\""
+		required:      false
+		type: object: options: "*": {
+			description: "A tag key/value pair that is appended to each measurement."
+			required:    true
+			type: string: {}
+		}
 	}
 	timestamp_format: {
 		description: "Format used for timestamp fields."
