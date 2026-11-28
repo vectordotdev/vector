@@ -12,8 +12,9 @@ use crate::{
     config::log_schema,
     sources::okta::OktaConfig,
     test_util::{
+        addr::next_addr,
         components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
-        next_addr, test_generate_config, wait_for_tcp,
+        test_generate_config, wait_for_tcp,
     },
 };
 
@@ -27,7 +28,7 @@ pub(crate) async fn run_compliance(config: OktaConfig) -> Vec<Event> {
         run_and_assert_source_compliance(config, Duration::from_secs(5), &HTTP_PULL_SOURCE_TAGS)
             .await;
 
-    assert!(!events.is_empty());
+    assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
     events
 }
@@ -60,7 +61,7 @@ register_validatable_component!(OktaConfig);
 
 #[tokio::test]
 async fn okta_compliance() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
         .and(warp::query::<std::collections::HashMap<String, String>>())
@@ -80,7 +81,7 @@ async fn okta_compliance() {
                         "link",
                         format!("<http://{in_addr}/api/v1/logs?after=xyz>; rel=\"next\""),
                     )
-                    .body(r#"[]"#)
+                    .body(r"[]")
                     .unwrap(),
             }
         });
@@ -100,7 +101,7 @@ async fn okta_compliance() {
 
     assert_eq!(events.len(), 2);
 
-    for event in events.iter() {
+    for event in &events {
         assert_eq!(
             event.as_log()[log_schema().source_type_key().unwrap().to_string()],
             OktaConfig::NAME.into()
@@ -109,9 +110,9 @@ async fn okta_compliance() {
     let log_event = events[0].as_log();
     assert_eq!(
         log_event
-            .get("data")
+            .get(vrl::event_path!("data"))
             .expect("data must be available")
-            .as_str()
+            .to_str_lossy()
             .unwrap(),
         "foo"
     );
@@ -119,7 +120,7 @@ async fn okta_compliance() {
 
 #[tokio::test]
 async fn okta_follows_rel() {
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
 
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
         .and(warp::query::<std::collections::HashMap<String, String>>())
@@ -147,7 +148,7 @@ async fn okta_follows_rel() {
                         "link",
                         format!("<http://{addr}/api/v1/logs?after=quux>; rel=\"next\""),
                     )
-                    .body(r#"[]"#)
+                    .body(r"[]")
                     .unwrap(),
                 Some(_) => panic!("following Link header with zero length reply"),
             }
@@ -168,21 +169,21 @@ async fn okta_follows_rel() {
 
     assert_eq!(events.len(), 2);
 
-    for event in events.iter() {
+    for event in &events {
         assert_eq!(
             event.as_log()[log_schema().source_type_key().unwrap().to_string()],
             OktaConfig::NAME.into()
         );
     }
-    assert_eq!(events[0].as_log()["data"].as_str().unwrap(), "foo");
-    assert_eq!(events[1].as_log()["data"].as_str().unwrap(), "bar");
+    assert_eq!(events[0].as_log()["data"].to_str_lossy().unwrap(), "foo");
+    assert_eq!(events[1].as_log()["data"].to_str_lossy().unwrap(), "bar");
 }
 
 #[tokio::test]
 async fn okta_persists_rel() {
     // the client follows `next` links; on the next interval it should pick up where it left off
     // and not start over from the beginning
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
 
     let init_guard: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
@@ -202,16 +203,7 @@ async fn okta_persists_rel() {
                     .unwrap(),
                 Some(after) if after == "test" => {
                     let initialized = init_guard.swap(true, Ordering::Relaxed);
-                    if !initialized {
-                        warp::http::Response::builder()
-                            .header("Content-Type", "application/json")
-                            .header(
-                                "link",
-                                format!("<http://{addr}/api/v1/logs?after=test>; rel=\"next\""),
-                            )
-                            .body(r#"[]"#)
-                            .unwrap()
-                    } else {
+                    if initialized {
                         warp::http::Response::builder()
                             .header("Content-Type", "application/json")
                             .header(
@@ -220,11 +212,20 @@ async fn okta_persists_rel() {
                             )
                             .body(r#"[{"initialized":"true"}]"#)
                             .unwrap()
+                    } else {
+                        warp::http::Response::builder()
+                            .header("Content-Type", "application/json")
+                            .header(
+                                "link",
+                                format!("<http://{addr}/api/v1/logs?after=test>; rel=\"next\""),
+                            )
+                            .body(r"[]")
+                            .unwrap()
                     }
                 }
                 Some(_) => warp::http::Response::builder()
                     .header("Content-Type", "application/json")
-                    .body(r#"[]"#)
+                    .body(r"[]")
                     .unwrap(),
             }
         });

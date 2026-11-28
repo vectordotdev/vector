@@ -4,12 +4,12 @@ use bytes::BytesMut;
 use serde::Serialize;
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, config::telemetry, request_metadata::GroupedCountByteSize,
+    EstimatedJsonEncodedSizeOf, codecs::Transformer, config::telemetry, internal_event::emit,
+    request_metadata::GroupedCountByteSize,
 };
 
 use super::sink::HecProcessedEvent;
 use crate::{
-    codecs::Transformer,
     event::{Event, LogEvent},
     internal_events::SplunkEventEncodeError,
     sinks::{splunk_hec::common::EndpointTarget, util::encoding::Encoder},
@@ -41,6 +41,7 @@ pub struct HecData<'a> {
 }
 
 impl<'a> HecData<'a> {
+    #[must_use]
     pub const fn new(event: HecEvent<'a>, fields: LogEvent, time: Option<f64>) -> Self {
         Self {
             event,
@@ -57,7 +58,7 @@ impl<'a> HecData<'a> {
 #[derive(Debug, Clone)]
 pub struct HecLogsEncoder {
     pub transformer: Transformer,
-    pub encoder: crate::codecs::Encoder<()>,
+    pub encoder: vector_lib::codecs::Encoder<()>,
     pub auto_extract_timestamp: bool,
 }
 
@@ -91,7 +92,7 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                             HecEvent::Json(
                                 serializer
                                     .to_json_value(event)
-                                    .map_err(|error| emit!(SplunkEventEncodeError { error }))
+                                    .map_err(|error| emit(SplunkEventEncodeError { error }))
                                     .ok()?,
                             )
                         } else {
@@ -120,8 +121,8 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                         match serde_json::to_vec(&hec_data) {
                             Ok(value) => Some(value),
                             Err(error) => {
-                                emit!(SplunkEventEncodeError {
-                                    error: error.into()
+                                emit(SplunkEventEncodeError {
+                                    error: error.into(),
                                 });
                                 None
                             }

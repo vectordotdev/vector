@@ -1,12 +1,22 @@
+use vector_vrl_category::Category;
 use vrl::prelude::*;
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Keep the owned-argument convention used by VRL runtime helpers."
+)]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "Keep the fallible return convention used by VRL runtime helpers."
+)]
 fn set_secret(
     ctx: &mut Context,
     key: Value,
     secret: Value,
 ) -> std::result::Result<Value, ExpressionError> {
-    let key_str = key.as_str().expect("key must be a string");
-    let secret_str = secret.as_str().expect("secret must be a string");
+    let key_str = key.to_str_lossy().expect("key must be a string");
+    let secret_str = secret.to_str_lossy().expect("secret must be a string");
 
     ctx.target_mut()
         .insert_secret(key_str.as_ref(), secret_str.as_ref());
@@ -21,27 +31,32 @@ impl Function for SetSecret {
         "set_secret"
     }
 
+    fn description(&self) -> &'static str {
+        "Sets the given secret in the event."
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "key",
-                kind: kind::BYTES,
-                required: true,
-            },
-            Parameter {
-                keyword: "secret",
-                kind: kind::BYTES,
-                required: true,
-            },
-        ]
+        const PARAMETERS: &[Parameter] = &[
+            Parameter::required("key", kind::BYTES, "The name of the secret."),
+            Parameter::required("secret", kind::BYTES, "The secret value."),
+        ];
+        PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Set the datadog api key",
             source: r#"set_secret("datadog_api_key", "secret-value")"#,
             result: Ok("null"),
-        }]
+        )]
     }
 
     fn compile(

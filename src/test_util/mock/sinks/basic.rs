@@ -12,8 +12,9 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
+    test_util::mock::TestComponentData,
 };
 
 /// Configuration for the `test_basic` sink.
@@ -26,8 +27,25 @@ pub struct BasicSinkConfig {
     #[serde(skip)]
     healthy: bool,
 
+    /// Optional template-confinement config, so tests can exercise the
+    /// topology-owned `security_confinement_disabled` gauge.
+    #[serde(skip)]
+    confinement: Option<crate::template::ConfinementConfig>,
+
     /// Dummy field used for generating unique configurations to trigger reloads.
     data: Option<String>,
+
+    /// Acknowledgements configuration retained by the test sink.
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
+
+    /// Extra data retained for configuration-loading assertions.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub extra: TestComponentData,
 }
 
 impl_generate_config_from_default!(BasicSinkConfig);
@@ -41,20 +59,40 @@ enum Mode {
 }
 
 impl BasicSinkConfig {
+    #[must_use]
     pub const fn new(sink: SourceSender, healthy: bool) -> Self {
         Self {
             sink: Mode::Normal(sink),
             healthy,
+            confinement: None,
             data: None,
+            acknowledgements: AcknowledgementsConfig::DEFAULT,
+            extra: TestComponentData::DEFAULT,
         }
     }
 
+    #[must_use]
     pub fn new_with_data(sink: SourceSender, healthy: bool, data: &str) -> Self {
         Self {
             sink: Mode::Normal(sink),
             healthy,
+            confinement: None,
             data: Some(data.into()),
+            acknowledgements: AcknowledgementsConfig::DEFAULT,
+            extra: TestComponentData::DEFAULT,
         }
+    }
+
+    /// Attach a template-confinement config, marking this sink as
+    /// confinement-aware so the topology emits its
+    /// `security_confinement_disabled` gauge. `allowed` sets
+    /// `dangerously_allow_unconfined_template_resolution`.
+    #[must_use]
+    pub fn with_confinement(mut self, allowed: bool) -> Self {
+        self.confinement = Some(crate::template::ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: allowed,
+        });
+        self
     }
 }
 
@@ -67,7 +105,32 @@ enum HealthcheckError {
 #[async_trait]
 #[typetag::serde(name = "test_basic")]
 impl SinkConfig for BasicSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        self.confinement.as_ref()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for BasicSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
         // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
         // started running, so that tests can request the topology be healthy before proceeding.
@@ -80,7 +143,7 @@ impl SinkConfig for BasicSinkConfig {
             None
         };
 
-        let sink = MockSink {
+        let sink = BasicSink {
             sink: self.sink.clone(),
             health_tx,
         };
@@ -89,23 +152,15 @@ impl SinkConfig for BasicSinkConfig {
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
     }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
-    }
 }
 
-struct MockSink {
+struct BasicSink {
     sink: Mode,
     health_tx: Option<oneshot::Sender<crate::Result<()>>>,
 }
 
 #[async_trait]
-impl StreamSink<Event> for MockSink {
+impl StreamSink<Event> for BasicSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         match self.sink {
             Mode::Normal(mut sink) => {
@@ -117,7 +172,7 @@ impl StreamSink<Event> for MockSink {
                 while let Some(mut event) = input.next().await {
                     let finalizers = event.take_finalizers();
                     if let Err(error) = sink.send_event(event).await {
-                        error!(message = "Ingesting an event failed at mock sink.", %error);
+                        error!(message = "Ingesting an event failed at test sink.", %error);
                     }
                     drop(finalizers);
                 }

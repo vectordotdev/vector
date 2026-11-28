@@ -1,10 +1,12 @@
 #[cfg(feature = "sources-amqp")]
-pub mod source {
-    use metrics::counter;
-    use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+pub(crate) mod source {
+    use vector_lib::{
+        NamedInternalEvent, counter,
+        internal_event::{CounterName, InternalEvent, error_stage, error_type},
+    };
 
-    #[derive(Debug)]
-    pub struct AmqpBytesReceived {
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct AmqpBytesReceived {
         pub byte_size: usize,
         pub protocol: &'static str,
     }
@@ -17,19 +19,19 @@ pub mod source {
                 protocol = %self.protocol,
             );
             counter!(
-                "component_received_bytes_total",
+                CounterName::ComponentReceivedBytesTotal,
                 "protocol" => self.protocol,
             )
             .increment(self.byte_size as u64);
         }
     }
 
-    #[derive(Debug)]
-    pub struct AmqpEventError {
-        pub error: lapin::Error,
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct AmqpEventError<'a> {
+        pub error: &'a lapin::Error,
     }
 
-    impl InternalEvent for AmqpEventError {
+    impl InternalEvent for AmqpEventError<'_> {
         fn emit(self) {
             error!(message = "Failed to read message.",
                    error = ?self.error,
@@ -37,7 +39,7 @@ pub mod source {
                    stage = error_stage::RECEIVING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
             )
@@ -45,8 +47,8 @@ pub mod source {
         }
     }
 
-    #[derive(Debug)]
-    pub struct AmqpAckError {
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct AmqpAckError {
         pub error: lapin::Error,
     }
 
@@ -58,7 +60,7 @@ pub mod source {
                    stage = error_stage::RECEIVING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::RECEIVING,
             )
@@ -66,8 +68,8 @@ pub mod source {
         }
     }
 
-    #[derive(Debug)]
-    pub struct AmqpRejectError {
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct AmqpRejectError {
         pub error: lapin::Error,
     }
 
@@ -79,7 +81,7 @@ pub mod source {
                    stage = error_stage::RECEIVING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_type" => error_type::COMMAND_FAILED,
                 "stage" => error_stage::RECEIVING,
             )

@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use bytes::BytesMut;
 use codecs::{
     VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
@@ -47,6 +49,11 @@ fn test_varint_framing_roundtrip() {
 }
 
 #[test]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::similar_names,
+    reason = "Related fixture values retain names that describe their types or encodings."
+)]
 fn test_varint_framing_large_frame() {
     let large_data = vec![b'x'; 300]; // 300 bytes
     let mut encoder = VarintLengthDelimitedEncoder::default();

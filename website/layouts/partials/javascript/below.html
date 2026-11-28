@@ -1,4 +1,8 @@
 {{ $js      := "js/below.js"}}
-{{ $jsOpts  := dict "targetPath" $js "minify" true "sourceMap" "inline" }}
+{{ $jsOpts  := dict "targetPath" $js "minify" true "sourceMap" "inline" "target" "es2020" }}
 {{ $builtJs := resources.Get $js | resources.ExecuteAsTemplate $js . | js.Build $jsOpts | fingerprint "sha256" }}
 <script type="text/javascript" src="{{ $builtJs.RelPermalink }}" integrity="{{ $builtJs.Data.Integrity }}"></script>
+{{ if hugo.IsServer }}
+  {{ $reloadJs := resources.Get "js/vrl-reload.js" | js.Build (dict "minify" true "target" "es2020") | fingerprint "sha256" }}
+  <script src="{{ $reloadJs.RelPermalink }}" integrity="{{ $reloadJs.Data.Integrity }}"></script>
+{{ end }}

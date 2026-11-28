@@ -2,7 +2,9 @@ use criterion::{BatchSize, Criterion, SamplingMode, Throughput, criterion_group,
 use indoc::indoc;
 use vector::{
     config,
-    test_util::{CountReceiver, next_addr, runtime, send_lines, start_topology, wait_for_tcp},
+    test_util::{
+        CountReceiver, addr::next_addr, runtime, send_lines, start_topology, wait_for_tcp,
+    },
 };
 
 criterion_group!(
@@ -133,7 +135,8 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
         ),
     ];
 
-    let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
+    let input =
+        r"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet";
     let output = serde_json::from_str(r#"{ "appname": "su", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19T21:48:09.004Z", "version": 3 }"#).unwrap();
 
     benchmark_configs(c, "parse_syslog", configs, "in", "last", input, &output);
@@ -221,7 +224,8 @@ fn benchmark_multifaceted(c: &mut Criterion) {
         ),
     ];
 
-    let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
+    let input =
+        r"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet";
     let output = serde_json::from_str(r#"{ "appname": "su", "facility": "user", "severity": "warning", "message": "tps report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "Sat Dec 19 21:48:09 2020", "version": 3 }"#).unwrap();
 
     benchmark_configs(c, "multifaceted", configs, "in", "last", input, &output);
@@ -233,7 +237,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
 ///
 /// * `criterion` - Criterion benchmark manager
 /// * `benchmark_name` - The name of the benchmark
-/// * `configs` - Vec of tuples of (config_name, config_snippet)
+/// * `configs` - Vec of tuples of (`config_name`, `config_snippet`)
 /// * `input_name` - Name of the input to the first transform
 /// * `output_name` - Name of the last transform
 /// * `input` - Line to use as input
@@ -253,8 +257,8 @@ fn benchmark_configs(
     let _ = output;
 
     let num_lines = 10_000;
-    let in_addr = next_addr();
-    let out_addr = next_addr();
+    let (_guard_0, in_addr) = next_addr();
+    let (_guard_1, out_addr) = next_addr();
 
     let lines: Vec<_> = std::iter::repeat_n(input.to_string(), num_lines).collect();
 
@@ -282,7 +286,7 @@ fn benchmark_configs(
         output_name, out_addr
     );
 
-    for (name, transform_config) in configs.into_iter() {
+    for (name, transform_config) in configs {
         group.throughput(Throughput::Elements(num_lines as u64));
         group.bench_function(name, |b| {
             b.iter_batched(
@@ -292,7 +296,7 @@ fn benchmark_configs(
                     config.push_str(&sink_config);
 
                     let config = config::load_from_str(&config, config::Format::Toml)
-                        .unwrap_or_else(|_| panic!("invalid TOML configuration: {}", &config));
+                        .unwrap_or_else(|_| panic!("invalid TOML configuration: {config}"));
                     let rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
@@ -319,8 +323,8 @@ fn benchmark_configs(
                                     serde_json::from_str(output_line).unwrap();
                                 // avoids asserting the actual == expected as the socket transform
                                 // adds dynamic keys like timestamp
-                                for (key, value) in output.iter() {
-                                    assert_eq!(Some(value), actual.get(key), "for key {key}",);
+                                for (key, value) in output {
+                                    assert_eq!(Some(value), actual.get(key), "for key {key}");
                                 }
                             }
                         }

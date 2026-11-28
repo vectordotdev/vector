@@ -9,14 +9,6 @@ use crate::testing::integration::ComposeTestLocalConfig;
 pub struct Cli {
     /// The integration name to stop
     integration: String,
-
-    /// If true, remove the runner container compiled with all integration test features
-    #[arg(short = 'a', long)]
-    build_all: bool,
-
-    /// Reuse existing test runner image instead of rebuilding (useful in CI)
-    #[arg(long)]
-    reuse_image: bool,
 }
 
 impl Cli {
@@ -24,8 +16,6 @@ impl Cli {
         crate::commands::compose_tests::stop::exec(
             ComposeTestLocalConfig::integration(),
             &self.integration,
-            self.build_all,
-            self.reuse_image,
         )
     }
 }

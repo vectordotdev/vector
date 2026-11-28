@@ -1,12 +1,11 @@
 use std::{fmt::Debug, sync::Arc};
+use vector_lib::internal_event::emit;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 
 use super::{NewRelicApiRequest, NewRelicCredentials, NewRelicEncoder};
-use crate::{
-    http::get_http_scheme_from_uri, internal_events::SinkRequestBuildError, sinks::prelude::*,
-};
+use crate::{internal_events::SinkRequestBuildError, sinks::prelude::*};
 
 #[derive(Debug)]
 pub struct NewRelicSinkError {
@@ -58,7 +57,7 @@ struct NewRelicRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = Vec<Event>;
     type Encoder = NewRelicEncoder;
     type Payload = Bytes;
@@ -73,19 +72,22 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut input: Vec<Event>,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut input: Vec<Event>) -> RequestParts<Self::Metadata, Self::Events> {
         let builder = RequestMetadataBuilder::from_events(&input);
         let finalizers = input.take_finalizers();
 
-        (finalizers, builder, input)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events: input,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        finalizers: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -99,7 +101,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     }
 }
 
-pub struct NewRelicSink<S> {
+pub(super) struct NewRelicSink<S> {
     pub service: S,
     pub encoder: NewRelicEncoder,
     pub credentials: Arc<NewRelicCredentials>,
@@ -120,7 +122,11 @@ where
             compression: self.compression,
             credentials: Arc::clone(&self.credentials),
         };
-        let protocol = get_http_scheme_from_uri(&self.credentials.get_uri());
+        let protocol = if self.credentials.get_uri().scheme_str() == Some("https") {
+            "https"
+        } else {
+            "http"
+        };
 
         input
             .batched(self.batcher_settings.as_byte_size_config())
@@ -129,7 +135,7 @@ where
                 |request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
                     match request {
                         Err(error) => {
-                            emit!(SinkRequestBuildError { error });
+                            emit(SinkRequestBuildError { error });
                             None
                         }
                         Ok(req) => Some(req),

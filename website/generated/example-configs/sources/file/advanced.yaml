@@ -1,0 +1,20 @@
+sources:
+  my_source_id:
+    type: file
+    data_dir: /var/local/lib/vector/
+    exclude:
+      - /var/log/binary-file.log
+    file_key: file
+    glob_minimum_cooldown_ms: 1000
+    host_key: hostname
+    ignore_checkpoints: false
+    ignore_not_found: false
+    ignore_older_secs: 600
+    include:
+      - /var/log/**/*.log
+    line_delimiter: "\n"
+    max_line_bytes: 102400
+    max_read_bytes: 2048
+    offset_key: offset
+    oldest_first: false
+    read_from: beginning

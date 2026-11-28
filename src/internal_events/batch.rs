@@ -1,9 +1,10 @@
-use metrics::counter;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, emit, error_stage,
+    error_type,
 };
+use vector_lib::{NamedInternalEvent, counter};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct LargeEventDroppedError {
     pub(crate) length: usize,
     pub max_length: usize,
@@ -20,12 +21,12 @@ impl InternalEvent for LargeEventDroppedError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "oversized",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::SENDING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

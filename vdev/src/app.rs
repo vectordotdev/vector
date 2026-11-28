@@ -13,7 +13,7 @@ use anyhow::{Context as _, Result, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 
-use crate::{config::Config, git, platform, util};
+use crate::utils;
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -30,15 +30,10 @@ pub static SHELL: LazyLock<OsString> =
     LazyLock::new(|| env::var_os("SHELL").unwrap_or_else(|| DEFAULT_SHELL.into()));
 
 static VERBOSITY: OnceLock<LevelFilter> = OnceLock::new();
-static CONFIG: OnceLock<Config> = OnceLock::new();
 static PATH: OnceLock<String> = OnceLock::new();
 
 pub fn verbosity() -> &'static LevelFilter {
     VERBOSITY.get().expect("verbosity is not initialized")
-}
-
-pub fn config() -> &'static Config {
-    CONFIG.get().expect("config is not initialized")
 }
 
 pub fn path() -> &'static String {
@@ -50,12 +45,12 @@ pub fn set_repo_dir() -> Result<()> {
 }
 
 pub fn version() -> Result<String> {
-    let mut version = util::get_version()?;
+    let mut version = utils::cargo::get_version()?;
 
-    let channel = util::get_channel();
+    let channel = utils::git::get_channel();
 
     if channel == "release" {
-        let head = util::git_head()?;
+        let head = utils::git::git_head()?;
         if !head.status.success() {
             let error = String::from_utf8_lossy(&head.stderr);
             bail!("Error running `git describe`:\n{error}");
@@ -69,7 +64,7 @@ pub fn version() -> Result<String> {
 
     // extend version for custom builds if not already
     } else if channel == "custom" && !version.contains("custom") {
-        let sha = git::get_git_sha()?;
+        let sha = utils::git::get_git_sha()?;
 
         // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
         // format requirements.
@@ -88,7 +83,6 @@ pub trait CommandExt {
     fn run(&mut self) -> Result<ExitStatus>;
     fn wait(&mut self, message: impl Into<Cow<'static, str>>) -> Result<()>;
     fn pre_exec(&self);
-    fn features(&mut self, features: &[String]) -> &mut Self;
 }
 
 impl CommandExt for Command {
@@ -181,17 +175,6 @@ impl CommandExt for Command {
             }
         }
     }
-
-    fn features(&mut self, features: &[String]) -> &mut Self {
-        self.arg("--no-default-features");
-        self.arg("--features");
-        if features.is_empty() {
-            self.arg(platform::default_features());
-        } else {
-            self.arg(features.join(","));
-        }
-        self
-    }
 }
 
 /// Helper function to build an error message from command output
@@ -212,26 +195,31 @@ fn format_command_error(
     }
 
     if let Some(description) = command_description {
-        let _ = writeln!(error_msg, "{description}");
+        writeln!(error_msg, "{description}").ok();
     }
 
-    let _ = write!(
+    write!(
         error_msg,
         "failed with exit code: {}",
         output.status.code().unwrap()
-    );
+    )
+    .ok();
 
     error_msg
 }
 
 /// Short-cut wrapper to create a new command, feed in the args, set the working directory, and then
 /// run it, checking the resulting exit code.
-pub fn exec<T: AsRef<OsStr>>(
-    program: &str,
+pub fn exec<P: AsRef<OsStr>, T: AsRef<OsStr>>(
+    program: P,
     args: impl IntoIterator<Item = T>,
     in_repo: bool,
 ) -> Result<()> {
-    let mut command = match program.strip_prefix("scripts/") {
+    let program = program.as_ref();
+    let mut command = match program
+        .to_str()
+        .and_then(|program| program.strip_prefix("scripts/"))
+    {
         Some(script) => Command::script(script),
         None => Command::new(program),
     };
@@ -256,10 +244,6 @@ fn get_progress_bar() -> Result<ProgressBar> {
 
 pub fn set_global_verbosity(verbosity: LevelFilter) {
     VERBOSITY.set(verbosity).expect("could not set verbosity");
-}
-
-pub fn set_global_config(config: Config) {
-    CONFIG.set(config).expect("could not set config");
 }
 
 pub fn set_global_path(path: String) {

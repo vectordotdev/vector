@@ -1,4 +1,12 @@
-use crate::{VALID_FIELD_REGEX, encoding::GelfChunker, gelf::GELF_TARGET_PATHS, gelf_fields::*};
+use crate::{
+    VALID_FIELD_REGEX,
+    encoding::GelfChunker,
+    gelf::GELF_TARGET_PATHS,
+    gelf_fields::{
+        FACILITY, FILE, FULL_MESSAGE, GELF_VERSION, HOST, LEVEL, LINE, SHORT_MESSAGE, TIMESTAMP,
+        VERSION,
+    },
+};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
 use ordered_float::NotNan;
@@ -78,21 +86,25 @@ pub struct GelfSerializerConfig {
 
 impl GelfSerializerConfig {
     /// Creates a new `GelfSerializerConfig`.
+    #[must_use]
     pub const fn new(options: GelfSerializerOptions) -> Self {
         Self { options }
     }
 
     /// Build the `GelfSerializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> GelfSerializer {
         GelfSerializer::new(self.options.clone())
     }
 
     /// The data type of events that are accepted by `GelfSerializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         // While technically we support `Value` variants that can't be losslessly serialized to
         // JSON, we don't want to enforce that limitation to users yet.
@@ -109,11 +121,23 @@ pub struct GelfSerializer {
 
 impl GelfSerializer {
     /// Creates a new `GelfSerializer`.
+    #[must_use]
     pub fn new(options: GelfSerializerOptions) -> Self {
         GelfSerializer { options }
     }
 
     /// Encode event and represent it as JSON value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event is not valid GELF and cannot be coerced into it: the `host`
+    /// field is missing, both `short_message` and the log schema message field are missing, a field
+    /// name contains characters other than word characters, `.`, `-`, or `@`, or a field value has
+    /// a type that GELF does not allow for that field.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the event is not a log event.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         // input_type() restricts the event type to LogEvents
         let log = to_gelf_event(event.into_log())?;
@@ -121,6 +145,7 @@ impl GelfSerializer {
     }
 
     /// Instantiates the GELF chunking configuration.
+    #[must_use]
     pub fn chunker(&self) -> GelfChunker {
         GelfChunker {
             max_chunk_size: self.options.max_chunk_size,
@@ -185,6 +210,11 @@ fn coerce_required_fields(mut log: LogEvent) -> vector_common::Result<LogEvent> 
 }
 
 /// Validates rules for field names and value types, coercing in some cases.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Preserve the existing floating-point representation of numeric values."
+)]
 fn coerce_field_names_and_values(
     mut log: LogEvent,
 ) -> vector_common::Result<(LogEvent, Vec<String>)> {
@@ -206,11 +236,15 @@ fn coerce_field_names_and_values(
                     if let Value::Timestamp(ts) = value {
                         let ts_millis = ts.timestamp_millis();
                         if ts_millis % 1000 != 0 {
-                            *value = Value::Float(NotNan::new(ts_millis as f64 / 1000.0).unwrap());
+                            // i64 to f64 / 1000.0 will never be NaN
+                            *value = Value::Float(
+                                NotNan::new(ts_millis as f64 / 1000.0)
+                                    .expect("i64 -> f64 produced NaN"),
+                            );
                         } else {
                             // keep full range of representable time if no milliseconds are set
                             // but still convert to numeric according to GELF protocol
-                            *value = Value::Integer(ts.timestamp())
+                            *value = Value::Integer(ts.timestamp());
                         }
                     }
                 }
@@ -262,7 +296,7 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
             for field in missing_prefix {
                 log.rename_key(
                     event_path!(field.as_str()),
-                    event_path!(format!("_{}", &field).as_str()),
+                    event_path!(format!("_{field}").as_str()),
                 );
             }
             log
@@ -277,7 +311,7 @@ mod tests {
     use chrono::NaiveDateTime;
     use vector_core::event::{Event, EventMetadata};
     use vrl::{
-        btreemap,
+        objectmap,
         value::{ObjectMap, Value},
     };
 
@@ -304,9 +338,11 @@ mod tests {
 
     #[test]
     fn gelf_serde_json_to_value_supported_success() {
-        let serializer = SerializerConfig::Gelf(Default::default()).build().unwrap();
+        let serializer = SerializerConfig::Gelf(GelfSerializerConfig::default())
+            .build()
+            .unwrap();
 
-        let event_fields = btreemap! {
+        let event_fields = objectmap! {
             VERSION => "1.1",
             HOST => "example.org",
             SHORT_MESSAGE => "Some message",
@@ -319,8 +355,10 @@ mod tests {
 
     #[test]
     fn gelf_serde_json_to_value_supported_failure_to_encode() {
-        let serializer = SerializerConfig::Gelf(Default::default()).build().unwrap();
-        let event_fields = btreemap! {};
+        let serializer = SerializerConfig::Gelf(GelfSerializerConfig::default())
+            .build()
+            .unwrap();
+        let event_fields = objectmap! {};
         let log_event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
         assert!(serializer.supports_json());
         assert!(serializer.to_json_value(log_event).is_err());
@@ -328,7 +366,7 @@ mod tests {
 
     #[test]
     fn gelf_serializing_valid() {
-        let event_fields = btreemap! {
+        let event_fields = objectmap! {
             VERSION => "1.1",
             HOST => "example.org",
             SHORT_MESSAGE => "Some message",
@@ -350,7 +388,7 @@ mod tests {
     fn gelf_serializing_coerced() {
         // no underscore
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 HOST => "example.org",
                 SHORT_MESSAGE => "Some message",
@@ -363,7 +401,7 @@ mod tests {
 
         // "message" => SHORT_MESSAGE
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 HOST => "example.org",
                 log_schema().message_key().unwrap().to_string() => "Some message",
@@ -375,6 +413,11 @@ mod tests {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::float_cmp,
+        reason = "Assert the exact floating-point value produced by this serialization fixture."
+    )]
     fn gelf_serializing_timestamp() {
         // floating point in case of sub second timestamp
         {
@@ -382,7 +425,7 @@ mod tests {
                 NaiveDateTime::parse_from_str("1970-01-01 00:00:00.1", "%Y-%m-%d %H:%M:%S%.f");
             let dt = naive_dt.unwrap().and_utc();
 
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
                 HOST => "example.org",
@@ -400,7 +443,7 @@ mod tests {
                 NaiveDateTime::parse_from_str("1970-01-01 00:00:00.0", "%Y-%m-%d %H:%M:%S%.f");
             let dt = naive_dt.unwrap().and_utc();
 
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
                 HOST => "example.org",
@@ -417,7 +460,7 @@ mod tests {
     fn gelf_serializing_invalid_error() {
         // no host
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
             };
@@ -425,7 +468,7 @@ mod tests {
         }
         // no message
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
             };
@@ -433,7 +476,7 @@ mod tests {
         }
         // expected string
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => 0,
@@ -442,7 +485,7 @@ mod tests {
         }
         // expected integer
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
@@ -452,7 +495,7 @@ mod tests {
         }
         // expected float
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
@@ -462,7 +505,7 @@ mod tests {
         }
         // invalid field name
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
@@ -472,7 +515,7 @@ mod tests {
         }
         // invalid additional value type - bool
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
@@ -482,7 +525,7 @@ mod tests {
         }
         // invalid additional value type - null
         {
-            let event_fields = btreemap! {
+            let event_fields = objectmap! {
                 HOST => "example.org",
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",

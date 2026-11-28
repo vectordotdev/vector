@@ -712,3 +712,33 @@ $dark-default-text-color: $gray-200
 
     // TextWhitespace
     .w
+
+// Build-time Syntect highlighting uses semantic VRL classes in both themes.
+// Code blocks have the same dark background in light and dark mode.
+.chroma .language-vrl
+  .vrl-comment
+    color: $gray-400
+
+  .vrl-function
+    color: $blue-300
+
+  .vrl-property
+    color: $emerald-300
+
+  .vrl-variable, .vrl-variable-parameter
+    color: $gray-200
+
+  .vrl-variable-builtin, .vrl-constant, .vrl-boolean, .vrl-number
+    color: $purple-300
+
+  .vrl-string
+    color: $emerald-300
+
+  .vrl-string-regexp, .vrl-string-escape
+    color: $pink-400
+
+  .vrl-keyword, .vrl-operator
+    color: $pink-400
+
+  .vrl-punctuation
+    color: $gray-300

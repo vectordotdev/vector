@@ -1,11 +1,13 @@
-use metrics::counter;
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 use super::prelude::{http_error_code, io_error_code};
 use crate::sources::aws_kinesis_firehose::Compression;
 
-#[derive(Debug)]
-pub struct AwsKinesisFirehoseRequestReceived<'a> {
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct AwsKinesisFirehoseRequestReceived<'a> {
     pub request_id: Option<&'a str>,
     pub source_arn: Option<&'a str>,
 }
@@ -20,15 +22,15 @@ impl InternalEvent for AwsKinesisFirehoseRequestReceived<'_> {
     }
 }
 
-#[derive(Debug)]
-pub struct AwsKinesisFirehoseRequestError<'a> {
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct AwsKinesisFirehoseRequestError<'a> {
     request_id: Option<&'a str>,
     error_code: String,
     error: &'a str,
 }
 
 impl<'a> AwsKinesisFirehoseRequestError<'a> {
-    pub fn new(code: hyper::StatusCode, error: &'a str, request_id: Option<&'a str>) -> Self {
+    pub(crate) fn new(code: http::StatusCode, error: &'a str, request_id: Option<&'a str>) -> Self {
         Self {
             error_code: http_error_code(code.as_u16()),
             error,
@@ -48,7 +50,7 @@ impl InternalEvent for AwsKinesisFirehoseRequestError<'_> {
             request_id = %self.request_id.unwrap_or(""),
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
             "error_code" => self.error_code,
@@ -57,8 +59,8 @@ impl InternalEvent for AwsKinesisFirehoseRequestError<'_> {
     }
 }
 
-#[derive(Debug)]
-pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct AwsKinesisFirehoseAutomaticRecordDecodeError {
     pub compression: Compression,
     pub error: std::io::Error,
 }
@@ -74,7 +76,7 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
             compression = %self.compression,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
             "error_code" => io_error_code(&self.error),

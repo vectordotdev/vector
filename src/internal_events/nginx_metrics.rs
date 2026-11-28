@@ -1,13 +1,13 @@
-use metrics::counter;
 use vector_lib::{
-    internal_event::{InternalEvent, error_stage, error_type},
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
 use crate::sources::nginx_metrics::parser::ParseError;
 
-#[derive(Debug)]
-pub struct NginxMetricsEventsReceived<'a> {
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct NginxMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
     pub endpoint: &'a str,
@@ -22,19 +22,20 @@ impl InternalEvent for NginxMetricsEventsReceived<'_> {
             endpoint = self.endpoint,
         );
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.byte_size.get() as u64);
     }
 }
 
-pub struct NginxMetricsRequestError<'a> {
+#[derive(NamedInternalEvent)]
+pub(crate) struct NginxMetricsRequestError<'a> {
     pub error: crate::Error,
     pub endpoint: &'a str,
 }
@@ -49,7 +50,7 @@ impl InternalEvent for NginxMetricsRequestError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "endpoint" => self.endpoint.to_owned(),
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -58,6 +59,7 @@ impl InternalEvent for NginxMetricsRequestError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub(crate) struct NginxMetricsStubStatusParseError<'a> {
     pub error: ParseError,
     pub endpoint: &'a str,
@@ -73,7 +75,7 @@ impl InternalEvent for NginxMetricsStubStatusParseError<'_> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "endpoint" => self.endpoint.to_owned(),
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,

@@ -1,11 +1,14 @@
-use std::{collections::HashMap, collections::HashSet, process::Command};
+use std::{
+    collections::{HashMap, HashSet},
+    process::Command,
+};
 
 use anyhow::Result;
 use clap::Args;
 use itertools::Itertools as _;
 use regex::Regex;
 
-use crate::{app::CommandExt as _, util};
+use crate::{app::CommandExt as _, utils};
 
 /// Show information about crates versions pulled in by all dependencies
 #[derive(Args, Debug)]
@@ -15,22 +18,34 @@ pub struct Cli {
     #[arg(long)]
     all: bool,
 
-    /// The feature to active (multiple allowed). If none are specified, the default is used.
-    #[arg(short = 'F', long)]
-    feature: Vec<String>,
+    /// Features to activate (comma-separated, or set FEATURES env var)
+    #[arg(short = 'F', long, value_delimiter = ',', env = "FEATURES")]
+    features: Vec<String>,
+
+    #[arg(long)]
+    no_default_features: bool,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let re_crate = Regex::new(r" (\S+) v([0-9.]+)").unwrap();
         let mut versions: HashMap<String, HashSet<String>> = HashMap::default();
+        let features: Vec<String> = self
+            .features
+            .into_iter()
+            .filter(|f| !f.is_empty())
+            .collect();
 
-        for line in Command::new("cargo")
-            .arg("tree")
-            .features(&self.feature)
-            .check_output()?
-            .lines()
-        {
+        let mut cmd = Command::new("cargo");
+        cmd.arg("tree");
+        if self.no_default_features {
+            cmd.arg("--no-default-features");
+        }
+        if !features.is_empty() {
+            cmd.args(["--features", &features.join(",")]);
+        }
+
+        for line in cmd.check_output()?.lines() {
             if let Some(captures) = re_crate.captures(line) {
                 let package = &captures[1];
                 let version = &captures[2];
@@ -46,7 +61,7 @@ impl Cli {
         }
 
         let width = versions.keys().map(String::len).max().unwrap_or(0).max(7);
-        if *util::IS_A_TTY {
+        if *utils::IS_A_TTY {
             println!("{:width$}  Version(s)", "Package");
             println!("{:width$}  ----------", "-------");
         }

@@ -1,26 +1,56 @@
-use crate::app::CommandExt as _;
-use crate::util;
-use anyhow::{anyhow, Ok, Result};
+use std::{path::PathBuf, process::Command};
+
+use anyhow::{Context, Result, anyhow};
 use glob::glob;
-use std::process::Command;
+use semver::Version;
+
+use super::release_notes;
+use crate::{
+    app::CommandExt as _,
+    utils::{cargo, paths},
+};
 
 /// Uploads target/artifacts to GitHub releases
 #[derive(clap::Args, Debug)]
 #[command()]
-pub struct Cli {}
+pub struct Cli {
+    /// Print the release description instead of creating the GitHub release
+    #[arg(long)]
+    dry_run: bool,
+
+    /// Path to the release notes Handlebars template. Relative paths resolve against the
+    /// repository root. Defaults to `vdev/src/commands/release/release_notes.hbs`.
+    #[arg(long, env = "VDEV_RELEASE_NOTES_TEMPLATE")]
+    template: Option<PathBuf>,
+}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        let repo_root = paths::find_repo_root()?;
+        let version = cargo::get_version()?;
+        let parsed_version = Version::parse(&version)
+            .with_context(|| format!("Invalid release version {version:?}"))?;
+        let notes = release_notes::generate(
+            &repo_root,
+            &parsed_version,
+            self.template.as_deref(),
+            release_notes::Target::Github,
+        )?;
+
+        if self.dry_run {
+            println!("{notes}");
+            return Ok(());
+        }
+
         let artifacts = glob("target/artifacts/*")
             .expect("failed to read glob pattern")
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| anyhow!("failed to read path: {}", e))?
+            .map_err(|e| anyhow!("failed to read path: {e}"))?
             .into_iter()
             .map(|p| p.into_os_string().into_string())
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| anyhow!("failed to turn path into string: {:?}", e))?;
+            .map_err(|e| anyhow!("failed to turn path into string: {}", e.to_string_lossy()))?;
 
-        let version = util::get_version()?;
         let mut command = Command::new("gh");
         command.in_repo();
         command.args(
@@ -33,7 +63,7 @@ impl Cli {
                 "--title",
                 &format!("v{version}"),
                 "--notes",
-                &format!("[View release notes](https://vector.dev/releases/{version})"),
+                &notes,
             ]
             .map(String::from)
             .into_iter()

@@ -1,0 +1,342 @@
+//! Git utilities
+
+use std::{collections::HashSet, fs, path::Path, process::Command};
+
+use anyhow::{Context, Result, anyhow, bail, ensure};
+use git2::{BranchType, ErrorCode, Repository};
+use regex::Regex;
+use semver::Version;
+
+use crate::app::CommandExt as _;
+
+pub const MASTER_BRANCH: &str = "master";
+
+/// Get the git HEAD tag if it exists
+pub fn git_head() -> Result<std::process::Output> {
+    Command::new("git")
+        .args(["describe", "--exact-match", "--tags", "HEAD"])
+        .output()
+        .context("Could not execute `git`")
+}
+
+/// Get the release channel from environment or default to "custom"
+pub fn get_channel() -> String {
+    std::env::var("CHANNEL").unwrap_or_else(|_| "custom".to_string())
+}
+
+pub fn current_branch() -> Result<String> {
+    let output = run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
+    Ok(output.trim_end().to_string())
+}
+
+pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
+    if branch_exists(branch_name)? {
+        checkout_branch(branch_name)?;
+    } else {
+        create_branch(branch_name)?;
+    }
+    Ok(())
+}
+
+pub fn changed_files() -> Result<Vec<String>> {
+    let mut files = HashSet::new();
+
+    // Use name-only output so renames and copies yield their destination path.
+    let base = format!("origin/{MASTER_BRANCH}...");
+    let output = run_and_check_output(&["diff", "--name-only", &base])?;
+    for line in output.lines() {
+        if !is_warning_line(line) {
+            files.insert(line.to_string());
+        }
+    }
+
+    // Tracked
+    let output = run_and_check_output(&["diff", "--name-only", "HEAD"])?;
+    for line in output.lines() {
+        if !is_warning_line(line) {
+            files.insert(line.to_string());
+        }
+    }
+
+    // Untracked
+    let output = run_and_check_output(&["ls-files", "--others", "--exclude-standard"])?;
+    for line in output.lines() {
+        files.insert(line.to_string());
+    }
+
+    let mut sorted = Vec::from_iter(files);
+    sorted.sort();
+
+    Ok(sorted)
+}
+
+pub fn list_files() -> Result<Vec<String>> {
+    Ok(run_and_check_output(&["ls-files"])?
+        .lines()
+        .map(str::to_owned)
+        .collect())
+}
+
+pub fn get_git_sha() -> Result<String> {
+    run_and_check_output(&["rev-parse", "--short", "HEAD"])
+        .map(|output| output.trim_end().to_string())
+}
+
+pub fn ensure_sha(value: &str, label: &str) -> Result<()> {
+    ensure!(
+        value.len() == 40
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+        "{label} must be a 40-character lowercase hexadecimal SHA"
+    );
+    Ok(())
+}
+
+pub fn ensure_worktree_clean() -> Result<()> {
+    ensure!(
+        run_and_check_output(&["status", "--porcelain"])?.is_empty(),
+        "working tree must be clean"
+    );
+    Ok(())
+}
+
+/// Get a list of files that have been modified, as a vector of strings
+pub fn get_modified_files() -> Result<Vec<String>> {
+    let args = vec![
+        "ls-files",
+        "--full-name",
+        "--modified",
+        "--others",
+        "--exclude-standard",
+    ];
+    Ok(run_and_check_output(&args)?
+        .lines()
+        .map(str::to_owned)
+        .collect())
+}
+
+/// Get a list of files that differ from HEAD, including staged and untracked files.
+pub fn get_files_changed_from_head() -> Result<Vec<String>> {
+    let mut files = HashSet::new();
+
+    let output = run_and_check_output(&["diff", "--name-only", "HEAD"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let output = run_and_check_output(&["ls-files", "--others", "--exclude-standard"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let mut files = Vec::from_iter(files);
+    files.sort();
+    Ok(files)
+}
+
+pub fn add_files_in_current_dir() -> Result<String> {
+    Command::new("git").args(["add", "."]).check_output()
+}
+
+/// Commits changes from the current repo
+pub fn commit(commit_message: &str) -> Result<String> {
+    Command::new("git")
+        .args(["commit", "--all", "--message", commit_message])
+        .check_output()
+}
+
+/// Returns the latest semver release tag (e.g. `0.55.0`), ignoring `vdev-v…` tags.
+pub fn latest_release_version() -> Result<semver::Version> {
+    let output = Command::new("git")
+        .args(["tag", "--list", "--sort=-v:refname"])
+        .check_output()?;
+    let re = regex::Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
+    for tag in output.lines() {
+        if tag.starts_with("vdev-v") {
+            continue;
+        }
+        if re.is_match(tag) {
+            return semver::Version::parse(tag.trim_start_matches('v'))
+                .context("Failed to parse version from tag");
+        }
+    }
+    anyhow::bail!("No valid semantic version tag found")
+}
+
+/// Returns the highest semantic version tag matching a pattern in a remote repository.
+pub fn highest_release_tag(repo: &str, pattern: &Regex) -> Result<String> {
+    let output = Command::new("git")
+        .args(["ls-remote", "--tags", "--refs", repo])
+        .check_output()
+        .with_context(|| format!("Could not list tags in {repo}"))?;
+    let tags = tags_from_ls_remote(&output);
+    select_highest_tag(tags, pattern)
+        .with_context(|| format!("Could not select a release from {repo}"))
+}
+
+fn tags_from_ls_remote(output: &str) -> impl Iterator<Item = &str> {
+    output.lines().filter_map(|line| {
+        let (_object, reference) = line.split_once('\t')?;
+        reference.strip_prefix("refs/tags/")
+    })
+}
+
+fn select_highest_tag<'a>(
+    tags: impl IntoIterator<Item = &'a str>,
+    pattern: &Regex,
+) -> Result<String> {
+    let mut highest: Option<(Version, &str)> = None;
+    for tag in tags.into_iter().filter(|tag| pattern.is_match(tag)) {
+        let version = version_of(tag)?;
+        if highest
+            .as_ref()
+            .is_none_or(|(current, _)| version > *current)
+        {
+            highest = Some((version, tag));
+        }
+    }
+    highest
+        .map(|(_, tag)| tag.to_string())
+        .with_context(|| format!("no tag matched the release pattern {}", pattern.as_str()))
+}
+
+fn version_of(tag: &str) -> Result<Version> {
+    let bare = tag.strip_prefix('v').unwrap_or(tag);
+    Version::parse(bare).with_context(|| format!("release tag {tag} is not a semantic version"))
+}
+
+/// Pushes changes from the current repo
+pub fn push() -> Result<String> {
+    Command::new("git").args(["push"]).check_output()
+}
+
+pub fn push_and_set_upstream(branch_name: &str) -> Result<String> {
+    Command::new("git")
+        .args(["push", "-u", "origin", branch_name])
+        .check_output()
+}
+
+/// Walks up from the current working directory until it finds a `.git`
+/// and opens that repo.  Panics (Err) if none is found.
+fn find_repo() -> Result<Repository, git2::Error> {
+    Repository::discover(".")
+}
+
+pub fn branch_exists(branch: &str) -> Result<bool> {
+    let repo = find_repo()?;
+
+    // Do the lookup inside its own scope so the temporary Branch<'_> is dropped
+    // before we try to drop `repo` at function exit.
+    let exists = {
+        match repo.find_branch(branch, BranchType::Local) {
+            Ok(_) => true,
+            Err(e) if e.code() == ErrorCode::NotFound => false,
+            Err(e) => bail!(e),
+        }
+    };
+
+    Ok(exists)
+}
+
+pub fn checkout_branch(branch_name: &str) -> Result<()> {
+    let _output = run_and_check_output(&["checkout", branch_name])?;
+    Ok(())
+}
+
+pub fn checkout_main_branch() -> Result<()> {
+    let _output = run_and_check_output(&["switch", MASTER_BRANCH])?;
+    Ok(())
+}
+
+pub fn create_branch(branch_name: &str) -> Result<()> {
+    let repo = find_repo()?;
+
+    let head_ref = repo.head()?;
+    let target_oid = head_ref
+        .target()
+        .ok_or_else(|| anyhow!("HEAD is not pointing at a valid commit"))?;
+    let target_commit = repo.find_commit(target_oid)?;
+
+    let branch = repo.branch(branch_name, &target_commit, false)?;
+    let reference = branch.into_reference();
+    let full_ref_name = reference
+        .name()
+        .context("branch reference name is not valid UTF-8")?;
+    repo.set_head(full_ref_name)?;
+    repo.checkout_head(None)?;
+
+    Ok(())
+}
+
+pub fn run_and_check_output(args: &[&str]) -> Result<String> {
+    Command::new("git").in_repo().args(args).check_output()
+}
+
+/// Sparse-checkout only `docs/generated` from a repo at the given commit.
+pub fn sparse_checkout_docs(sha: &str, repo_url: &str, clone_dir: &Path) -> Result<()> {
+    fs::create_dir_all(clone_dir)?;
+
+    let git = |args: &[&str]| -> Result<String> {
+        Command::new("git")
+            .current_dir(clone_dir)
+            .args(args)
+            .check_output()
+    };
+
+    git(&["init"])?;
+    git(&["remote", "add", "origin", repo_url])?;
+    git(&["config", "core.sparseCheckout", "true"])?;
+
+    let sparse_file = clone_dir.join(".git").join("info").join("sparse-checkout");
+    fs::create_dir_all(sparse_file.parent().unwrap())?;
+    fs::write(&sparse_file, "docs/generated\n")
+        .context("Failed to write sparse-checkout config")?;
+
+    git(&["fetch", "--depth", "1", "origin", sha])?;
+    git(&["checkout", "FETCH_HEAD"])?;
+
+    Ok(())
+}
+
+fn is_warning_line(line: &str) -> bool {
+    line.starts_with("warning: ") || line.contains("original line endings")
+}
+
+/// Returns a list of tracked files. If `pattern` is specified, it filters using that pattern.
+pub fn git_ls_files(pattern: Option<&str>) -> Result<Vec<String>> {
+    let args = match pattern {
+        Some(p) => vec!["ls-files", p],
+        None => vec!["ls-files"],
+    };
+
+    let output = run_and_check_output(&args)?;
+    Ok(output.lines().map(str::to_owned).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selects_highest_stable_tag() {
+        let pattern = Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
+        let tag = select_highest_tag(
+            ["v1.9.0", "v1.10.0", "v1.2.0", "v1.10.0-rc.1", "main"],
+            &pattern,
+        )
+        .unwrap();
+        assert_eq!(tag, "v1.10.0");
+    }
+
+    #[test]
+    fn selects_highest_numeric_tag() {
+        let pattern = Regex::new(r"^[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
+        let tag =
+            select_highest_tag(["7.9.0", "7.10.0", "7.83.3", "7.83.3-rc.1"], &pattern).unwrap();
+        assert_eq!(tag, "7.83.3");
+    }
+
+    #[test]
+    fn parses_ls_remote_tags() {
+        let output = "abc\trefs/tags/v1.1.0\ndef\trefs/tags/v1.1.0^{}\n";
+        let tags: Vec<_> = tags_from_ls_remote(output).collect();
+        assert_eq!(tags, ["v1.1.0", "v1.1.0^{}"]);
+    }
+}

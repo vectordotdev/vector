@@ -20,10 +20,15 @@ struct Param {
 
 impl fmt::Display for Param {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.slug,)
+        write!(f, "{}", self.slug)
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::default_trait_access,
+    reason = "Keep inferred defaults where concrete type names need a separate import or API cleanup."
+)]
 fn reduce(c: &mut Criterion) {
     let mut group: BenchmarkGroup<WallTime> =
         c.benchmark_group("vector::transforms::reduce::Reduce");
@@ -36,7 +41,7 @@ fn reduce(c: &mut Criterion) {
     {
         let param = &Param {
             slug: "proof_of_concept",
-            input: fixed_stream.clone(),
+            input: fixed_stream,
             reduce_config: ReduceConfig {
                 expire_after_ms: Duration::from_secs(30),
                 end_every_period_ms: None,
@@ -54,17 +59,22 @@ fn reduce(c: &mut Criterion) {
                 .iter_batched(
                     || {
                         let reduce = Transform::event_task(
-                            Reduce::new(&param.reduce_config, &Default::default()).unwrap(),
+                            Reduce::new(
+                                &param.reduce_config,
+                                &Default::default(),
+                                &Default::default(),
+                            )
+                            .unwrap(),
                         )
                         .into_task();
                         (Box::new(reduce), Box::pin(param.input.clone()))
                     },
                     |(reduce, input)| async {
                         let output = reduce.transform_events(input);
-                        consume(output)
+                        consume(output);
                     },
                     BatchSize::SmallInput,
-                )
+                );
         });
     }
 }
@@ -73,7 +83,7 @@ criterion_group!(
     name = benches;
     config = Criterion::default()
         .warm_up_time(Duration::from_secs(5))
-        .measurement_time(Duration::from_secs(120))
+        .measurement_time(Duration::from_mins(2))
         // degree of noise to ignore in measurements, here 1%
         .noise_threshold(0.01)
         // likelihood of noise registering as difference, here 5%

@@ -17,12 +17,14 @@ added new `decoding` options to [most sources][9404].
 For example, if you have a `kafka` source that has JSON-encoded messages, now
 you can simply add `decoding.codec = "json"` to your source configuration like:
 
-```toml
-[sources.kafka]
-type = "kafka"
-bootstrap_servers = "localhost:9200"
-topics = ["my_topic"]
-decoding.codec = "json"
+```yaml
+sources:
+  kafka:
+    type: "kafka"
+    bootstrap_servers: "localhost:9200"
+    topics: ["my_topic"]
+    decoding:
+      codec: "json"
 ```
 
 This will decode your messages from JSON, thus saving you from an additional
@@ -35,12 +37,15 @@ separating messages).
 For example, if you have an `http` source where the messages are delimited by
 commas instead of newlines, you can configure this like:
 
-```toml
-[sources.http]
-type = "http"
-address = "0.0.0.0:8080"
-framing.method = "character_delimited"
-framing.character_delimited.delimiter = ","
+```yaml
+sources:
+  http:
+    type: "http"
+    address: "0.0.0.0:8080"
+    framing:
+      method: "character_delimited"
+      character_delimited:
+        delimiter: ","
 ```
 
 To have Vector parse each comma-delimited element as a new message. This can be

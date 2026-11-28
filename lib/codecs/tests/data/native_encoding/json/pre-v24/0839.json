@@ -1,1 +1,0 @@
-{"metric":{"name":"_","namespace":"w","tags":{"a":"w"},"kind":"incremental","distribution":{"samples":[{"value":-988928.0,"rate":645316511},{"value":558464.0,"rate":247277823},{"value":-347328.0,"rate":1898288274},{"value":-828992.0,"rate":3055439500},{"value":815360.0,"rate":2626393648}],"statistic":"summary"}}}

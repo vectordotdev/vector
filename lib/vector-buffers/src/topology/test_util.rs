@@ -3,7 +3,9 @@ use std::{error, fmt, num::NonZeroUsize};
 use bytes::{Buf, BufMut};
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    finalization::{AddBatchNotifier, BatchNotifier},
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable, MergeFinalizable,
+    },
 };
 
 use super::builder::TopologyBuilder;
@@ -53,6 +55,18 @@ impl Sample {
 impl AddBatchNotifier for Sample {
     fn add_batch_notifier(&mut self, batch: BatchNotifier) {
         drop(batch); // We never check acknowledgements for this type
+    }
+}
+
+impl Finalizable for Sample {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        EventFinalizers::DEFAULT
+    }
+}
+
+impl MergeFinalizable for Sample {
+    fn merge_finalizers(&mut self, _finalizers: EventFinalizers) {
+        // We never check acknowledgements for this type.
     }
 }
 
@@ -120,6 +134,8 @@ impl EventCount for Sample {
     }
 }
 
+impl Bufferable for Sample {}
+
 #[derive(Debug)]
 #[allow(dead_code)] // The inner _is_ read by the `Debug` impl, but that's ignored
 pub struct BasicError(pub(crate) String);
@@ -137,7 +153,7 @@ impl error::Error for BasicError {}
 /// If `mode` is set to `WhenFull::Overflow`, then the buffer will be set to overflow mode, with
 /// another in-memory channel buffer being used as the overflow buffer.  The overflow buffer will
 /// also use the same capacity as the outer buffer.
-pub(crate) async fn build_buffer(
+pub(crate) fn build_buffer(
     capacity: usize,
     mode: WhenFull,
     overflow_mode: Option<WhenFull>,
@@ -154,27 +170,25 @@ pub(crate) async fn build_buffer(
                 NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
                 overflow_mode,
                 handle.clone(),
-            )
-            .await;
+                None,
+            );
             let (mut base_sender, mut base_receiver) = TopologyBuilder::standalone_memory_test(
                 NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
                 WhenFull::Overflow,
                 handle.clone(),
-            )
-            .await;
+                None,
+            );
             base_sender.switch_to_overflow(overflow_sender);
             base_receiver.switch_to_overflow(overflow_receiver);
 
             (base_sender, base_receiver)
         }
-        m => {
-            TopologyBuilder::standalone_memory_test(
-                NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
-                m,
-                handle.clone(),
-            )
-            .await
-        }
+        m => TopologyBuilder::standalone_memory_test(
+            NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
+            m,
+            handle.clone(),
+            None,
+        ),
     };
 
     (tx, rx, handle)

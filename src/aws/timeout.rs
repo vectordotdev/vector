@@ -9,6 +9,11 @@ use vector_lib::configurable::configurable_component;
 #[derive(Copy, Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::struct_field_names,
+    reason = "Preserve existing field names and their configuration or API contracts."
+)]
 pub struct AwsTimeout {
     /// The connection timeout for AWS requests
     ///
@@ -48,16 +53,19 @@ pub struct AwsTimeout {
 
 impl AwsTimeout {
     /// returns the connection timeout
+    #[must_use]
     pub const fn connect_timeout(&self) -> Option<u64> {
         self.connect_timeout
     }
 
     /// returns the operation timeout
+    #[must_use]
     pub const fn operation_timeout(&self) -> Option<u64> {
         self.operation_timeout
     }
 
     /// returns the read timeout
+    #[must_use]
     pub const fn read_timeout(&self) -> Option<u64> {
         self.read_timeout
     }
@@ -69,13 +77,11 @@ mod tests {
 
     #[test]
     fn parsing_timeout_configuration() {
-        let config = toml::from_str::<AwsTimeout>(
-            r"
-            connect_timeout_seconds = 20
-            operation_timeout_seconds = 20
-            read_timeout_seconds = 60
-        ",
-        )
+        let config = serde_yaml::from_str::<AwsTimeout>(indoc::indoc! {r"
+            connect_timeout_seconds: 20
+            operation_timeout_seconds: 20
+            read_timeout_seconds: 60
+        "})
         .unwrap();
 
         assert_eq!(config.connect_timeout, Some(20));

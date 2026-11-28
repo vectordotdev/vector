@@ -31,7 +31,7 @@ Instances with at least 8 vCPUs and 16 GiB of memory are good units for scaling.
 | Cloud | Recommendations |
 | --- | --- |
 | AWS | c6i.2xlarge (recommended) or c6g.2xlarge |
-| Azure | f8 |
+| Azure | f8  or  D8plds_v6 |
 | GCP | c2 (8 vCPUs, 16 GiB memory) |
 
 #### CPUs
@@ -46,8 +46,8 @@ The `ARM64` architecture typically offers better performance for the investment 
 | Cloud | Recommendations |
 | --- | --- |
 | AWS | Latest generation Graviton (recommended) or Intel Xeon, ≥8 vCPUs |
-| Azure | Latest generation Intel Xeon, ≥8 vCPUs |
-| GCP | Latests generation Intel Xeon, ≥8 vCPUs |
+| Azure | Latest generation Cobalt (recommended) or Intel Xeon, ≥8 vCPUs |
+| GCP | Latest generation Intel Xeon, ≥8 vCPUs |
 
 #### Memory
 

@@ -33,7 +33,7 @@ You have three options for handling errors in VRL:
 As documented in the [assignment expression reference][assign], you can **assign** errors when
 invoking an expression that's fallible. When assigned, runtime errors are simple strings:
 
-```coffee
+```vrl
 structured, err = parse_json("not json")
 if err != null {
   log("Unable to parse JSON: " + err, level: "error")
@@ -44,7 +44,7 @@ if err != null {
 
 If the expression fails, the `ok` assignment target is assigned the "empty" value of its type:
 
-```coffee
+```vrl
 # `.foo` can be `100` or `"not an int"`
 foo, err = to_int(.foo)
 
@@ -64,24 +64,24 @@ of an infallible assignment.
 
 ##### Empty values
 
-Type | Empty value
-:----|:-----------
-String | `""`
-Integer | `0`
-Float | `0.0`
-Boolean | `false`
-Object | `{}`
-Array | `[]`
-Timestamp | `t'1970-01-01T00:00:00Z'` (Unix epoch)
-Regular expression | `r''`
-Null | `null`
+| Type | Empty value |
+| :---- | :----------- |
+| String | `""` |
+| Integer | `0` |
+| Float | `0.0` |
+| Boolean | `false` |
+| Object | `{}` |
+| Array | `[]` |
+| Timestamp | `t'1970-01-01T00:00:00Z'` (Unix epoch) |
+| Regular expression | `r''` |
+| Null | `null` |
 
 #### Coalescing
 
 As documented in the [coalesce expression reference][coalesce], you can **coalesce** errors to
 efficiently step through multiple expressions:
 
-```coffee
+```vrl
 structured = parse_json("not json") ?? parse_syslog("not syslog") ?? {}
 . = merge(., structured)
 ```
@@ -91,7 +91,7 @@ structured = parse_json("not json") ?? parse_syslog("not syslog") ?? {}
 As documented in the [function call reference][call], you can **raise** errors to immediately abort
 the program by adding a `!` to the end of the function name:
 
-```coffee
+```vrl
 structured = parse_json!("not json")
 . = merge(., structured)
 ```

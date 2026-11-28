@@ -1,38 +1,53 @@
 # Cleanup GHCR Images
 #
-# This workflow cleans up old images from GitHub Container Registry
-# to prevent unlimited storage growth. It runs weekly and removes:
-# 1. Untagged images from all packages (intermediate build artifacts)
-# 2. Old test-runner versions (keeps 50 most recent, deletes up to 50 oldest)
+# Weekly cleanup: keep five test-runner versions and remove dated nightlies
+# older than 14 days, including their unreferenced multi-platform children.
 
-name: Cleanup Untagged GHCR Images
+name: Cleanup GHCR Images
 
 on:
   schedule:
-    # Run weekly on Sundays at 2 AM UTC
-    - cron: '0 2 * * 0'
+    # Sundays at 2 AM UTC
+    - cron: "0 2 * * 0"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview nightly cleanup without deleting any images"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read # Restrictive default
 
 jobs:
-  cleanup:
-    runs-on: ubuntu-latest
+  cleanup-test-runner:
+    if: ${{ github.repository == 'vectordotdev/vector' && !inputs.dry_run }}
+    runs-on: ubuntu-24.04
     permissions:
-      packages: write
-      contents: read
+      packages: write # Required to delete package versions from GHCR
     steps:
-      - name: Delete untagged vector images
+      - name: Delete old test-runner images
         uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
         with:
-          package-name: vector
-          package-type: container
-          min-versions-to-keep: 0
-          delete-only-untagged-versions: true
-        continue-on-error: true
-
-      - name: Delete old vector-test-runner images
-        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
-        with:
-          package-name: test-runner
+          package-name: vector/test-runner
           package-type: container
           min-versions-to-keep: 5
-          num-old-versions-to-delete: 50
+
+  cleanup-nightlies:
+    if: ${{ github.repository == 'vectordotdev/vector' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: ghcr-nightly-cleanup
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Delete nightly images older than 14 days
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          package: vector
+          delete-tags: nightly-????-??-??-*
+          older-than: 14 days
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}

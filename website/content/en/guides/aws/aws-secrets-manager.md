@@ -16,7 +16,7 @@ Before you begin, ensure you have:
 - An AWS account with access to AWS Secrets Manager.
 - Appropriate AWS IAM permissions to read secrets.
 - Vector v0.38.0 or higher installed.
-- Vector compiled with the `secrets-aws-secrets-manager` feature (enabled by default in most distributions).
+- Vector compiled with the `secrets-aws_secrets_manager` feature (enabled by default in most distributions).
 
 ## Setting up AWS Secrets Manager
 
@@ -113,12 +113,15 @@ sources:
 sinks:
   my_api_sink:
     type: http
+    inputs:
+      - my_database
     uri: "https://api.example.com/events"
     encoding:
       codec: json
-    headers:
-      Authorization: "Bearer SECRET[my_aws_secrets.oauth_token]"
-      X-API-Key: "SECRET[my_aws_secrets.api_key]"
+    request:
+      headers:
+        Authorization: "Bearer SECRET[my_aws_secrets.oauth_token]"
+        X-API-Key: "SECRET[my_aws_secrets.api_key]"
 ```
 
 ### 3. Complete example
@@ -149,8 +152,9 @@ sinks:
       - app_logs
     encoding:
       codec: json
-    headers:
-      Authorization: "Bearer SECRET[production_secrets.api_token]"
+    request:
+      headers:
+        Authorization: "Bearer SECRET[production_secrets.api_token]"
 ```
 
 ## Configuration options
@@ -224,14 +228,8 @@ Vector retrieves the entire secret and makes individual key-value pairs availabl
 
 Enable debug logging to see more details about secret retrieval:
 
-```yaml
-api:
-  enabled: true
-  address: "0.0.0.0:8686"
-
-# Add debug logging
-log:
-  level: debug
+```bash
+VECTOR_LOG=debug vector --config vector.yaml
 ```
 
 Check Vector logs for messages related to secret retrieval:
@@ -255,5 +253,5 @@ vector --config vector.yaml 2>&1 | grep -i secret
 ## Related resources
 
 - [AWS Secrets Manager Documentation](https://docs.aws.amazon.com/secretsmanager/)
-- [Vector Secrets Management Overview](/docs/reference/configuration/global-options/#secret)
-- [AWS Authentication in Vector](/docs/reference/configuration/components/aws/)
+- [Vector Secrets Management Overview](/docs/reference/configuration/secrets/#secret)
+- [AWS Authentication in Vector](/docs/reference/configuration/sinks/aws_s3/#auth)

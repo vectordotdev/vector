@@ -3,7 +3,6 @@ use std::{
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -18,7 +17,7 @@ use tokio::{
 use tokio_util::codec::Encoder;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
-    json_size::JsonSize,
+    internal_event::emit, json_size::JsonSize,
 };
 
 use crate::{
@@ -65,10 +64,8 @@ pub struct TcpSinkConfig {
     #[configurable(metadata(docs::examples = "https://somehost:5000"))]
     address: String,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
     /// The size of the socket's send buffer.
@@ -80,6 +77,7 @@ pub struct TcpSinkConfig {
 }
 
 impl TcpSinkConfig {
+    #[must_use]
     pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
@@ -94,6 +92,7 @@ impl TcpSinkConfig {
         }
     }
 
+    #[must_use]
     pub const fn from_address(address: String) -> Self {
         Self {
             address,
@@ -103,6 +102,27 @@ impl TcpSinkConfig {
         }
     }
 
+    /// Parse and validate the configured address, returning the host and port.
+    ///
+    /// This performs only pure parsing — no DNS resolution and no TLS setup —
+    /// so it can run during validation. TLS resolution remains in
+    /// [`Self::build`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the address is invalid or lacks a host or valid port.
+    pub fn parse_address(&self) -> crate::Result<(String, u16)> {
+        let uri = self.address.parse::<http::Uri>()?;
+        let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
+        let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
+        Ok((host, port))
+    }
+
+    /// Builds the sink and its healthcheck.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the address is invalid or TLS configuration fails.
     pub fn build(
         &self,
         transformer: Transformer,
@@ -112,9 +132,30 @@ impl TcpSinkConfig {
         + Sync
         + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let uri = self.address.parse::<http::Uri>()?;
-        let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
-        let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
+        let (host, port) = self.parse_address()?;
+        self.build_with_address(host, port, transformer, encoder)
+    }
+
+    /// Build the sink from an already-parsed host and port.
+    ///
+    /// Used by sinks whose `validate` already parsed the address, so the
+    /// parsed value is plumbed through the validated state rather than
+    /// re-parsed here. TLS resolution still happens in this method.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if TLS configuration fails.
+    pub fn build_with_address(
+        &self,
+        host: String,
+        port: u16,
+        transformer: Transformer,
+        encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
         let sink = TcpSink::new(connector.clone(), transformer, encoder);
@@ -157,11 +198,9 @@ impl TcpConnector {
         Self::new(host, port, None, None.into(), None)
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
+        ExponentialBackoff::default()
     }
 
     async fn connect(&self) -> Result<MaybeTlsStream<TcpStream>, TcpError> {
@@ -199,13 +238,13 @@ impl TcpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(TcpSocketConnectionEstablished {
+                    emit(TcpSocketConnectionEstablished {
                         peer_addr: socket.peer_addr().ok(),
                     });
                     return socket;
                 }
                 Err(error) => {
-                    emit!(TcpSocketOutgoingConnectionError { error });
+                    emit(TcpSocketOutgoingConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -307,7 +346,7 @@ where
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit(ConnectionOpen { count }));
 
             let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
                 Ok(()) => sink.close().await,
@@ -321,11 +360,11 @@ where
             // responded with Ok(0).
             if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(TcpSocketConnectionShutdown {});
+                    emit(TcpSocketConnectionShutdown {});
                 }
-                emit!(SocketSendError {
+                emit(SocketSendError {
                     mode: SocketMode::Tcp,
-                    error
+                    error,
                 });
             }
         }
@@ -339,18 +378,18 @@ mod test {
     use tokio::net::TcpListener;
 
     use super::*;
-    use crate::test_util::{next_addr, trace_init};
+    use crate::test_util::{addr::next_addr, trace_init};
 
     #[tokio::test]
     async fn healthcheck() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let _listener = TcpListener::bind(&addr).await.unwrap();
         let good = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(good.healthcheck().await.is_ok());
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let bad = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(bad.healthcheck().await.is_err());
     }

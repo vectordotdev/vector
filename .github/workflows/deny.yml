@@ -3,71 +3,106 @@
 # Checks for security vulnerabilities or license incompatibilities
 #
 # Runs on:
-#  - scheduled UTC midnight
-#  - on PR review (see comment-trigger.yml)
+#  - scheduled daily at 05:00 UTC
+#  - on PR review (see ci-review-trigger.yml)
 #  - on demand from github actions UI
+#  - on pull requests when Cargo.toml or Cargo.lock files change
+#  - in the merge queue
+#
+# Pull requests and merge queue runs only fail on cargo deny errors that the base revision does not
+# also have, so a new advisory for an existing dependency does not fail every PR. The scheduled run
+# reports those.
 
 name: Deny - Linux
 
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+
+  pull_request:
+  merge_group:
+    types: [checks_requested]
   schedule:
-    # Same schedule as nightly.yml
-    - cron: "0 5 * * 2-6"  # Runs at 5:00 AM UTC, Tuesday through Saturday
+    - cron: "0 5 * * *" # Runs daily at 5:00 AM UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
+  changes:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: ./.github/workflows/changes.yml
+    secrets: inherit
+
   test-deny:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      CARGO_INCREMENTAL: 0
+      # Only set for pull requests and merge queue runs.
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+    if: &deny_gate >-
+      always() &&
+      (github.event_name != 'pull_request' || needs.changes.outputs.deny == 'true') &&
+      (github.event_name != 'schedule' || github.repository == 'vectordotdev/vector')
+    needs: [changes]
     steps:
-      - name: (PR review) Set latest commit status as pending
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Deny - Linux
-          status: pending
-
-      - name: (PR review) Checkout PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          ref: ${{ github.event.review.commit_id }}
-
       - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        name: Cache Cargo registry + index
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          ref: ${{ inputs.ref }}
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh --modules=cargo-deny
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - name: Check cargo deny advisories/licenses
+      - name: Checkout base
+        if: env.BASE_SHA != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: base
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          cargo-deny: true
+
+      - name: Check cargo deny (all)
+        if: env.BASE_SHA == ''
         run: make check-deny
 
-      - name: (PR review) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        if: always() && github.event_name == 'pull_request_review'
+      - name: Check cargo deny (new errors compared to base)
+        if: env.BASE_SHA != ''
+        # Runs `cargo deny` of this branch on the base.
+        run: vdev check deny --base-dir base
+
+  test-deny-licenses:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    if: *deny_gate
+    needs: [changes]
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Deny - Linux
-          status: ${{ job.status }}
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          cargo-deny: true
+
+      - name: Check cargo deny licenses
+        run: make check-deny-licenses

@@ -7,4 +7,3 @@ http:
  - selector: opentelemetry.proto.collector.metrics.v1.MetricsService.Export
    post: /v1/metrics
    body: "*"
-

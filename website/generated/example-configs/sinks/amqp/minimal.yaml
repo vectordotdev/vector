@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: amqp
+    inputs:
+      - my-source-or-transform-id
+    connection_string: amqp://user:password@127.0.0.1:5672/%2f?timeout=10
+    encoding:
+      codec: json
+    exchange: my-exchange

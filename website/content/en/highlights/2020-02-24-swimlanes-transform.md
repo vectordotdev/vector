@@ -16,15 +16,16 @@ The new [`swimlanes` transform][docs.transforms.swimlanes] makes it much easier
 to configure conditional branches of transforms and sinks. For example, you can
 easily create [if/else pipelines][docs.transforms.swimlanes#examples].
 
-```toml title="vector.toml"
-[transforms.lanes]
-  types = "swimlanes"
-
-  [transforms.my_transform_id.lanes.errors]
-    "level.eq" = "error"
-
-  [transforms.my_transform_id.lanes.not_errors]
-    "level.neq" = "error"
+```yaml title="vector.yaml"
+transforms:
+  lanes:
+    types: "swimlanes"
+  my_transform_id:
+    lanes:
+      errors:
+        "level.eq": "error"
+      not_errors:
+        "level.neq": "error"
 ```
 
 Remember to occasionally let your branches mingle so that they don't completely

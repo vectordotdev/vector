@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.22.0": {
-	date:     "2022-05-24"
-	codename: ""
+	date: "2022-05-24"
 
 	whats_next: [
 		{
@@ -219,7 +218,7 @@ releases: "0.22.0": {
 
 				For example:
 
-				```coffeescript
+				```vrl
 				foo = 1
 				{ foo = "bar" }
 				upcase(foo)
@@ -366,7 +365,7 @@ releases: "0.22.0": {
 
 				For example:
 
-				```coffeescript
+				```vrl
 				parse_json!("{\"1\": {\"2\": {\"3\": {\"4\": {\"5\": {\"6\": \"finish\"}}}}}}", max_depth: 5)
 				```
 

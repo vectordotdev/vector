@@ -1,5 +1,4 @@
 use bytes::BytesMut;
-use derivative::Derivative;
 use tokio_util::codec::{Encoder, LengthDelimitedCodec};
 use vector_config::configurable_component;
 
@@ -8,8 +7,7 @@ use crate::common::length_delimited::LengthDelimitedCoderOptions;
 
 /// Config used to build a `LengthDelimitedEncoder`.
 #[configurable_component]
-#[derive(Debug, Clone, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct LengthDelimitedEncoderConfig {
     /// Options for the length delimited decoder.
     #[serde(skip_serializing_if = "vector_core::serde::is_default")]
@@ -18,6 +16,7 @@ pub struct LengthDelimitedEncoderConfig {
 
 impl LengthDelimitedEncoderConfig {
     /// Build the `LengthDelimitedEncoder` from this configuration.
+    #[must_use]
     pub fn build(&self) -> LengthDelimitedEncoder {
         LengthDelimitedEncoder::new(&self.length_delimited)
     }
@@ -32,6 +31,7 @@ pub struct LengthDelimitedEncoder {
 
 impl LengthDelimitedEncoder {
     /// Creates a new `LengthDelimitedEncoder`.
+    #[must_use]
     pub fn new(config: &LengthDelimitedCoderOptions) -> Self {
         Self {
             codec: config.build_codec(),
@@ -52,7 +52,7 @@ impl Default for LengthDelimitedEncoder {
 impl Encoder<()> for LengthDelimitedEncoder {
     type Error = BoxedFramingError;
 
-    fn encode(&mut self, _: (), buffer: &mut BytesMut) -> Result<(), BoxedFramingError> {
+    fn encode(&mut self, (): (), buffer: &mut BytesMut) -> Result<(), BoxedFramingError> {
         self.inner_buffer.clear();
         self.inner_buffer.extend_from_slice(buffer);
         buffer.clear();

@@ -1,0 +1,10 @@
+sources:
+  my_source_id:
+    type: statsd
+    address: 0.0.0.0:9000
+    convert_to: seconds
+    mode: tcp
+    permit_origin:
+      - 192.168.0.0/16
+    sanitize: true
+    shutdown_timeout_secs: 30

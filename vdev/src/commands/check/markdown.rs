@@ -1,7 +1,6 @@
 use anyhow::Result;
 
-use crate::app;
-use crate::git::git_ls_files;
+use crate::{app, utils::git::git_ls_files};
 
 /// Check that markdown is styled properly
 #[derive(clap::Args, Debug)]
@@ -15,17 +14,8 @@ impl Cli {
             return Ok(());
         }
 
-        let args: Vec<&str> = vec![
-            "--config",
-            "scripts/.markdownlintrc",
-            // We should fix these as well. Previously these files were not linted.
-            "--ignore",
-            ".github"
-        ]
-            .into_iter()
-            .chain(files.iter().map(String::as_str))
-            .collect();
+        let args: Vec<&str> = files.iter().map(String::as_str).collect();
 
-        app::exec("markdownlint", &args, true)
+        app::exec("markdownlint-cli2", &args, true)
     }
 }

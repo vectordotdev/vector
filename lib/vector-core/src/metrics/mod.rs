@@ -15,6 +15,7 @@ use metrics_util::layers::Layer;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
+pub use self::label_filter::{LABELS, MetricLabel};
 use self::{
     label_filter::VectorLabelFilter,
     recorder::{Registry, VectorRecorder},
@@ -45,10 +46,6 @@ static CONTROLLER: OnceLock<Controller> = OnceLock::new();
 // of their environment and how vectors acts in it.
 const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
 static CARDINALITY_KEY: Key = Key::from_static_name(CARDINALITY_KEY_NAME);
-
-// Older deprecated counter key name
-const CARDINALITY_COUNTER_KEY_NAME: &str = "internal_metrics_cardinality_total";
-static CARDINALITY_COUNTER_KEY: Key = Key::from_static_name(CARDINALITY_COUNTER_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
@@ -184,15 +181,10 @@ impl Controller {
         let mut metrics = self.recorder.with_registry(Registry::visit_metrics);
 
         #[allow(clippy::cast_precision_loss)]
-        let value = (metrics.len() + 2) as f64;
+        let value = (metrics.len() + 1) as f64;
         metrics.push(Metric::from_metric_kv(
             &CARDINALITY_KEY,
             MetricValue::Gauge { value },
-            timestamp,
-        ));
-        metrics.push(Metric::from_metric_kv(
-            &CARDINALITY_COUNTER_KEY,
-            MetricValue::Counter { value },
             timestamp,
         ));
 
@@ -200,52 +192,14 @@ impl Controller {
     }
 }
 
-#[macro_export]
-/// This macro is used to emit metrics as a `counter` while simultaneously
-/// converting from absolute values to incremental values.
-///
-/// Values that do not arrive in strictly monotonically increasing order are
-/// ignored and will not be emitted.
-macro_rules! update_counter {
-    ($label:literal, $value:expr) => {{
-        use ::std::sync::atomic::{AtomicU64, Ordering};
-
-        static PREVIOUS_VALUE: AtomicU64 = AtomicU64::new(0);
-
-        let new_value = $value;
-        let mut previous_value = PREVIOUS_VALUE.load(Ordering::Relaxed);
-
-        loop {
-            // Either a new greater value has been emitted before this thread updated the counter
-            // or values were provided that are not in strictly monotonically increasing order.
-            // Ignore.
-            if new_value <= previous_value {
-                break;
-            }
-
-            match PREVIOUS_VALUE.compare_exchange_weak(
-                previous_value,
-                new_value,
-                Ordering::SeqCst,
-                Ordering::Relaxed,
-            ) {
-                // Another thread has written a new value before us. Re-enter loop.
-                Err(value) => previous_value = value,
-                // Calculate delta to last emitted value and emit it.
-                Ok(_) => {
-                    let delta = new_value - previous_value;
-                    // Albeit very unlikely, note that this sequence of deltas might be emitted in
-                    // a different order than they were calculated.
-                    counter!($label).increment(delta);
-                    break;
-                }
-            }
-        }
-    }};
-}
-
 #[cfg(test)]
 mod tests {
+    use strum::IntoEnumIterator;
+    use vector_common::{
+        counter, gauge,
+        internal_event::{CounterName, GaugeName},
+    };
+
     use super::*;
     use crate::{
         config::metrics_expiration::{
@@ -268,28 +222,27 @@ mod tests {
             let controller = Controller::get().unwrap();
             controller.reset();
 
+            let name = CounterName::iter().next().unwrap();
             for idx in 0..cardinality {
-                metrics::counter!("test", "idx" => idx.to_string()).increment(1);
+                counter!(name, "idx" => idx.to_string()).increment(1);
             }
 
             let metrics = controller.capture_metrics();
-            assert_eq!(metrics.len(), cardinality + 2);
+            assert_eq!(metrics.len(), cardinality + 1);
+            assert!(
+                !metrics
+                    .iter()
+                    .any(|metric| metric.name() == "internal_metrics_cardinality_total")
+            );
 
             #[allow(clippy::cast_precision_loss)]
             let value = metrics.len() as f64;
-            for metric in metrics {
-                match metric.name() {
-                    CARDINALITY_KEY_NAME => {
-                        assert_eq!(metric.value(), &MetricValue::Gauge { value });
-                        assert_eq!(metric.kind(), MetricKind::Absolute);
-                    }
-                    CARDINALITY_COUNTER_KEY_NAME => {
-                        assert_eq!(metric.value(), &MetricValue::Counter { value });
-                        assert_eq!(metric.kind(), MetricKind::Absolute);
-                    }
-                    _ => {}
-                }
-            }
+            let gauge = metrics
+                .iter()
+                .find(|metric| metric.name() == CARDINALITY_KEY_NAME)
+                .expect("cardinality gauge should be emitted");
+            assert_eq!(gauge.value(), &MetricValue::Gauge { value });
+            assert_eq!(gauge.kind(), MetricKind::Absolute);
         }
     }
 
@@ -297,14 +250,14 @@ mod tests {
     fn handles_registered_metrics() {
         let controller = init_metrics();
 
-        let counter = metrics::counter!("test7");
-        assert_eq!(controller.capture_metrics().len(), 3);
+        let counter = counter!(CounterName::iter().next().unwrap());
+        assert_eq!(controller.capture_metrics().len(), 2);
         counter.increment(1);
+        assert_eq!(controller.capture_metrics().len(), 2);
+        let gauge = gauge!(GaugeName::iter().next().unwrap());
         assert_eq!(controller.capture_metrics().len(), 3);
-        let gauge = metrics::gauge!("test8");
-        assert_eq!(controller.capture_metrics().len(), 4);
         gauge.set(1.0);
-        assert_eq!(controller.capture_metrics().len(), 4);
+        assert_eq!(controller.capture_metrics().len(), 3);
     }
 
     #[test]
@@ -314,13 +267,17 @@ mod tests {
             .set_expiry(Some(IDLE_TIMEOUT), Vec::new())
             .unwrap();
 
-        metrics::counter!("test2").increment(1);
-        metrics::counter!("test3").increment(2);
-        assert_eq!(controller.capture_metrics().len(), 4);
+        let mut names = CounterName::iter();
+        let name_a = names.next().unwrap();
+        let name_b = names.next().unwrap();
+
+        counter!(name_a).increment(1);
+        counter!(name_b).increment(2);
+        assert_eq!(controller.capture_metrics().len(), 3);
 
         std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-        metrics::counter!("test2").increment(3);
-        assert_eq!(controller.capture_metrics().len(), 3);
+        counter!(name_a).increment(3);
+        assert_eq!(controller.capture_metrics().len(), 2);
     }
 
     #[test]
@@ -330,13 +287,14 @@ mod tests {
             .set_expiry(Some(IDLE_TIMEOUT), Vec::new())
             .unwrap();
 
-        metrics::counter!("test4", "tag" => "value1").increment(1);
-        metrics::counter!("test4", "tag" => "value2").increment(2);
-        assert_eq!(controller.capture_metrics().len(), 4);
+        let name = CounterName::iter().next().unwrap();
+        counter!(name, "tag" => "value1").increment(1);
+        counter!(name, "tag" => "value2").increment(2);
+        assert_eq!(controller.capture_metrics().len(), 3);
 
         std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-        metrics::counter!("test4", "tag" => "value1").increment(3);
-        assert_eq!(controller.capture_metrics().len(), 3);
+        counter!(name, "tag" => "value1").increment(3);
+        assert_eq!(controller.capture_metrics().len(), 2);
     }
 
     #[test]
@@ -346,21 +304,25 @@ mod tests {
             .set_expiry(Some(IDLE_TIMEOUT), Vec::new())
             .unwrap();
 
-        let a = metrics::counter!("test5");
-        metrics::counter!("test6").increment(5);
-        assert_eq!(controller.capture_metrics().len(), 4);
+        let mut names = CounterName::iter();
+        let name_a = names.next().unwrap();
+        let name_b = names.next().unwrap();
+
+        let a = counter!(name_a);
+        counter!(name_b).increment(5);
+        assert_eq!(controller.capture_metrics().len(), 3);
         a.increment(1);
-        assert_eq!(controller.capture_metrics().len(), 4);
+        assert_eq!(controller.capture_metrics().len(), 3);
 
         std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-        assert_eq!(controller.capture_metrics().len(), 3);
+        assert_eq!(controller.capture_metrics().len(), 2);
 
         a.increment(1);
         let metrics = controller.capture_metrics();
-        assert_eq!(metrics.len(), 3);
+        assert_eq!(metrics.len(), 2);
         let metric = metrics
             .into_iter()
-            .find(|metric| metric.name() == "test5")
+            .find(|metric| metric.name() == name_a.as_str())
             .expect("Test metric is not present");
         match metric.value() {
             MetricValue::Counter { value } => assert_eq!(*value, 2.0),
@@ -371,12 +333,17 @@ mod tests {
     #[test]
     fn expires_metrics_per_set() {
         let controller = init_metrics();
+
+        let mut names = CounterName::iter();
+        let name_a = names.next().unwrap();
+        let name_b = names.next().unwrap();
+
         controller
             .set_expiry(
                 None,
                 vec![PerMetricSetExpiration {
                     name: Some(MetricNameMatcherConfig::Exact {
-                        value: "test3".to_string(),
+                        value: name_b.as_str().to_string(),
                     }),
                     labels: None,
                     expire_secs: IDLE_TIMEOUT,
@@ -384,25 +351,32 @@ mod tests {
             )
             .unwrap();
 
-        metrics::counter!("test2").increment(1);
-        metrics::counter!("test3").increment(2);
-        assert_eq!(controller.capture_metrics().len(), 4);
+        counter!(name_a).increment(1);
+        counter!(name_b).increment(2);
+        assert_eq!(controller.capture_metrics().len(), 3);
 
         std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 2.0));
-        metrics::counter!("test2").increment(3);
-        assert_eq!(controller.capture_metrics().len(), 3);
+        counter!(name_a).increment(3);
+        assert_eq!(controller.capture_metrics().len(), 2);
     }
 
     #[test]
     fn expires_metrics_multiple_different_sets() {
         let controller = init_metrics();
+
+        let mut names = CounterName::iter();
+        let name_a = names.next().unwrap();
+        let name_b = names.next().unwrap();
+        let name_c = names.next().unwrap();
+        let name_d = names.next().unwrap();
+
         controller
             .set_expiry(
                 Some(IDLE_TIMEOUT * 3.0),
                 vec![
                     PerMetricSetExpiration {
                         name: Some(MetricNameMatcherConfig::Exact {
-                            value: "test3".to_string(),
+                            value: name_c.as_str().to_string(),
                         }),
                         labels: None,
                         expire_secs: IDLE_TIMEOUT,
@@ -421,22 +395,22 @@ mod tests {
             )
             .unwrap();
 
-        metrics::counter!("test1").increment(1);
-        metrics::counter!("test2").increment(1);
-        metrics::counter!("test3").increment(2);
-        metrics::counter!("test4", "tag" => "value1").increment(3);
-        assert_eq!(controller.capture_metrics().len(), 6);
-
-        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 1.5));
-        metrics::counter!("test2").increment(3);
+        counter!(name_a).increment(1);
+        counter!(name_b).increment(1);
+        counter!(name_c).increment(2);
+        counter!(name_d, "tag" => "value1").increment(3);
         assert_eq!(controller.capture_metrics().len(), 5);
 
-        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT));
-        metrics::counter!("test2").increment(3);
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT * 1.5));
+        counter!(name_b).increment(3);
         assert_eq!(controller.capture_metrics().len(), 4);
 
         std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT));
-        metrics::counter!("test2").increment(3);
+        counter!(name_b).increment(3);
         assert_eq!(controller.capture_metrics().len(), 3);
+
+        std::thread::sleep(Duration::from_secs_f64(IDLE_TIMEOUT));
+        counter!(name_b).increment(3);
+        assert_eq!(controller.capture_metrics().len(), 2);
     }
 }

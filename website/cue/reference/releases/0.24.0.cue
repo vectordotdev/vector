@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.24.0": {
-	date:     "2022-08-29"
-	codename: ""
+	date: "2022-08-29"
 
 	whats_next: [
 		{
@@ -79,7 +78,7 @@ releases: "0.24.0": {
 				The VRL compiler now rejects assignments to fields on values known not to be
 				objects or arrays. For example, this now fails:
 
-				```coffeescript
+				```vrl
 				foo = 1
 				foo.bar = 2
 				```
@@ -122,7 +121,7 @@ releases: "0.24.0": {
 				A `filter` function was added to VRL to allow easy removal of keys from objects or
 				elements from arrays. It can be used like:
 
-				```coffeescript
+				```vrl
 				.kubernetes.pod_annotations = filter(.kubernetes.pod_annotations) { |key, _value|
 					!starts_with(key, "checksum")
 				}
@@ -155,7 +154,7 @@ releases: "0.24.0": {
 			scopes: ["enrichment tables"]
 			description: """
 				A new enrichment table type was added,
-				[`geoip`](/docs/reference/configuration/global-options/#enrichment_tables.type).
+				[`geoip`](/docs/reference/configuration/pipeline-components/#enrichment_tables..type).
 				This can be used with [VRL's enrichment table
 				functions](/docs/reference/vrl/functions/#enrichment-functions) to enrich events
 				using a [GeoIP database](https://www.maxmind.com/en/geoip2-databases).
@@ -554,7 +553,7 @@ releases: "0.24.0": {
 		{sha: "61756a545fd9e2aad5044739789c6f1e111ddcfc", date: "2022-07-16 03:35:33 UTC", description: "add Accept-Encoding header for compression", pr_number: 13571, scopes: ["elasticsearch sink"], type: "fix", breaking_change: false, author: "Kyle Criddle", files_count: 1, insertions_count: 3, deletions_count: 1},
 		{sha: "d54f26edb3759e38a26756ecb5012a2ed17e4116", date: "2022-07-16 10:28:36 UTC", description: "bump axum from 0.5.12 to 0.5.13", pr_number: 13576, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 2, insertions_count: 3, deletions_count: 3},
 		{sha: "7e431fb5f45c06ad2dc38029ab8d9e65180c1ad5", date: "2022-07-16 10:31:27 UTC", description: "bump dyn-clone from 1.0.6 to 1.0.8", pr_number: 13577, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 6, insertions_count: 7, deletions_count: 7},
-		{sha: "b5906e3ebd409f4d208213a0abc8dafc62edc542", date: "2022-07-19 06:43:01 UTC", description: "typoes", pr_number: 13582, scopes: [], type: "docs", breaking_change: false, author: "Tshepang Mbambo", files_count: 3, insertions_count: 3, deletions_count: 3},
+		{sha: "b5906e3ebd409f4d208213a0abc8dafc62edc542", date: "2022-07-19 06:43:01 UTC", description: "typos", pr_number: 13582, scopes: [], type: "docs", breaking_change: false, author: "Tshepang Mbambo", files_count: 3, insertions_count: 3, deletions_count: 3},
 		{sha: "4e707f88534fc45288920f6810637385c3aa1303", date: "2022-07-19 03:22:46 UTC", description: "Add template for otel source, and correct cue docs", pr_number: 13599, scopes: [], type: "docs", breaking_change: false, author: "Spencer Gilbert", files_count: 2, insertions_count: 16, deletions_count: 11},
 		{sha: "000fe8bb918a5409b8b7df0d43c436648c611d32", date: "2022-07-19 01:29:44 UTC", description: "Handle negative acknowledgements by stopping readers", pr_number: 13563, scopes: ["buffers"], type: "enhancement", breaking_change: false, author: "Bruce Guenter", files_count: 12, insertions_count: 325, deletions_count: 81},
 		{sha: "c640add4fe223041534afb5931a10c4b2bfd7ce1", date: "2022-07-19 03:35:26 UTC", description: "pre-flight work for initial integration of configuration schema for sinks", pr_number: 13516, scopes: ["config"], type: "chore", breaking_change: false, author: "Toby Lawrence", files_count: 33, insertions_count: 1014, deletions_count: 541},

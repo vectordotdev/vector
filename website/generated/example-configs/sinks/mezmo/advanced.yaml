@@ -1,0 +1,14 @@
+sinks:
+  my_sink_id:
+    type: mezmo
+    inputs:
+      - my-source-or-transform-id
+    api_key: ${LOGDNA_API_KEY}
+    default_app: vector
+    default_env: production
+    endpoint: https://logs.mezmo.com/
+    hostname: ${HOSTNAME}
+    ip: 0.0.0.0
+    mac: my-mac-address
+    tags:
+      - tag1

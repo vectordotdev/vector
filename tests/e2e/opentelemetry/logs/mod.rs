@@ -1,6 +1,7 @@
-use vector_lib::opentelemetry::proto::LOGS_REQUEST_MESSAGE_TYPE;
-use vector_lib::opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
-use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
+use vector_lib::opentelemetry::proto::{
+    LOGS_REQUEST_MESSAGE_TYPE, collector::logs::v1::ExportLogsServiceRequest,
+    common::v1::any_value::Value as AnyValueEnum,
+};
 
 use crate::opentelemetry::{
     assert_service_name_with, parse_line_to_export_type_request, read_file_helper,
@@ -26,7 +27,7 @@ fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, 
                 LOGS_REQUEST_MESSAGE_TYPE,
                 line,
             )
-            .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+            .map_err(|e| format!("Line {}: {e}", line_num + 1))?
             .resource_logs,
         );
     }
@@ -139,4 +140,16 @@ fn vector_sink_otel_sink_logs_match() {
         collector_request, vector_request,
         "Collector and Vector log requests should match"
     );
+}
+
+#[tokio::test]
+async fn vector_component_received_events_total_counts_individual_log_records() {
+    // This test verifies that when OTLP preservation is enabled, the
+    // component_received_events_total metric counts individual log records
+    // within OTLP batches, not the number of batch requests.
+    // This ensures consistency with other Vector sources and with the same
+    // OpenTelemetry source when native conversion is enabled.
+    use crate::opentelemetry::assert_component_received_events_total;
+
+    assert_component_received_events_total(EXPECTED_LOG_COUNT).await;
 }

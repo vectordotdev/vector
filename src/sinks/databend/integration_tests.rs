@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use databend_client::{APIClient as DatabendAPIClient, Page};
 use futures::{future::ready, stream};
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vrl::event_path;
 
 use super::config::DatabendConfig;
 use crate::{
@@ -22,7 +23,7 @@ fn databend_endpoint() -> String {
 fn make_event() -> (Event, BatchStatusReceiver) {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let mut event = LogEvent::from("raw log line").with_batch_notifier(&batch);
-    event.insert("host", "example.com");
+    event.insert(event_path!("host"), "example.com");
     (event.into(), receiver)
 }
 

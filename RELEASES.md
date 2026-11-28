@@ -6,17 +6,17 @@ This document covers Vector's releases and the relevant aspect for Vector users.
 
 1. [Channels](#channels)
    1. [Stable channel](#stable-channel)
-   1. [Nightly channel](#nightly-channel)
-1. [Tracking](#tracking)
+   2. [Nightly channel](#nightly-channel)
+2. [Tracking](#tracking)
    1. [Stable channel](#stable-channel-1)
-   1. [Nightly channel](#nightly-channel-1)
-1. [Downloading](#downloading)
-1. [Cadence](#cadence)
+   2. [Nightly channel](#nightly-channel-1)
+3. [Downloading](#downloading)
+4. [Cadence](#cadence)
    1. [Stable channel](#stable-channel-2)
-   1. [Nightly channel](#nightly-channel-2)
-1. [Support Policy](#support-policy)
-1. [Guarantees](#guarantees)
-1. [FAQ](#faq)
+   2. [Nightly channel](#nightly-channel-2)
+5. [Support Policy](#support-policy)
+6. [Guarantees](#guarantees)
+7. [FAQ](#faq)
    1. [Which release type should I be using?](#which-release-type-should-i-be-using)
 
 <!-- /MarkdownTOC -->
@@ -50,7 +50,7 @@ experimental or breaking changes.
 
 ### Nightly channel
 
-Releases will appear in our [nightly artifact list] every night.
+Nightly releases are published every night.
 
 ## Downloading
 
@@ -95,7 +95,6 @@ Otherwise, the stable release is your best bet.
 [chat]: https://chat.vector.dev
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [download page]: https://vector.dev/download/
-[nightly artifact list]: https://packages.timber.io/vector/nightly/
 [@vectordotdev]: https://twitter.com/vectordotdev
 [GitHub repository]: https://github.com/vectordotdev/vector
 [GitHub subscription docs]: https://docs.github.com/en/github/managing-subscriptions-and-notifications-on-github/managing-subscriptions-for-activity-on-github/viewing-your-subscriptions

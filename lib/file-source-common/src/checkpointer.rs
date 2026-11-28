@@ -19,6 +19,7 @@ use super::{FilePosition, fingerprinter::FileFingerprint};
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 pub const CHECKPOINT_FILE_NAME: &str = "checkpoints.json";
+const EXPIRATION_GRACE_DURATION: chrono::Duration = chrono::Duration::seconds(60);
 
 /// This enum represents the file format of checkpoints persisted to disk. Right
 /// now there is only one variant, but any incompatible changes will require and
@@ -64,6 +65,7 @@ impl CheckpointsView {
         self.removed_times.remove(&fng);
     }
 
+    #[must_use]
     pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(&fng).map(|r| *r.value())
     }
@@ -98,7 +100,7 @@ impl CheckpointsView {
             .filter(|entry| {
                 let ts = entry.value();
                 let duration = now - *ts;
-                duration >= chrono::Duration::seconds(60)
+                duration >= EXPIRATION_GRACE_DURATION
             })
             .map(|entry| *entry.key())
             .collect::<Vec<FileFingerprint>>();
@@ -110,7 +112,7 @@ impl CheckpointsView {
         }
     }
 
-    fn load(&self, checkpoint: Checkpoint) {
+    fn load(&self, checkpoint: &Checkpoint) {
         self.checkpoints
             .insert(checkpoint.fingerprint, checkpoint.position);
         self.modified_times
@@ -126,7 +128,7 @@ impl CheckpointsView {
                     {
                         continue;
                     }
-                    self.load(checkpoint);
+                    self.load(&checkpoint);
                 }
             }
         }
@@ -146,8 +148,7 @@ impl CheckpointsView {
                         modified: self
                             .modified_times
                             .get(fingerprint)
-                            .map(|r| *r.value())
-                            .unwrap_or_else(Utc::now),
+                            .map_or_else(Utc::now, |r| *r.value()),
                     }
                 })
                 .collect(),
@@ -156,6 +157,7 @@ impl CheckpointsView {
 }
 
 impl Checkpointer {
+    #[must_use]
     pub fn new(data_dir: &Path) -> Checkpointer {
         let tmp_file_path = data_dir.join(TMP_FILE_NAME);
         let stable_file_path = data_dir.join(CHECKPOINT_FILE_NAME);
@@ -185,6 +187,11 @@ impl Checkpointer {
     /// Persist the current checkpoints state to disk, making our best effort to
     /// do so in an atomic way that allow for recovering the previous state in
     /// the event of a crash.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serializing, writing, syncing, or renaming the
+    /// checkpoint file fails, or if the blocking write task fails to complete.
     pub async fn write_checkpoints(&self) -> Result<usize, io::Error> {
         // First drop any checkpoints for files that were removed more than 60
         // seconds ago. This keeps our working set as small as possible and
@@ -330,7 +337,7 @@ mod test {
             let chkptr = Checkpointer::new(data_dir.path());
 
             for (fingerprint, modified) in &[&newer, &oldish, &older] {
-                chkptr.checkpoints.load(Checkpoint {
+                chkptr.checkpoints.load(&Checkpoint {
                     fingerprint: *fingerprint,
                     position,
                     modified: *modified,
@@ -429,7 +436,7 @@ mod test {
             (FileFingerprint::FirstLinesChecksum(123), 0, 30),
             (FileFingerprint::FirstLinesChecksum(456), 1, 60),
             (FileFingerprint::FirstLinesChecksum(789), 2, 90),
-            (FileFingerprint::FirstLinesChecksum(101112), 3, 120),
+            (FileFingerprint::FirstLinesChecksum(101_112), 3, 120),
         ];
 
         let data_dir = tempdir().unwrap();
@@ -574,7 +581,112 @@ mod test {
         chkptr.read_checkpoints(None).await;
 
         for fingerprint in fingerprints {
-            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(1234))
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(1234));
         }
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_expiration_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: FilePosition = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        chkptr.update_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        chkptr.checkpoints.set_dead(fingerprint);
+        chkptr.checkpoints.remove_expired();
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        // Hack the timestamp to be in the past
+        let now = Utc::now();
+        let past = now - Duration::seconds(61);
+        chkptr.checkpoints.removed_times.insert(fingerprint, past);
+
+        chkptr.checkpoints.remove_expired();
+        assert_eq!(chkptr.get_checkpoint(fingerprint), None);
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_serialization_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: FilePosition = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        chkptr.update_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        chkptr.write_checkpoints().await.unwrap();
+        assert!(data_dir.path().join(CHECKPOINT_FILE_NAME).exists());
+        assert!(!data_dir.path().join(TMP_FILE_NAME).exists());
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_deserialization_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: u64 = 1234;
+        let data_dir = tempdir().unwrap();
+
+        // load and persist the checkpoints
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.update_checkpoint(fingerprint, position);
+            chkptr.write_checkpoints().await.unwrap();
+        }
+
+        // read them back
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.read_checkpoints(None).await;
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_restart_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: u64 = 1234;
+        let data_dir = tempdir().unwrap();
+
+        // load and persist the checkpoints
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.update_checkpoint(fingerprint, position);
+            chkptr.write_checkpoints().await.unwrap();
+        }
+
+        // simulate a crash by writing to the tmp file
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.update_checkpoint(fingerprint, position + 1);
+            let current = chkptr.checkpoints.get_state();
+            let f = std::io::BufWriter::new(std::fs::File::create(&chkptr.tmp_file_path).unwrap());
+            serde_json::to_writer(f, &current).unwrap();
+        }
+
+        // read them back and assert we get the tmp file
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.read_checkpoints(None).await;
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position + 1));
+        }
+    }
+
+    #[test]
+    fn test_checkpointer_file_upgrades_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: u64 = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        chkptr.update_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        let fingerprint2 = FileFingerprint::DevInode(3, 4);
+        chkptr.checkpoints.update_key(fingerprint, fingerprint2);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), None);
+        assert_eq!(chkptr.get_checkpoint(fingerprint2), Some(position));
     }
 }

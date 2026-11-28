@@ -3,11 +3,14 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use vector_vrl_category::Category;
 use vrl::{
     diagnostic::Label,
     path::{OwnedTargetPath, PathPrefix},
     prelude::*,
 };
+
+use indoc::indoc;
 
 #[derive(Debug, Default, Clone)]
 pub struct MeaningList(pub BTreeMap<String, OwnedTargetPath>);
@@ -34,27 +37,45 @@ impl Function for SetSemanticMeaning {
         "set_semantic_meaning"
     }
 
+    fn description(&self) -> &'static str {
+        indoc! {"Sets a semantic meaning for an event."}
+    }
+
+    fn notices(&self) -> &'static [&'static str] {
+        &[indoc! {"
+            This function assigns meaning at startup, and has _no_ runtime behavior. It is suggested
+            to put all calls to this function at the beginning of a VRL function. The function
+            cannot be conditionally called. For example, using an if statement cannot stop the
+            meaning from being assigned.
+        "}]
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "target",
-                kind: kind::ANY,
-                required: true,
-            },
-            Parameter {
-                keyword: "meaning",
-                kind: kind::BYTES,
-                required: true,
-            },
-        ]
+        const PARAMETERS: &[Parameter] = &[
+            Parameter::required(
+                "target",
+                kind::ANY,
+                "The path of the value that is assigned a meaning.",
+            ),
+            Parameter::required("meaning", kind::BYTES, "The name of the meaning to assign."),
+        ];
+        PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Sets custom field semantic meaning",
             source: r#"set_semantic_meaning(.foo, "bar")"#,
             result: Ok("null"),
-        }]
+        )]
     }
 
     fn compile(
@@ -72,9 +93,7 @@ impl Function for SetSemanticMeaning {
             .expect("meaning not bytes")
             .into_owned();
 
-        let path = if let Some(path) = query.external_path() {
-            path
-        } else {
+        let Some(path) = query.external_path().cloned() else {
             // Semantic meaning can only be assigned to external fields.
             let mut labels = vec![Label::primary(
                 "this path must point to an event or metadata",
@@ -115,7 +134,7 @@ impl Function for SetSemanticMeaning {
                 labels: vec![
                     Label::primary("cannot assign semantic meaning to non-existing field", span),
                     Label::context(
-                        format!("field \".{}\" is not known to exist for all events", &path),
+                        format!("field \".{path}\" is not known to exist for all events"),
                         span,
                     ),
                 ],
@@ -135,16 +154,10 @@ impl Function for SetSemanticMeaning {
                     message: "semantic meaning referencing two different fields".to_owned(),
                     labels: vec![
                         Label::primary(
-                            format!(
-                                "semantic meaning \"{}\" must reference a single field",
-                                &meaning
-                            ),
+                            format!("semantic meaning \"{meaning}\" must reference a single field"),
                             span,
                         ),
-                        Label::context(
-                            format!("already referencing field \".{}\"", &duplicate),
-                            span,
-                        ),
+                        Label::context(format!("already referencing field \".{duplicate}\""), span),
                     ],
                     notes: vec![],
                 };
@@ -153,7 +166,7 @@ impl Function for SetSemanticMeaning {
             }
 
             list.insert(meaning, path);
-        };
+        }
 
         Ok(SetSemanticMeaningFn.as_expr())
     }

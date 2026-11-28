@@ -16,7 +16,7 @@ use nom::{
 
 /// We try to catch all nom's `ErrorKind` with our own `ErrorKind`,
 /// to provide a meaningful error message.
-/// Parsers in this module should return this IResult instead of `nom::IResult`.
+/// Parsers in this module should return this `IResult` instead of `nom::IResult`.
 type IResult<'a, O> = Result<(&'a str, O), nom::Err<ErrorKind>>;
 
 #[derive(Debug, snafu::Snafu, PartialEq, Eq)]
@@ -239,6 +239,16 @@ impl Metric {
     /// backslash (`\`), double-quote (`"`), and line feed (`\n`) characters have to be
     /// escaped as `\\`, `\"`, and `\n`, respectively.
     fn parse_escaped_string(input: &str) -> IResult<'_, String> {
+        fn match_quote(input: &str) -> IResult<'_, char> {
+            char('"')(input).map_err(|_: NomError| {
+                ErrorKind::ExpectedChar {
+                    expected: '"',
+                    input: input.to_owned(),
+                }
+                .into()
+            })
+        }
+
         #[derive(Debug)]
         enum StringFragment<'a> {
             Literal(&'a str),
@@ -274,16 +284,6 @@ impl Metric {
             },
         );
 
-        fn match_quote(input: &str) -> IResult<'_, char> {
-            char('"')(input).map_err(|_: NomError| {
-                ErrorKind::ExpectedChar {
-                    expected: '"',
-                    input: input.to_owned(),
-                }
-                .into()
-            })
-        }
-
         delimited(match_quote, build_string, match_quote).parse(input)
     }
 }
@@ -312,9 +312,9 @@ impl Header {
             expected: "TYPE",
             input: input.to_owned(),
         })?;
-        let (input, _) = Self::space1(input)?;
+        let (input, ()) = Self::space1(input)?;
         let (input, metric_name) = parse_name(input)?;
-        let (input, _) = Self::space1(input)?;
+        let (input, ()) = Self::space1(input)?;
         let (input, kind) = alt((
             value(MetricKind::Counter, tag("counter")),
             value(MetricKind::Gauge, tag("gauge")),
@@ -445,7 +445,7 @@ mod test {
         assert_eq!(left, tail);
         assert_eq!(r, "\\n");
 
-        let input = wrap(r#"  😂  "#);
+        let input = wrap(r"  😂  ");
         let (left, r) = Metric::parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "  😂  ");
@@ -552,6 +552,12 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Verify parsed positive integer boundaries via their existing casts"
+    )]
     fn test_parse_value() {
         fn wrap(s: &str) -> String {
             format!("  \t {s}  .")
@@ -597,10 +603,10 @@ mod test {
         assert_eq!(left, tail);
         assert_eq!(r as u64, 2_u64.pow(53) - 1);
 
-        let input = wrap(&(u32::MAX as u64 + 1).to_string());
+        let input = wrap(&(u64::from(u32::MAX) + 1).to_string());
         let (left, r) = Metric::parse_value(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r as u64, u32::MAX as u64 + 1);
+        assert_eq!(r as u64, u64::from(u32::MAX) + 1);
 
         let tests = [
             ("0", 0.0f64),
@@ -683,11 +689,11 @@ mod test {
         // Edge cases
         assert_eq!(
             Metric::parse_timestamp("9223372036854775807"),
-            Ok(("", Some(9223372036854775807i64)))
+            Ok(("", Some(9_223_372_036_854_775_807i64)))
         );
         assert_eq!(
             Metric::parse_timestamp("-9223372036854775808"),
-            Ok(("", Some(-9223372036854775808i64)))
+            Ok(("", Some(-9_223_372_036_854_775_808i64)))
         );
         // overflow
         assert_eq!(

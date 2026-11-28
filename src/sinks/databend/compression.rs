@@ -7,18 +7,14 @@ use vector_lib::configurable::configurable_component;
 #[configurable(metadata(
     docs::enum_tag_description = "The compression algorithm to use for sending."
 ))]
+#[derive(Default)]
 pub enum DatabendCompression {
     /// No compression.
+    #[default]
     None,
 
     /// [Gzip][gzip] compression.
     ///
     /// [gzip]: https://www.gzip.org/
     Gzip,
-}
-
-impl Default for DatabendCompression {
-    fn default() -> Self {
-        Self::None
-    }
 }

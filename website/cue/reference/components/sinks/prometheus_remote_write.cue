@@ -4,7 +4,6 @@ components: sinks: prometheus_remote_write: {
 	title: "Prometheus Remote Write"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -15,11 +14,13 @@ components: sinks: prometheus_remote_write: {
 	features: {
 		auto_generated:   true
 		acknowledgements: true
-		healthcheck: enabled: true
+		healthcheck: {
+			enabled:  true
+			uses_uri: true
+		}
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   1000
 				timeout_secs: 1.0
 			}
@@ -34,7 +35,7 @@ components: sinks: prometheus_remote_write: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
-				headers:                    false
+				headers:                    true
 			}
 			tls: {
 				enabled:                true
@@ -73,7 +74,6 @@ components: sinks: prometheus_remote_write: {
 				as a way to protect against this.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.prometheus_remote_write.configuration

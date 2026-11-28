@@ -47,10 +47,13 @@
 {{ define "subsection-group" }}
 {{ $here := .here }}
 {{ $section := .section }}
-{{ $open := .ctx.IsAncestor $section }}
+{{ $open := or (.ctx.IsAncestor $section) (strings.HasPrefix $here .ctx.RelPermalink) }}
+{{ $isActive := eq .ctx.RelPermalink $here }}
 <div x-data="{ open: {{ $open }} }">
   <span class="flex justify-between items-center">
-    {{ template "link" (dict "here" $here "url" .ctx.RelPermalink "title" (.ctx.Params.short | default .ctx.Title)) }}
+    <a href="{{ .ctx.RelPermalink }}" @click="open = true" class="flex-1 text-gray-800 font-semibold tracking-tight dark:text-gray-400 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
+      {{ .ctx.Params.short | default .ctx.Title }}
+    </a>
     {{ template "chevron-icon" }}
   </span>
 

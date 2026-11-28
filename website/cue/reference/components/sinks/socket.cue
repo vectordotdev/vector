@@ -4,7 +4,6 @@ components: sinks: socket: {
 	title: "Socket"
 
 	classes: {
-		commonly_used: true
 		delivery:      "best_effort"
 		development:   "stable"
 		egress_method: "stream"
@@ -56,7 +55,6 @@ components: sinks: socket: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.socket.configuration

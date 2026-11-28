@@ -12,19 +12,23 @@ use super::service::DatabendRequest;
 use crate::{
     codecs::{Encoder, Transformer},
     sinks::util::{
-        Compression, RequestBuilder, metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
+        Compression, RequestBuilder,
+        metadata::RequestMetadataBuilder,
+        request_builder::{EncodeResult, RequestParts},
     },
 };
 
 #[derive(Clone)]
-pub struct DatabendRequestBuilder {
+pub(super) struct DatabendRequestBuilder {
     compression: Compression,
     encoder: (Transformer, Encoder<Framer>),
 }
 
 impl DatabendRequestBuilder {
-    pub const fn new(compression: Compression, encoder: (Transformer, Encoder<Framer>)) -> Self {
+    pub(super) const fn new(
+        compression: Compression,
+        encoder: (Transformer, Encoder<Framer>),
+    ) -> Self {
         Self {
             compression,
             encoder,
@@ -33,7 +37,7 @@ impl DatabendRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for DatabendRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
@@ -48,19 +52,22 @@ impl RequestBuilder<Vec<Event>> for DatabendRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        input: Vec<Event>,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, input: Vec<Event>) -> RequestParts<Self::Metadata, Self::Events> {
         let mut events = input;
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        (finalizers, builder, events)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        finalizers: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {

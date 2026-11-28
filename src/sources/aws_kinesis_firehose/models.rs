@@ -1,5 +1,18 @@
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// Represents AWS Kinesis Firehose X-Amz-Firehose-Common-Attributes header
+///
+/// Represents protocol v1.0 (the only protocol as of writing)
+///
+/// <https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html>
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct FirehoseCommonAttributesHeader {
+    #[serde(default)]
+    pub common_attributes: HashMap<String, String>,
+}
 
 /// Represents an AWS Kinesis Firehose request
 ///
@@ -8,7 +21,7 @@ use serde::{Deserialize, Serialize};
 /// <https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html>
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FirehoseRequest {
+pub(super) struct FirehoseRequest {
     pub access_key: Option<String>,
     pub request_id: String,
 
@@ -19,7 +32,7 @@ pub struct FirehoseRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct EncodedFirehoseRecord {
+pub(super) struct EncodedFirehoseRecord {
     /// data is base64 encoded, gzip'd, bytes
     pub data: String,
 }
@@ -31,7 +44,7 @@ pub struct EncodedFirehoseRecord {
 /// <https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html>
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FirehoseResponse {
+pub(super) struct FirehoseResponse {
     pub request_id: String,
 
     #[serde(with = "ts_milliseconds")]

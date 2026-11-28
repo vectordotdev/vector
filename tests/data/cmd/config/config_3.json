@@ -16,22 +16,19 @@
   },
   "transforms": {
     "transform0": {
-      "inputs": [
-        "source0"
-      ],
+      "inputs": ["source0"],
       "drop_on_abort": false,
       "drop_on_error": false,
       "metric_tag_values": "single",
       "reroute_dropped": false,
       "runtime": "ast",
+      "source": ".",
       "type": "remap"
     }
   },
   "sinks": {
     "sink0": {
-      "inputs": [
-        "transform0"
-      ],
+      "inputs": ["transform0"],
       "target": "stdout",
       "type": "console",
       "encoding": {

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, time::Duration};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
@@ -15,11 +15,14 @@ use vector_lib::{
     },
     source::Source,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{
     ComponentKey, ProxyConfig, Resource, SharedTopologyMetadata, dot_graph::GraphConfig, schema,
 };
-use crate::{SourceSender, extra_context::ExtraContext, shutdown::ShutdownSignal};
+use vector_lib::extra_context::ExtraContext;
+
+use crate::{SourceSender, shutdown::ShutdownSignal};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
 
@@ -51,14 +54,11 @@ impl<T: SourceConfig + 'static> From<T> for BoxedSource {
 
 /// Fully resolved source component.
 #[configurable_component]
-#[configurable(metadata(docs::component_base_type = "source"))]
 #[derive(Clone, Debug)]
 pub struct SourceOuter {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 
@@ -73,8 +73,8 @@ pub struct SourceOuter {
 impl SourceOuter {
     pub(crate) fn new<I: Into<BoxedSource>>(inner: I) -> Self {
         Self {
-            proxy: Default::default(),
-            graph: Default::default(),
+            proxy: ProxyConfig::default(),
+            graph: GraphConfig::default(),
             sink_acknowledgements: false,
             inner: inner.into(),
         }
@@ -94,6 +94,19 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
     /// If an error occurs while building the source, an error variant explaining the issue is
     /// returned.
     async fn build(&self, cx: SourceContext) -> crate::Result<Source>;
+
+    /// Validates structural constraints on the source configuration that do not require
+    /// environment resources.
+    ///
+    /// Called during config compilation so errors are reported before the topology is built.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        Ok(())
+    }
 
     /// Gets the list of outputs exposed by this source.
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput>;
@@ -122,6 +135,12 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
     /// well as emit contextual warnings when end-to-end acknowledgements are enabled, but the
     /// topology as configured does not actually support the use of end-to-end acknowledgements.
     fn can_acknowledge(&self) -> bool;
+
+    /// If this source supports timeout returns from the `SourceSender` and the configuration
+    /// provides a timeout value, return it here and the `out` channel will be configured with it.
+    fn send_timeout(&self) -> Option<Duration> {
+        None
+    }
 }
 
 dyn_clone::clone_trait_object!(SourceConfig);
@@ -130,6 +149,7 @@ pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
+    pub metrics_storage: MetricsStorage,
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
@@ -152,6 +172,12 @@ pub struct SourceContext {
 
 impl SourceContext {
     #[cfg(any(test, feature = "test-utils"))]
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     pub fn new_shutdown(
         key: &ComponentKey,
         out: SourceSender,
@@ -163,13 +189,14 @@ impl SourceContext {
                 key: key.clone(),
                 globals: GlobalOptions::default(),
                 enrichment_tables: Default::default(),
+                metrics_storage: MetricsStorage::default(),
                 shutdown: shutdown_signal,
                 out,
-                proxy: Default::default(),
+                proxy: ProxyConfig::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
                 schema: Default::default(),
-                extra_context: Default::default(),
+                extra_context: ExtraContext::default(),
                 topology_metadata: None,
             },
             shutdown,
@@ -177,6 +204,12 @@ impl SourceContext {
     }
 
     #[cfg(any(test, feature = "test-utils"))]
+    #[must_use]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     pub fn new_test(
         out: SourceSender,
         schema_definitions: Option<HashMap<Option<String>, schema::Definition>>,
@@ -185,13 +218,14 @@ impl SourceContext {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
             enrichment_tables: Default::default(),
+            metrics_storage: MetricsStorage::default(),
             shutdown: ShutdownSignal::noop(),
             out,
-            proxy: Default::default(),
+            proxy: ProxyConfig::default(),
             acknowledgements: false,
             schema_definitions: schema_definitions.unwrap_or_default(),
             schema: Default::default(),
-            extra_context: Default::default(),
+            extra_context: ExtraContext::default(),
             topology_metadata: None,
         }
     }
@@ -206,13 +240,13 @@ impl SourceContext {
         }
 
         config
-            .merge_default(&self.globals.acknowledgements)
             .merge_default(&self.acknowledgements.into())
             .enabled()
     }
 
     /// Gets the log namespacing to use. The passed in value is from the source itself
     /// and will override any global default if it's set.
+    #[must_use]
     pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
         namespace
             .or(self.schema.log_namespace)

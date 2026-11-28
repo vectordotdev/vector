@@ -8,12 +8,11 @@ use crate::sinks::prelude::*;
 
 pub(super) struct MqttMetadata {
     topic: String,
-    finalizers: EventFinalizers,
 }
 
 pub(super) struct MqttEncoder {
-    pub(super) encoder: crate::codecs::Encoder<()>,
-    pub(super) transformer: crate::codecs::Transformer,
+    pub(super) encoder: vector_lib::codecs::Encoder<()>,
+    pub(super) transformer: vector_lib::codecs::Transformer,
 }
 
 impl encoding::Encoder<Event> for MqttEncoder {
@@ -60,23 +59,24 @@ impl RequestBuilder<MqttEvent> for MqttRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut input: MqttEvent,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut input: MqttEvent) -> RequestParts<Self::Metadata, Self::Events> {
         let builder = RequestMetadataBuilder::from_event(&input.event);
 
-        let metadata = MqttMetadata {
-            topic: input.topic,
-            finalizers: input.event.take_finalizers(),
-        };
+        let finalizers = input.event.take_finalizers();
+        let metadata = MqttMetadata { topic: input.topic };
 
-        (metadata, builder, input.event)
+        RequestParts {
+            metadata,
+            request_metadata_builder: builder,
+            events: input.event,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         mqtt_metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -84,7 +84,7 @@ impl RequestBuilder<MqttEvent> for MqttRequestBuilder {
         MqttRequest {
             body,
             topic: mqtt_metadata.topic,
-            finalizers: mqtt_metadata.finalizers,
+            finalizers,
             metadata,
         }
     }

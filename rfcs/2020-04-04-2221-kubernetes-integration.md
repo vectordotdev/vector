@@ -135,7 +135,7 @@ it has to be deployed on every [`Node`][k8s_docs_node] in your cluster.
 
 The following diagram demonstrates how this works:
 
-<img src="2020-04-04-2221-kubernetes-integration/deployment-topology.svg" />
+<img src="2020-04-04-2221-kubernetes-integration/deployment-topology.svg" alt="Kubernetes deployment topology" />
 
 ### What We'll Accomplish
 
@@ -149,7 +149,7 @@ The following diagram demonstrates how this works:
 
 #### Deploy using `kubectl`
 
-1.  Configure Vector:
+1. Configure Vector:
 
     Before we can deploy Vector we must configure. This is done by creating
     a Kubernetes `ConfigMap`:
@@ -173,7 +173,7 @@ The following diagram demonstrates how this works:
     kubectl create secret generic vector-config --from-file=vector.toml=vector.toml
     ```
 
-2.  Deploy Vector!
+2. Deploy Vector!
 
     Now that you have your custom `ConfigMap` ready it's time to deploy Vector.
     Create a `Namespace` and apply your `ConfigMap` and our recommended
@@ -190,20 +190,20 @@ The following diagram demonstrates how this works:
 
 #### Deploy using Helm
 
-1.  Install [`helm`][helm_install].
+1. Install [`helm`][helm_install].
 
-2.  Add our Helm Chart repo.
+2. Add our Helm Chart repo.
 
     ```shell
     helm repo add vector https://charts.vector.dev
     helm repo update
     ```
 
-3.  Configure Vector.
+3. Configure Vector.
 
     TODO: address this when we decide on the helm chart internals.
 
-4.  Deploy Vector!
+4. Deploy Vector!
 
     ```shell
     kubectl create namespace vector
@@ -227,9 +227,9 @@ The following diagram demonstrates how this works:
 
 #### Deploy using Kustomize
 
-1.  Install [`kustomize`][kustomize].
+1. Install [`kustomize`][kustomize].
 
-1.  Prepare `kustomization.yaml`.
+2. Prepare `kustomization.yaml`.
 
     Use the same config as in [`kubectl` guide][anchor_tutorial_kubectl].
 
@@ -243,7 +243,7 @@ The following diagram demonstrates how this works:
       - vector-configmap.yaml
     ```
 
-1.  Deploy Vector!
+3. Deploy Vector!
 
     ```shell
     kustomize build . | kubectl apply -f -
@@ -327,9 +327,7 @@ logs such that they're accessible from the following locations:
 - `/var/log/containers` - legacy location, kept for backward compatibility
   with pre `1.14` clusters.
 
-To make our lives easier, here's a [link][k8s_src_build_container_logs_directory]
-to the part of the k8s source that's responsible for building the path to the
-log file. If we encounter issues, this would be a good starting point to unwrap
+To make our lives easier, here's a reference to the [k8s source code responsible for building the container log path][k8s_src_build_container_logs_directory]. If we encounter issues, this would be a good starting point to unwrap
 the k8s code.
 
 #### Log file format
@@ -603,7 +601,7 @@ This worth a separate dedicated RFC though.
 #### Security considerations on deployment configuration
 
 Security considerations on deployment configuration are grouped together with
-other security-related measures. See [here](#deployment-hardening).
+other security-related measures. See the [deployment hardening](#deployment-hardening) section.
 
 #### Other notable [`PodSpec`][k8s_api_pod_spec] properties
 
@@ -1059,7 +1057,7 @@ We have a matrix of concerns, we'd like to ensure Vectors works properly with.
   - OCI (via [CRI-O](https://cri-o.io/) or [containerd](https://containerd.io/))
     - [runc](https://github.com/opencontainers/runc)
     - [runhcs](https://github.com/Microsoft/hcsshim/tree/master/cmd/runhcs) -
-      see more [here][windows_in_kubernetes]
+      see [Windows in Kubernetes][windows_in_kubernetes]
     - [Kata Containers](https://github.com/kata-containers/runtime)
     - [gVisor](https://github.com/google/gvisor)
     - [Firecracker](https://github.com/firecracker-microvm/firecracker-containerd)
@@ -1508,16 +1506,16 @@ nightly!) the supported Vector versions.
 ## Prior Art
 
 1. [Filebeat k8s integration]
-1. [Fluentbit k8s integration]
-1. [Fluentd k8s integration]
-1. [LogDNA k8s integration]
-1. [Honeycomb integration]
-1. [Bonzai logging operator] - This is approach is likely outside of the scope
+2. [Fluentbit k8s integration]
+3. [Fluentd k8s integration]
+4. [LogDNA k8s integration]
+5. [Honeycomb integration]
+6. [Bonzai logging operator] - This is approach is likely outside of the scope
    of Vector's initial Kubernetes integration because it focuses more on
    deployment strategies and topologies. There are likely some very useful
    and interesting tactics in their approach though.
-1. [Influx Helm charts]
-1. [Awesome Operators List] - an "awesome list" of operators.
+7. [Influx Helm charts]
+8. [Awesome Operators List] - an "awesome list" of operators.
 
 ## Sales Pitch
 
@@ -1541,7 +1539,7 @@ See [motivation](#motivation).
    namespaces?
    We'd just need to configure Vector to exclude this namespace?~~
    See the [Origin filtering][anchor_origin_filtering] section.
-1. ~~From what I understand, Vector requires the Kubernetes `watch` verb in order
+2. ~~From what I understand, Vector requires the Kubernetes `watch` verb in order
    to receive updates to k8s cluster changes. This is required for the
    `kubernetes_pod_metadata` transform. Yet, Fluentbit [requires the `get`,
    `list`, and `watch` verbs][fluentbit_role]. Why don't we require the same?~~
@@ -1550,7 +1548,7 @@ See [motivation](#motivation).
    complete the implementation. It's really trivial to determine from a set of
    API calls used.
    See the [Deployment Hardening](#deployment-hardening) section.
-1. What are some of the details that set Vector's Kubernetes integration apart?
+3. What are some of the details that set Vector's Kubernetes integration apart?
    This is for marketing purposes and also helps us "raise the bar".
 
 ### From Mike
@@ -1559,12 +1557,12 @@ See [motivation](#motivation).
    we want to test against? Some clusters use `docker`, some use `CRI-O`,
    [etc][container_runtimes]. Some even use [gVisor] or [Firecracker]. There
    might be differences in how different container runtimes handle logs.
-1. How do we want to approach Helm Chart Repository management.
-1. How do we implement liveness, readiness and startup probes?
+2. How do we want to approach Helm Chart Repository management.
+3. How do we implement liveness, readiness and startup probes?
    Readiness probe is a tricky one. See [Container probes](#container-probes).
-1. Can we populate file at `terminationMessagePath` with some meaningful
+4. Can we populate file at `terminationMessagePath` with some meaningful
    information when we exit or crash?
-1. Can we allow passing arbitrary fields from the `Pod` object to the event?
+5. Can we allow passing arbitrary fields from the `Pod` object to the event?
    Currently we only to pass `pod_id`, pod `annotations` and pod `labels`.
 
 ## Plan Of Attack

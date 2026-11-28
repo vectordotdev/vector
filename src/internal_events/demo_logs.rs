@@ -1,7 +1,7 @@
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
 
-#[derive(Debug)]
-pub struct DemoLogsEventProcessed;
+#[derive(Debug, NamedInternalEvent)]
+pub(crate) struct DemoLogsEventProcessed;
 
 impl InternalEvent for DemoLogsEventProcessed {
     fn emit(self) {

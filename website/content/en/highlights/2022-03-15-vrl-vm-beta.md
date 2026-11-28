@@ -20,14 +20,14 @@ the VRL program that is being run.
 
 You can give the VM a try by adding the `runtime` configuration option to your Remap transform:
 
-```toml
-[transforms.remap]
-type = "remap"
-inputs = [ "..." ]
-runtime = "vm"
-source = '''
-...
-'''
+```yaml
+transforms:
+  remap:
+    type: "remap"
+    inputs: ["..."]
+    runtime: "vm"
+    source: |
+      ...
 ```
 
 ## Let us know what you think!
@@ -40,7 +40,7 @@ If you have any feedback for us let us know on [Discord] or on [Twitter].
 Currently VRL is run using a Tree Walking interpreter. A VRL program is compiled into a tree of
 program nodes. For example, given this simple VRL program:
 
-```coffee
+```vrl
 if .flag == 42 {
   .field = 32
 } else {

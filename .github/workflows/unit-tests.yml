@@ -1,0 +1,158 @@
+# Reusable Workflow: Tests
+#
+# Runs test suites via the Makefile. By default runs unit tests and component
+# validation. Callers can enable additional suites (CLI, Vector API, behavior)
+# via boolean inputs.
+#
+# With coverage: false (default), plain cargo-nextest; uploads test results to Datadog.
+# With coverage: true, cargo-llvm-cov (COVERAGE=true); uploads an lcov artifact named "coverage-unit".
+#
+# When `default` is true (the default), all nextest-based suites run in a
+# single `make test` invocation with the relevant features enabled. When
+# `default` is false, only the explicitly enabled suites run, using a nextest
+# filter expression to select the matching tests.
+
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+      coverage:
+        description: "Collect workspace coverage (requires ci-coverage-tools from coverage.yml)"
+        required: false
+        type: boolean
+        default: false
+      default:
+        description: "Run the full default unit test suite (--workspace with default features)"
+        required: true
+        type: boolean
+      component-validation:
+        description: "Include component validation tests"
+        required: false
+        type: boolean
+        default: true
+      cli:
+        description: "Include CLI tests"
+        required: false
+        type: boolean
+        default: false
+      vector-api:
+        description: "Include Vector API tests"
+        required: false
+        type: boolean
+        default: false
+      behavior:
+        description: "Include behavior tests (cargo run based, no coverage)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  DD_ENV: "ci"
+
+jobs:
+  tests:
+    name: Tests
+    if: github.repository == 'vectordotdev/vector'
+    runs-on: ubuntu-24.04-8core
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/dd-token
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-nextest: true
+          cargo-llvm-cov: ${{ inputs.coverage }}
+          datadog-ci: ${{ !inputs.coverage }}
+          protoc: true
+          libsasl2: true
+          cargo-cache: true
+
+      - name: Run tests
+        run: |
+          add_suite() {
+            local enabled="$1" feature="$2" filter="$3"
+            [[ "${enabled}" != "true" ]] && return
+            FEATURES="${FEATURES:+$FEATURES,}${feature}"
+            if [[ "${{ inputs.default }}" != "true" ]]; then
+              SCOPE="${SCOPE:+$SCOPE | }${filter}"
+            fi
+          }
+
+          if [[ "${{ inputs.default }}" == "true" ]]; then
+            FEATURES="default"
+          else
+            FEATURES=""
+          fi
+
+          add_suite "${{ inputs.component-validation }}" "component-validation-tests" "test(components::validation::tests)"
+          add_suite "${{ inputs.cli }}" "cli-tests" "package(vector) & binary(=integration)"
+          add_suite "${{ inputs.vector-api }}" "vector-api-tests" "binary(=vector_api)"
+
+          # Skip `make test` entirely if no nextest-based suite was selected
+          # (e.g. behavior-only runs). Running `make test` with empty FEATURES
+          # would otherwise execute the workspace-wide suite.
+          if [[ "${{ inputs.default }}" == "true" ]]; then
+            make test FEATURES="${FEATURES}"
+          elif [[ -n "${SCOPE}" ]]; then
+            make test FEATURES="${FEATURES}" SCOPE="-E '${SCOPE}'"
+          else
+            echo "No nextest suites selected; skipping 'make test'"
+          fi
+        env:
+          COVERAGE: ${{ inputs.coverage }}
+
+      - name: Behavior tests
+        if: ${{ inputs.behavior }}
+        run: make test-behavior
+
+      - name: Upload test results to Datadog
+        if: ${{ !inputs.coverage && always() }}
+        run: scripts/upload-test-results.sh
+
+      - name: Download coverage tooling
+        if: ${{ inputs.coverage }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ci-coverage-tools
+          path: ${{ runner.temp }}/coverage-tools
+
+      - name: Use workflow coverage tooling
+        if: ${{ inputs.coverage }}
+        run: |
+          chmod +x "$RUNNER_TEMP/coverage-tools/vdev"
+          echo "$RUNNER_TEMP/coverage-tools" >> "$GITHUB_PATH"
+
+      - name: Generate and seal workspace coverage
+        if: ${{ inputs.coverage }}
+        run: |
+          # Explicit selection is needed for libraries in a non-virtual workspace.
+          # Use the workflow's command even if the tested ref has an older Makefile.
+          mkdir -p target/coverage-unit
+          cargo llvm-cov report --package '*' --lcov --output-path target/coverage-unit/lcov.info
+          vdev build coverage seal \
+            --plan "$RUNNER_TEMP/coverage-tools/plan.json" \
+            --artifact coverage-unit --directory target/coverage-unit
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ inputs.coverage }}
+        with:
+          name: coverage-unit
+          path: target/coverage-unit/
+          if-no-files-found: error
+          overwrite: true

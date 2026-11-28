@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{app, git};
+use crate::{app, utils::git};
 
 /// Check that shell scripts do not have common mistakes
 #[derive(clap::Args, Debug)]

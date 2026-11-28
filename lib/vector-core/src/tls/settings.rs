@@ -1,29 +1,33 @@
 use std::{
+    collections::HashMap,
     fmt,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
+    sync::{Arc, LazyLock, Mutex},
 };
 
+use super::{
+    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, ClientCertVerifier,
+    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
+    NewStoreBuilderSnafu, ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu,
+    SetCertificateSnafu, SetPrivateKeySnafu, SetSessionIdContextSnafu, SetVerifyCertSnafu,
+    SslBuildSnafu, TlsError, X509ParseSnafu, client_cert_verifier::verify_client_cert,
+};
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
-    pkcs12::{ParsedPkcs12_2, Pkcs12},
+    pkcs12::Pkcs12,
     pkey::{PKey, Private},
-    ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
+    ssl::{
+        AlpnError, ConnectConfiguration, SslContextBuilder, SslOptions, SslSessionCacheMode,
+        SslVerifyMode, select_next_proto,
+    },
     stack::Stack,
-    x509::{X509, store::X509StoreBuilder},
+    x509::{X509, store::X509StoreBuilder, verify::X509CheckFlags},
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
-
-use super::{
-    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, DerExportSnafu,
-    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
-    NewStoreBuilderSnafu, ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result,
-    SetAlpnProtocolsSnafu, SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError,
-    TlsIdentitySnafu, X509ParseSnafu,
-};
 
 pub const PEM_START_MARKER: &str = "-----BEGIN ";
 
@@ -40,7 +44,6 @@ pub const TEST_PEM_CLIENT_KEY_PATH: &str =
 
 /// Configures the TLS options for incoming/outgoing connections.
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TlsEnableableConfig {
@@ -83,7 +86,6 @@ pub struct TlsSourceConfig {
 
 /// TLS configuration.
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
@@ -171,26 +173,68 @@ impl TlsConfig {
     }
 }
 
-/// Directly usable settings for TLS connectors
-#[derive(Clone, Default)]
+/// Directly usable settings for TLS connectors, constructed with an explicit client or server role.
+#[derive(Clone)]
 pub struct TlsSettings {
     verify_certificate: bool,
     pub(super) verify_hostname: bool,
     authorities: Vec<X509>,
-    pub(super) identity: Option<IdentityStore>, // openssl::pkcs12::ParsedPkcs12 doesn't impl Clone yet
+    include_system_roots: bool,
+    pub(super) identity: Option<IdentityStore>,
     alpn_protocols: Option<Vec<u8>>,
     server_name: Option<String>,
+    pub(super) client_cert_verifier: Option<Arc<dyn ClientCertVerifier>>,
 }
 
+/// Identity store in PEM format
 #[derive(Clone)]
-pub(super) struct IdentityStore(Vec<u8>, String);
+pub struct IdentityStore {
+    cert: X509,
+    key: PKey<Private>,
+    ca: Option<Vec<X509>>,
+}
+
+impl IdentityStore {
+    /// Serializes identity (leaf cert, private key, and optional intermediate chain)
+    /// into a DER-encoded PKCS#12 archive in memory.
+    pub fn to_pkcs12(
+        &self,
+        password: &str,
+    ) -> std::result::Result<Vec<u8>, openssl::error::ErrorStack> {
+        let mut builder = Pkcs12::builder();
+        builder.cert(&self.cert);
+        builder.pkey(&self.key);
+
+        if let Some(ca_chain) = &self.ca {
+            let mut stack = Stack::new()?;
+            for ca in ca_chain {
+                stack.push(ca.clone())?;
+            }
+            builder.ca(stack);
+        }
+
+        let p12 = builder.build2(password)?;
+        let der = p12.to_der()?;
+        Ok(der)
+    }
+}
 
 impl TlsSettings {
-    /// Generate a filled out settings struct from the given optional
-    /// option set, interpreted as client options. If `options` is
-    /// `None`, the result is set to defaults (ie empty).
+    /// Construct TLS settings for a client.
+    ///
+    /// With no options, certificate and hostname verification are enabled using system roots.
     pub fn from_options(options: Option<&TlsConfig>) -> Result<Self> {
         Self::from_options_base(options, false)
+    }
+
+    /// Trust system roots in addition to configured CA certificates.
+    ///
+    /// By default, a nonempty `ca_file` replaces system roots. Use this policy for clients
+    /// whose configured CA certificates must supplement, rather than replace, system trust.
+    #[must_use]
+    pub fn with_system_roots(mut self) -> Self {
+        self.include_system_roots = true;
+        self
     }
 
     pub(super) fn from_options_base(options: Option<&TlsConfig>, for_server: bool) -> Result<Self> {
@@ -214,43 +258,51 @@ impl TlsSettings {
             verify_certificate: options.verify_certificate.unwrap_or(!for_server),
             verify_hostname: options.verify_hostname.unwrap_or(!for_server),
             authorities: options.load_authorities()?,
+            include_system_roots: false,
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
             server_name: options.server_name.clone(),
+            client_cert_verifier: None,
         })
     }
 
-    /// Returns the identity as PKCS12
+    /// Authorize TLS clients with `verifier`, on top of chain validation. Server only.
     ///
-    /// # Panics
+    /// Requires a client certificate regardless of `verify_certificate`, disables session
+    /// resumption, and requires a CA file without system roots.
     ///
-    /// Panics if the identity is invalid.
-    fn identity(&self) -> Option<ParsedPkcs12_2> {
-        // This data was test-built previously, so we can just use it
-        // here and expect the results will not fail. This can all be
-        // reworked when `openssl::pkcs12::ParsedPkcs12` gains the Clone
-        // impl.
-        self.identity.as_ref().map(|identity| {
-            Pkcs12::from_der(&identity.0)
-                .expect("Could not build PKCS#12 archive from parsed data")
-                .parse2(&identity.1)
-                .expect("Could not parse stored PKCS#12 archive")
-        })
+    /// [`TlsAcceptorReloader::reload`](super::TlsAcceptorReloader::reload) keeps the current
+    /// verifier when the new settings have none.
+    #[must_use]
+    pub fn with_client_cert_verifier(mut self, verifier: Arc<dyn ClientCertVerifier>) -> Self {
+        self.client_cert_verifier = Some(verifier);
+        self
     }
 
-    /// Returns the identity as PEM data
+    /// The configured SNI server name override, if any.
+    pub fn server_name(&self) -> Option<&str> {
+        self.server_name.as_deref()
+    }
+
+    /// Whether certificate hostname verification is enabled.
+    pub fn verify_hostname(&self) -> bool {
+        self.verify_hostname
+    }
+
+    /// Returns the identity as PEM encoded byte arrays
     ///
     /// # Panics
     ///
     /// Panics if the identity is missing, invalid, or the authorities to chain are invalid.
     pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
-        self.identity().map(|identity| {
-            let mut cert = identity
-                .cert
-                .expect("Identity required")
-                .to_pem()
+        self.identity.as_ref().map(|identity| {
+            // we have verified correct formatting at ingest time
+            let mut cert = identity.cert.to_pem().expect("Invalid stored identity");
+            let key = identity
+                .key
+                .private_key_to_pem_pkcs8()
                 .expect("Invalid stored identity");
-            if let Some(chain) = identity.ca {
+            if let Some(chain) = identity.ca.as_ref() {
                 for authority in chain {
                     cert.extend(
                         authority
@@ -259,11 +311,6 @@ impl TlsSettings {
                     );
                 }
             }
-            let key = identity
-                .pkey
-                .expect("Private key required")
-                .private_key_to_pem_pkcs8()
-                .expect("Invalid stored private key");
             (cert, key)
         })
     }
@@ -290,47 +337,96 @@ impl TlsSettings {
         context: &mut SslContextBuilder,
         for_server: bool,
     ) -> Result<()> {
-        context.set_verify(if self.verify_certificate {
-            SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
-        } else {
-            SslVerifyMode::NONE
-        });
-        if let Some(identity) = self.identity() {
-            if let Some(cert) = &identity.cert {
-                context.set_certificate(cert).context(SetCertificateSnafu)?;
+        match &self.client_cert_verifier {
+            Some(verifier) if for_server => {
+                // Without a CA, client chains would be checked against the system roots, which
+                // accept any publicly issued certificate, or against an empty store, which rejects
+                // every client.
+                if self.authorities.is_empty() {
+                    return Err(TlsError::ClientCertVerifierWithoutCa);
+                }
+                if self.include_system_roots {
+                    return Err(TlsError::ClientCertVerifierWithSystemRoots);
+                }
+                let verifier = Arc::clone(verifier);
+                context.set_verify_callback(
+                    SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT,
+                    move |preverified, store_context| {
+                        verify_client_cert(verifier.as_ref(), preverified, store_context)
+                    },
+                );
+                // A resumed session skips certificate verification, so the verifier would not run.
+                context.set_session_cache_mode(SslSessionCacheMode::OFF);
+                context.set_options(SslOptions::NO_TICKET);
+                // Only matters if the acceptor ever enables TLS 1.3.
+                context.set_num_tickets(0).context(SslBuildSnafu)?;
             }
-            if let Some(pkey) = &identity.pkey {
-                context.set_private_key(pkey).context(SetPrivateKeySnafu)?;
-            }
+            _ => context.set_verify(if self.verify_certificate {
+                SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT
+            } else {
+                SslVerifyMode::NONE
+            }),
+        }
+        if for_server {
+            // When it requests client certificates, OpenSSL fails the handshake of any client
+            // resuming a session unless a session id context is set. Each context has its own
+            // session cache and ticket keys, so a constant is enough.
+            context
+                .set_session_id_context(b"vector")
+                .context(SetSessionIdContextSnafu)?;
+        }
+        if let Some(identity) = &self.identity {
+            context
+                .set_certificate(&identity.cert)
+                .context(SetCertificateSnafu)?;
+            context
+                .set_private_key(&identity.key)
+                .context(SetPrivateKeySnafu)?;
 
-            if let Some(chain) = identity.ca {
+            if let Some(chain) = &identity.ca {
                 for cert in chain {
                     context
-                        .add_extra_chain_cert(cert)
+                        .add_extra_chain_cert(cert.clone())
                         .context(AddExtraChainCertSnafu)?;
                 }
             }
         }
-        if self.authorities.is_empty() {
+        let system_store = if self.authorities.is_empty() || self.include_system_roots {
             debug!("Fetching system root certs.");
 
             cfg_if! {
                 if #[cfg(windows)] {
-                    load_windows_certs(context).unwrap();
+                    Some(load_windows_certs().unwrap())
                 } else if #[cfg(target_os = "macos")] {
                     cfg_if! { // Panic in release builds, warn in debug builds.
                         if #[cfg(debug_assertions)] {
-                            if let Err(error) = load_mac_certs(context) {
-                                warn!("Failed to load macOS certs: {error}");
-                            }
+                            load_mac_certs()
+                                .inspect_err(|error| warn!("Failed to load macOS certs: {error}"))
+                                .ok()
                         } else {
-                            load_mac_certs(context).unwrap();
+                            Some(load_mac_certs().unwrap())
                         }
+                    }
+                } else {
+                    // Without configured CAs, retain the connector's default verification paths.
+                    if self.authorities.is_empty() {
+                        None
+                    } else {
+                        let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
+                        store.set_default_paths().context(SetVerifyCertSnafu)?;
+                        Some(store)
                     }
                 }
             }
         } else {
-            let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
+            None
+        };
+
+        if system_store.is_some() || !self.authorities.is_empty() {
+            let mut store = match system_store {
+                Some(store) => store,
+                None => X509StoreBuilder::new().context(NewStoreBuilderSnafu)?,
+            };
             for authority in &self.authorities {
                 store
                     .add_cert(authority.clone())
@@ -343,9 +439,11 @@ impl TlsSettings {
 
         if let Some(alpn) = &self.alpn_protocols {
             if for_server {
-                let server_proto = alpn.clone();
-                // See https://github.com/sfackler/rust-openssl/pull/2360.
-                let server_proto_ref: &'static [u8] = Box::leak(server_proto.into_boxed_slice());
+                // The server ALPN select callback requires a `'static` protocol list (see
+                // https://github.com/sfackler/rust-openssl/pull/2360). Intern it so the intentional
+                // leak happens at most once per distinct list, rather than leaking a fresh copy
+                // every time the context is (re)built.
+                let server_proto_ref = intern_alpn_protocols(alpn);
                 context.set_alpn_select_callback(move |_, client_proto| {
                     select_next_proto(server_proto_ref, client_proto).ok_or(AlpnError::NOACK)
                 });
@@ -359,22 +457,77 @@ impl TlsSettings {
         Ok(())
     }
 
+    /// Apply per-connection TLS settings.
+    ///
+    /// `skip_server_name` must be set when the connection targets a forward proxy rather than the
+    /// upstream destination. The `server_name` override applies only to the destination; applying it
+    /// to the proxy's own TLS connection would verify the proxy certificate against the upstream
+    /// name and fail.
     pub fn apply_connect_configuration(
         &self,
         connection: &mut ConnectConfiguration,
+        skip_server_name: bool,
     ) -> std::result::Result<(), openssl::error::ErrorStack> {
-        connection.set_verify_hostname(self.verify_hostname);
-        if let Some(server_name) = &self.server_name {
-            // Prevent native TLS lib from inferring default SNI using domain name from url.
+        if let Some(server_name) = self.server_name.as_deref().filter(|_| !skip_server_name) {
+            // Use the configured server name for both SNI and certificate hostname
+            // verification. `ConnectConfiguration::into_ssl` (called by the connector
+            // after this callback) would otherwise apply the URL host to SNI and the
+            // verify parameter, overriding the configured server name and causing a
+            // hostname mismatch. Disabling both here prevents that override.
             connection.set_use_server_name_indication(false);
-            connection.set_hostname(server_name)?;
+            connection.set_verify_hostname(false);
+
+            let server_ip = server_name.parse::<std::net::IpAddr>();
+
+            // SNI must be a hostname, not an IP literal.
+            if server_ip.is_err() {
+                connection.set_hostname(server_name)?;
+            }
+
+            if self.verify_hostname {
+                // Mirror `ConnectConfiguration::into_ssl`'s `setup_verify_hostname` so that
+                // verification against `server_name` behaves exactly as it would against the
+                // URL host, just with our name instead:
+                // https://github.com/rust-openssl/rust-openssl/blob/db9c9e2f5db2ad7b45fd894e8d297ee15bfd0c7c/openssl/src/ssl/connector.rs#L380-L389
+                let param = connection.param_mut();
+                // Disallow partial-wildcard matches such as `w*.example.com` matching
+                // `www.example.com`, so a wildcard label must be the entire leftmost label
+                // (`*.example.com`).
+                param.set_hostflags(X509CheckFlags::NO_PARTIAL_WILDCARDS);
+                match server_ip {
+                    Ok(ip) => param.set_ip(ip)?,
+                    Err(_) => param.set_host(server_name)?,
+                }
+            }
+        } else {
+            connection.set_verify_hostname(self.verify_hostname);
         }
         Ok(())
     }
 }
 
+/// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.
+///
+/// `SslContextBuilder::set_alpn_select_callback` requires the protocol list to outlive the context
+/// with a `'static` lifetime, so the bytes must be leaked. Interning by content means rebuilding an
+/// acceptor with the same ALPN configuration (e.g. on every certificate reload) reuses the existing
+/// allocation instead of leaking a fresh copy each time, keeping the leak bounded and one-time.
+fn intern_alpn_protocols(protocols: &[u8]) -> &'static [u8] {
+    static INTERNED: LazyLock<Mutex<HashMap<Vec<u8>, &'static [u8]>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+
+    let mut interned = INTERNED.lock().expect("mutex poisoned");
+
+    if let Some(existing) = interned.get(protocols).copied() {
+        return existing;
+    }
+    let leaked: &'static [u8] = Box::leak(protocols.to_vec().into_boxed_slice());
+    interned.insert(protocols.to_vec(), leaked);
+    leaked
+}
+
 impl TlsConfig {
-    fn load_authorities(&self) -> Result<Vec<X509>> {
+    pub fn load_authorities(&self) -> Result<Vec<X509>> {
         match &self.ca_file {
             None => Ok(vec![]),
             Some(filename) => {
@@ -393,7 +546,7 @@ impl TlsConfig {
         }
     }
 
-    fn load_identity(&self) -> Result<Option<IdentityStore>> {
+    pub fn load_identity(&self) -> Result<Option<IdentityStore>> {
         match (&self.crt_file, &self.key_file) {
             (None, Some(_)) => Err(TlsError::MissingCrtKeyFile),
             (None, None) => Ok(None),
@@ -401,7 +554,7 @@ impl TlsConfig {
                 let (data, filename) = open_read(filename, "certificate")?;
                 der_or_pem(
                     data,
-                    |der| self.parse_pkcs12_identity(der),
+                    |der| self.parse_pkcs12_identity(&der),
                     |pem| self.parse_pem_identity(&pem, &filename),
                 )
             }
@@ -430,45 +583,43 @@ impl TlsConfig {
         match &self.key_file {
             None => Err(TlsError::MissingKey),
             Some(key_file) => {
-                let name = crt_file.to_string_lossy().to_string();
                 let mut crt_stack = X509::stack_from_pem(pem.as_bytes())
                     .with_context(|_| X509ParseSnafu { filename: crt_file })?
                     .into_iter();
 
-                let crt = crt_stack.next().ok_or(TlsError::MissingCertificate)?;
+                let cert = crt_stack.next().ok_or(TlsError::MissingCertificate)?;
                 let key = load_key(key_file.as_path(), self.key_pass.as_ref())?;
 
                 let mut ca_stack = Stack::new().context(NewCaStackSnafu)?;
                 for intermediate in crt_stack {
                     ca_stack.push(intermediate).context(CaStackPushSnafu)?;
                 }
-
-                let pkcs12 = Pkcs12::builder()
-                    .ca(ca_stack)
-                    .name(&name)
-                    .pkey(&key)
-                    .cert(&crt)
-                    .build2("")
-                    .context(Pkcs12Snafu)?;
-                let identity = pkcs12.to_der().context(DerExportSnafu)?;
-
-                // Build the resulting parsed PKCS#12 archive,
-                // but don't store it, as it cannot be cloned.
-                // This is just for error checking.
-                pkcs12.parse2("").context(TlsIdentitySnafu)?;
-
-                Ok(Some(IdentityStore(identity, String::new())))
+                let ca: Vec<X509> = ca_stack
+                    .iter()
+                    .map(std::borrow::ToOwned::to_owned)
+                    .collect();
+                Ok(Some(IdentityStore {
+                    cert,
+                    key,
+                    ca: Some(ca),
+                }))
             }
         }
     }
 
     /// Parse identity from a DER encoded PKCS#12 archive
-    fn parse_pkcs12_identity(&self, der: Vec<u8>) -> Result<Option<IdentityStore>> {
-        let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12Snafu)?;
+    fn parse_pkcs12_identity(&self, der: &[u8]) -> Result<Option<IdentityStore>> {
+        let pkcs12 = Pkcs12::from_der(der).context(ParsePkcs12Snafu)?;
         // Verify password
         let key_pass = self.key_pass.as_deref().unwrap_or("");
-        pkcs12.parse2(key_pass).context(ParsePkcs12Snafu)?;
-        Ok(Some(IdentityStore(der, key_pass.to_string())))
+        let parsed = pkcs12.parse2(key_pass).context(ParsePkcs12Snafu)?;
+        // extract cert, key and ca and store as PEM sow e can return an IdentityStore
+        let cert = parsed.cert.ok_or(TlsError::MissingCertificate)?;
+        let key = parsed.pkey.ok_or(TlsError::MissingKey)?;
+        let ca: Option<Vec<X509>> = parsed
+            .ca
+            .map(|stack| stack.iter().map(std::borrow::ToOwned::to_owned).collect());
+        Ok(Some(IdentityStore { cert, key, ca }))
     }
 }
 
@@ -479,7 +630,7 @@ impl TlsConfig {
 /// Load the system default certs from `schannel` this should be in place
 /// of openssl-probe on linux.
 #[cfg(windows)]
-fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
+fn load_windows_certs() -> Result<X509StoreBuilder> {
     use super::SchannelSnafu;
 
     let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
@@ -493,15 +644,11 @@ fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
         store.add_cert(cert).context(AddCertToStoreSnafu)?;
     }
 
-    builder
-        .set_verify_cert_store(store.build())
-        .context(SetVerifyCertSnafu)?;
-
-    Ok(())
+    Ok(store)
 }
 
 #[cfg(target_os = "macos")]
-fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
+fn load_mac_certs() -> Result<X509StoreBuilder> {
     use std::collections::HashMap;
 
     use security_framework::trust_settings::{Domain, TrustSettings, TrustSettingsForCertificate};
@@ -551,11 +698,7 @@ fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
         }
     }
 
-    builder
-        .set_verify_cert_store(store.build())
-        .context(SetVerifyCertSnafu)?;
-
-    Ok(())
+    Ok(store)
 }
 
 impl fmt::Debug for TlsSettings {
@@ -563,6 +706,10 @@ impl fmt::Debug for TlsSettings {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
+            .field(
+                "has_client_cert_verifier",
+                &self.client_cert_verifier.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -746,6 +893,66 @@ mod test {
         assert_eq!(settings.authorities.len(), 1);
     }
 
+    #[tokio::test]
+    async fn system_roots_preserve_custom_ca_verification() {
+        use std::time::Duration;
+
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        let server = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
+        .unwrap();
+        let mut listener = server.bind(&"127.0.0.1:0".parse().unwrap()).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        for trust_private_ca in [false, true] {
+            let options = TlsConfig {
+                ca_file: trust_private_ca.then(|| TEST_PEM_CA_PATH.into()),
+                ..Default::default()
+            };
+            let client: MaybeTlsSettings = TlsSettings::from_options(Some(&options))
+                .unwrap()
+                .with_system_roots()
+                .into();
+
+            let receive = async {
+                let connection = client.connect("localhost", &addr).await;
+                if trust_private_ca {
+                    let mut connection = connection.unwrap();
+                    let mut payload = [0; 7];
+                    connection.read_exact(&mut payload).await.unwrap();
+                    assert_eq!(&payload, b"trusted");
+                } else {
+                    assert!(matches!(connection, Err(TlsError::Handshake { .. })));
+                }
+            };
+            let serve = async {
+                let mut connection = listener.accept().await.unwrap();
+                let handshake = connection.handshake().await;
+                if trust_private_ca {
+                    handshake.unwrap();
+                    connection.write_all(b"trusted").await.unwrap();
+                } else {
+                    assert!(handshake.is_err());
+                }
+            };
+            tokio::time::timeout(Duration::from_secs(10), async {
+                tokio::join!(receive, serve);
+            })
+            .await
+            .unwrap();
+        }
+    }
+
     #[test]
     fn from_options_inline_ca() {
         let ca = String::from_utf8(
@@ -812,6 +1019,109 @@ mod test {
         // Actual error is an ASN parse, doesn't really matter
     }
 
+    // End-to-end regression test for the OpenSSL hostname-mismatch bug: the server presents a
+    // certificate for `localhost` (CN=localhost, no SAN) while the client connects by IP, so the
+    // connection URL host (`127.0.0.1`) does not match the certificate. Verification must instead
+    // use the configured `server_name`.
+    #[tokio::test]
+    async fn server_name_is_used_for_hostname_verification() {
+        use std::{net::SocketAddr, pin::Pin};
+
+        use openssl::ssl::{SslConnector, SslMethod};
+
+        // Connects to `addr` by IP, driving `into_ssl` with `url_host` exactly as
+        // `hyper-openssl` does (it passes the connection URL host).
+        async fn connect(
+            server_name: Option<&str>,
+            skip_server_name: bool,
+            url_host: &str,
+            addr: SocketAddr,
+        ) -> std::result::Result<(), String> {
+            let settings = TlsSettings::from_options(Some(&TlsConfig {
+                ca_file: Some("tests/data/ca/intermediate_server/certs/ca-chain.cert.pem".into()),
+                server_name: server_name.map(Into::into),
+                ..Default::default()
+            }))
+            .unwrap();
+
+            let tcp = tokio::net::TcpStream::connect(addr)
+                .await
+                .map_err(|e| e.to_string())?;
+            let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+            settings
+                .apply_context(&mut builder)
+                .map_err(|e| e.to_string())?;
+            let mut config = builder.build().configure().unwrap();
+            settings
+                .apply_connect_configuration(&mut config, skip_server_name)
+                .map_err(|e| e.to_string())?;
+            let ssl = config.into_ssl(url_host).map_err(|e| e.to_string())?;
+            let mut stream = tokio_openssl::SslStream::new(ssl, tcp).unwrap();
+            Pin::new(&mut stream)
+                .connect()
+                .await
+                .map_err(|e| e.to_string())
+        }
+
+        let server_settings = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
+        .unwrap();
+        let reloader = server_settings
+            .reloadable_acceptor()
+            .unwrap()
+            .expect("tls enabled, so an acceptor should exist");
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut listener = server_settings
+            .bind_reloadable(&addr, Some(reloader))
+            .await
+            .unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            while let Ok(mut stream) = listener.accept().await {
+                stream.handshake().await.ok();
+            }
+        });
+
+        // With `server_name` set to the certificate's name, verification uses it and succeeds even
+        // though the connection host is the IP. This passes only because `server_name` is applied
+        // to hostname verification (the bug this fixes).
+        connect(Some("localhost"), false, "127.0.0.1", local_addr)
+            .await
+            .expect("handshake should succeed when server_name matches the certificate");
+
+        // Control: without `server_name`, verification falls back to the connection host (the IP),
+        // which the certificate does not cover, so it fails. This proves verification is active.
+        let error = connect(None, false, "127.0.0.1", local_addr)
+            .await
+            .expect_err("handshake should fail when verifying against the IP");
+        assert!(
+            error.contains("certificate verify failed"),
+            "expected a certificate verification failure, got: {error}"
+        );
+
+        // With `skip_server_name` (as when dialing a proxy), the `server_name` override is ignored
+        // and verification falls back to the connection host (the IP), which fails. This is what
+        // keeps an HTTPS proxy's own certificate verified against the proxy host.
+        let error = connect(Some("localhost"), true, "127.0.0.1", local_addr)
+            .await
+            .expect_err("handshake should fail when the server_name override is skipped");
+        assert!(
+            error.contains("certificate verify failed"),
+            "expected a certificate verification failure, got: {error}"
+        );
+
+        server.abort();
+    }
+
     #[test]
     fn from_config_none() {
         assert!(MaybeTlsSettings::from_config(None, true).unwrap().is_raw());
@@ -849,6 +1159,81 @@ mod test {
         let config = make_config(enabled, set_crt, set_key);
         MaybeTlsSettings::from_config(Some(&config), for_server)
             .expect("Failed to generate settings from config")
+    }
+
+    #[tokio::test]
+    async fn verified_client_can_resume_its_session() {
+        use std::{net::SocketAddr, pin::Pin};
+
+        use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslSession, SslVersion};
+        use tokio::{io::AsyncWriteExt as _, net::TcpStream};
+        use tokio_openssl::SslStream;
+
+        async fn connect(
+            connector: &SslConnector,
+            addr: SocketAddr,
+            session: Option<&SslSession>,
+        ) -> SslStream<TcpStream> {
+            let mut ssl = connector
+                .configure()
+                .unwrap()
+                .into_ssl("localhost")
+                .unwrap();
+            if let Some(session) = session {
+                // SAFETY: the session was issued to a connection of the same connector.
+                unsafe { ssl.set_session(session).unwrap() };
+            }
+            let tcp = TcpStream::connect(addr).await.unwrap();
+            let mut stream = SslStream::new(ssl, tcp).unwrap();
+            Pin::new(&mut stream)
+                .connect()
+                .await
+                .expect("the server accepts the client");
+            // OpenSSL never resumes the session of a connection that was not shut down cleanly.
+            stream.shutdown().await.ok();
+            stream
+        }
+
+        let config = TlsEnableableConfig {
+            enabled: Some(true),
+            options: TlsConfig {
+                verify_certificate: Some(true),
+                ca_file: Some(TEST_PEM_CA_PATH.into()),
+                crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                key_file: Some(TEST_PEM_KEY_PATH.into()),
+                ..Default::default()
+            },
+        };
+        let mut listener = MaybeTlsSettings::from_config(Some(&config), true)
+            .unwrap()
+            .bind(&"127.0.0.1:0".parse().unwrap())
+            .await
+            .unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            while let Ok(mut stream) = listener.accept().await {
+                stream.handshake().await.ok();
+            }
+        });
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder.set_ca_file(TEST_PEM_CA_PATH).unwrap();
+        builder
+            .set_certificate_chain_file(TEST_PEM_CLIENT_CRT_PATH)
+            .unwrap();
+        builder
+            .set_private_key_file(TEST_PEM_CLIENT_KEY_PATH, SslFiletype::PEM)
+            .unwrap();
+        // Under TLS 1.2, the session is available as soon as the handshake completes.
+        builder
+            .set_max_proto_version(Some(SslVersion::TLS1_2))
+            .unwrap();
+        let connector = builder.build();
+
+        let first = connect(&connector, addr, None).await;
+        let session = first.ssl().session().unwrap().to_owned();
+        let second = connect(&connector, addr, Some(&session)).await;
+        assert!(second.ssl().session_reused());
     }
 
     fn make_config(enabled: Option<bool>, set_crt: bool, set_key: bool) -> TlsEnableableConfig {

@@ -63,8 +63,9 @@ use metrics_util::{
 };
 use parking_lot::Mutex;
 use quanta::{Clock, Instant};
+use vector_common::atomic::AtomicF64;
 
-use super::storage::{AtomicF64, Histogram};
+use super::storage::Histogram;
 
 /// The generation of a metric.
 ///
@@ -253,6 +254,9 @@ where
     }
 }
 
+/// The last-seen generation and update time of each tracked metric.
+type GenerationMap<K> = HashMap<K, (Generation, Instant)>;
+
 /// Tracks recency of metric updates by their registry generation and time.
 ///
 /// In many cases, a user may have a long-running process where metrics are stored over time using
@@ -268,7 +272,7 @@ where
 /// tracking recency does not matter, despite their otherwise tight coupling.
 pub(super) struct Recency<K, M: KeyMatcher<K>> {
     mask: MetricKindMask,
-    inner: Mutex<(Clock, HashMap<K, (Generation, Instant)>)>,
+    inner: Mutex<(Clock, GenerationMap<K>)>,
     global_idle_timeout: Option<Duration>,
     per_set_timeouts: Mutex<PerSetTimeout<K, M>>,
 }

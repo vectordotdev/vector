@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::util::get_channel;
+use crate::utils::git::get_channel;
 
 /// Provide the release channel (release/nightly/custom).
 /// This command is intended for use only within GitHub build workflows.

@@ -1,8 +1,0 @@
-subscription ComponentReceivedBytesTotalsSubscription($interval: Int!) {
-    componentReceivedBytesTotals(interval: $interval) {
-        componentId
-        metric {
-            receivedBytesTotal
-        }
-    }
-}

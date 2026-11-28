@@ -1,8 +1,9 @@
-//! Integration tests for http_client source.
+//! Integration tests for `http_client` source.
 //! The container configuration file is `docker-compose.http_client.yml`
 //! It leverages a static file server ("dufs"), which serves the files in tests/data/http-client
 
 use std::collections::HashMap;
+use vector_lib::codecs::decoding::{JsonDeserializerConfig, NativeJsonDeserializerConfig};
 
 use tokio::time::{Duration, Instant};
 use vector_lib::{codecs::decoding::DeserializerConfig, config::log_schema};
@@ -35,13 +36,13 @@ fn dufs_https_address() -> String {
 }
 
 /// The error path should not yield any events and must emit the required error internal events.
-/// Consider extracting this function into test_util , if it is always true that if the error
+/// Consider extracting this function into `test_util` , if it is always true that if the error
 /// internal event metric is fired that no events would be outputted by the source.
 pub(crate) async fn run_error(config: HttpClientConfig) {
     let events =
         run_and_assert_source_error(config, Duration::from_secs(3), &COMPONENT_ERROR_TAGS).await;
 
-    assert!(events.is_empty());
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
 }
 
 /// An endpoint in the config that is not reachable should generate errors.
@@ -56,6 +57,7 @@ async fn invalid_endpoint() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -75,6 +77,7 @@ async fn collected_logs_bytes() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -96,10 +99,11 @@ async fn collected_logs_json() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -121,10 +125,11 @@ async fn collected_metrics_native_json() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::NativeJson(Default::default()),
+        decoding: DeserializerConfig::NativeJson(NativeJsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -151,10 +156,11 @@ async fn collected_trace_native_json() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::NativeJson(Default::default()),
+        decoding: DeserializerConfig::NativeJson(NativeJsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -176,10 +182,11 @@ async fn unauthorized_no_auth() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -195,10 +202,11 @@ async fn unauthorized_wrong_auth() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: Some(Auth::Basic {
             user: "white_rabbit".to_string(),
@@ -217,10 +225,11 @@ async fn authorized() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: Some(Auth::Basic {
             user: "user".to_string(),
@@ -239,10 +248,11 @@ async fn tls_invalid_ca() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: Some(TlsConfig {
             ca_file: Some("tests/integration/http-client/data/certs/invalid-ca-cert.pem".into()),
             ..Default::default()
@@ -261,10 +271,11 @@ async fn tls_valid() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: Some(TlsConfig {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
@@ -284,10 +295,11 @@ async fn shutdown() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
-        decoding: DeserializerConfig::Json(Default::default()),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: None,
         log_namespace: None,

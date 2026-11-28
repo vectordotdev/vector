@@ -1,0 +1,13 @@
+sinks:
+  my_sink_id:
+    type: file
+    inputs:
+      - my-source-or-transform-id
+    base_dir: /var/log/vector
+    compression: none
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    idle_timeout_secs: 30
+    path: /var/log/vector/vector-%Y-%m-%d.log
+    timezone: local

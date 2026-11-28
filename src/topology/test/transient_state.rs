@@ -1,3 +1,5 @@
+use vector_lib::extra_context::ExtraContext;
+
 use crate::{
     config::Config,
     test_util::{
@@ -29,12 +31,10 @@ async fn closed_source() {
 
     topology.sources_finished().await;
 
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -53,12 +53,10 @@ async fn remove_sink() {
     new_config.add_sink("out1", &["trans"], basic_sink(1).1);
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -78,12 +76,10 @@ async fn remove_transform() {
     new_config.add_sink("out1", &["trans1"], basic_sink(1).1);
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -104,10 +100,8 @@ async fn replace_transform() {
     new_config.add_sink("out1", &["trans1"], basic_sink(1).1);
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
+        .await
+        .unwrap();
 }

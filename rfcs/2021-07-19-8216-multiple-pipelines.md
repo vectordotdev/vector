@@ -36,8 +36,8 @@ Large Vector users often require complex Vector topologies to facilitate the col
 This change will introduce the concept of pipelines to users. A pipeline is defined as:
 
 1. A collection of transforms defined together, outside of the top-level configuration file
-1. Able to draw input from and send output to components defined in the top-level configuration, but are isolated from other pipelines
-1. Having each contained component's internal metrics tagged with the `id` of the pipeline
+2. Able to draw input from and send output to components defined in the top-level configuration, but are isolated from other pipelines
+3. Having each contained component's internal metrics tagged with the `id` of the pipeline
 
 Pipelines will be loaded from a `pipelines` sub-directory relative to the Vector configuration directory (e.g., `/etc/vector/pipelines`). Therefore, if a user changes the location of the Vector configuration directory they will also change the `pipelines` directory path. They are coupled.
 

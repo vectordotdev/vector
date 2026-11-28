@@ -1,10 +1,14 @@
 #!/bin/bash
 for arg in "$@"
 do
-  if [[ $arg = --after-cursor=* ]]
-  then
-    after="${arg#--after-cursor=}"
-  fi
+  case "$arg" in
+    --after-cursor=* )
+      after="${arg#--after-cursor=}"
+      ;;
+    --version )
+      printf "systemd 300 (300.3-vector99)\n+XYZ -ABC\n"
+      exit
+  esac
 done
 
 lines=(

@@ -1,0 +1,29 @@
+features:
+  - e2e-tests-datadog
+
+test: "e2e"
+
+test_filter: "datadog::metrics::"
+
+runner:
+  env:
+    VECTOR_RECEIVE_PORT: "8081"
+    FAKE_INTAKE_AGENT_ENDPOINT: "http://fakeintake-agent:80"
+    FAKE_INTAKE_VECTOR_ENDPOINT: "http://fakeintake-vector:80"
+
+matrix:
+  # Keep the last Agent version before v3 series became the default, and also
+  # test the floating v7 tag to cover v3 series intake.
+  agent_version: ["7.80.4", "7", "6"]
+  # Validate every series API version still supported by the Datadog metrics sink.
+  series_api_version: ["v2", "v3"]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/common/datadog.rs"
+  - "src/sources/datadog_agent/**"
+  - "src/internal_events/datadog_*"
+  - "src/sinks/datadog/metrics/**"
+  - "src/sinks/util/**"
+  - "tests/e2e/datadog-metrics/**"

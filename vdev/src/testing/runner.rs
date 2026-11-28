@@ -1,20 +1,23 @@
 use anyhow::Result;
-use std::{collections::HashSet, env, process::Command};
+use std::{collections::HashSet, path::PathBuf, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
-use crate::testing::test_runner_dockerfile;
 use crate::{
     app::{self, CommandExt as _},
-    environment::{Environment, append_environment_variables},
     testing::{
         build::prepare_build_command,
         docker::{DOCKER_SOCKET, docker_command},
+        test_runner_dockerfile,
     },
-    util::{ChainArgs as _, IS_A_TTY},
+    utils::{
+        IS_A_TTY,
+        command::ChainArgs as _,
+        environment::{Environment, append_environment_variables},
+    },
 };
 
 const MOUNT_PATH: &str = "/home/vector";
-const TARGET_PATH: &str = "/home/target";
+pub(super) const TARGET_PATH: &str = "/home/target";
 const VOLUME_TARGET: &str = "vector_target";
 const VOLUME_CARGO_GIT: &str = "vector_cargo_git";
 const VOLUME_CARGO_REGISTRY: &str = "vector_cargo_registry";
@@ -26,8 +29,33 @@ const TEST_COMMAND: &[&str] = &[
     "--no-fail-fast",
     "--no-default-features",
 ];
-// The upstream container we publish artifacts to on a successful master build.
-const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
+const BUILD_TESTS_COMMAND: &[&str] = &[
+    "cargo",
+    "nextest",
+    "run",
+    "--no-run",
+    "--no-default-features",
+];
+/// Lock file in the shared target volume (`TARGET_PATH`), held by [`ContainerTestRunner::build_tests`]
+/// so concurrent runners can't relink shared artifacts before the follow-up step reads them.
+const BUILD_LOCK_PATH: &str = "/home/target/.vdev-build.lock";
+const LOCAL_TEST_COMMAND: &[&str] = &["cargo", "nextest", "run", "--no-fail-fast"];
+const COVERAGE_COMMAND: &[&str] = &[
+    "cargo",
+    "llvm-cov",
+    "nextest",
+    "--workspace",
+    "--no-fail-fast",
+    "--no-default-features",
+];
+/// Coverage output path inside the test runner container.
+const COVERAGE_OUTPUT_DIR: &str = "/coverage";
+/// Coverage output path on the host (relative to project root).
+pub(crate) const LOCAL_COVERAGE_OUTPUT_DIR: &str = "target/coverage";
+
+pub(crate) fn local_coverage_output_dir() -> PathBuf {
+    std::path::Path::new(app::path()).join(LOCAL_COVERAGE_OUTPUT_DIR)
+}
 
 pub enum RunnerState {
     Running,
@@ -40,24 +68,24 @@ pub enum RunnerState {
     Unknown,
 }
 
-pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
-    if container {
-        Ok(Box::new(DockerTestRunner))
-    } else {
-        Ok(Box::new(LocalTestRunner))
-    }
-}
-
 pub trait TestRunner {
+    #[allow(clippy::too_many_arguments)]
     fn test(
         &self,
         outer_env: &Environment,
         inner_env: &Environment,
-        features: Option<&[String]>,
         args: &[String],
-        reuse_image: bool,
-        build: bool,
+        coverage: bool,
+        coverage_env: Option<&str>,
     ) -> Result<()>;
+}
+
+/// Return the coverage output filename, optionally scoped to an environment.
+pub(crate) fn coverage_filename(coverage_env: Option<&str>) -> String {
+    match coverage_env {
+        Some(env) => format!("lcov-{env}.info"),
+        None => "lcov.info".to_string(),
+    }
 }
 
 pub trait ContainerTestRunner: TestRunner {
@@ -100,13 +128,7 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(RunnerState::Missing)
     }
 
-    fn ensure_running(
-        &self,
-        features: Option<&[String]>,
-        config_environment_variables: &Environment,
-        reuse_image: bool,
-        build: bool,
-    ) -> Result<()> {
+    fn ensure_running(&self, config_environment_variables: &Environment) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
             RunnerState::Created | RunnerState::Exited => self.start()?,
@@ -117,7 +139,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, config_environment_variables, reuse_image, build)?;
+                self.build(config_environment_variables)?;
                 self.create()?;
                 self.start()?;
             }
@@ -145,32 +167,29 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(())
     }
 
-    fn build(
-        &self,
-        features: Option<&[String]>,
-        config_env_vars: &Environment,
-        reuse_image: bool,
-        build: bool,
-    ) -> Result<()> {
+    fn build(&self, config_env_vars: &Environment) -> Result<()> {
         let image_name = self.image_name();
 
-        // When reuse_image is true, skip build if image already exists (useful in CI).
-        // Otherwise, always rebuild to pick up local code changes.
-        if reuse_image {
-            let mut check_command = docker_command(["image", "inspect", &image_name]);
-            if check_command
-                .output()
-                .is_ok_and(|output| output.status.success())
-            {
-                info!("Image {image_name} already exists, skipping build");
-                return Ok(());
-            }
-        }
-
         let dockerfile = test_runner_dockerfile();
-        let mut command =
-            prepare_build_command(&image_name, &dockerfile, features, config_env_vars, build);
+        let mut command = prepare_build_command(&image_name, &dockerfile, config_env_vars);
         waiting!("Building image {}", image_name);
+        command.check_run()
+    }
+
+    /// Compile the tests selected by `args` in the running container without running them, then
+    /// run the shell command `then` while still holding the target-volume build lock.
+    fn build_tests(&self, args: &[String], then: &str) -> Result<()> {
+        let mut command = docker_command(["exec"]);
+        if *IS_A_TTY {
+            command.arg("--tty");
+        }
+        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
+        if let Ok(color) = std::env::var("CARGO_TERM_COLOR") {
+            command.args(["--env", &format!("CARGO_TERM_COLOR={color}")]);
+        }
+        command.arg(self.container_name());
+        command.args(locked_build_command(args, then));
+        waiting!("Compiling tests in {}", self.container_name());
         command.check_run()
     }
 
@@ -239,6 +258,18 @@ pub trait ContainerTestRunner: TestRunner {
     }
 }
 
+/// The command that compiles tests and then runs `then`, both under one `flock`.
+fn locked_build_command(args: &[String], then: &str) -> Vec<String> {
+    let mut command: Vec<String> = ["flock", BUILD_LOCK_PATH, "sh", "-c"]
+        .map(String::from)
+        .into();
+    command.push(format!(r#""$@" && {then}"#));
+    command.push("sh".to_string());
+    command.extend(BUILD_TESTS_COMMAND.iter().map(ToString::to_string));
+    command.extend(args.iter().cloned());
+    command
+}
+
 impl<T> TestRunner for T
 where
     T: ContainerTestRunner,
@@ -247,12 +278,11 @@ where
         &self,
         outer_env: &Environment,
         config_environment_variables: &Environment,
-        features: Option<&[String]>,
         args: &[String],
-        reuse_image: bool,
-        build: bool,
+        coverage: bool,
+        coverage_env: Option<&str>,
     ) -> Result<()> {
-        self.ensure_running(features, config_environment_variables, reuse_image, build)?;
+        self.ensure_running(config_environment_variables)?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -270,8 +300,20 @@ where
         append_environment_variables(&mut command, config_environment_variables);
 
         command.arg(self.container_name());
-        command.args(TEST_COMMAND);
+        command.args(if coverage {
+            COVERAGE_COMMAND
+        } else {
+            TEST_COMMAND
+        });
         command.args(args);
+        if coverage {
+            let filename = coverage_filename(coverage_env);
+            command.args([
+                "--lcov",
+                "--output-path",
+                &format!("{COVERAGE_OUTPUT_DIR}/{filename}"),
+            ]);
+        }
 
         command.check_run()
     }
@@ -300,12 +342,23 @@ impl IntegrationTestRunner {
 
         volumes.push(format!("{VOLUME_TARGET}:/output"));
 
+        // Always mount the coverage directory so the container can be reused
+        // for coverage runs without needing to be recreated.
+        let coverage_dir = local_coverage_output_dir();
+        std::fs::create_dir_all(&coverage_dir)?;
+        volumes.push(format!("{}:{COVERAGE_OUTPUT_DIR}", coverage_dir.display()));
+
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
             network,
             volumes,
         })
+    }
+
+    /// Returns true if this runner uses the shared image (with all features)
+    pub(super) fn is_shared_runner(&self) -> bool {
+        self.integration.is_none()
     }
 
     pub(super) fn ensure_network(&self) -> Result<()> {
@@ -355,8 +408,7 @@ impl ContainerTestRunner for IntegrationTestRunner {
     fn container_name(&self) -> String {
         if let Some(integration) = self.integration.as_ref() {
             format!(
-                "vector-test-runner-{}-{}",
-                integration,
+                "vector-test-runner-{integration}-{}",
                 RustToolchainConfig::rust_version()
             )
         } else {
@@ -377,30 +429,6 @@ impl ContainerTestRunner for IntegrationTestRunner {
     }
 }
 
-pub struct DockerTestRunner;
-
-impl ContainerTestRunner for DockerTestRunner {
-    fn network_name(&self) -> Option<&str> {
-        None
-    }
-
-    fn container_name(&self) -> String {
-        format!("vector-test-runner-{}", RustToolchainConfig::rust_version())
-    }
-
-    fn image_name(&self) -> String {
-        env::var("ENVIRONMENT_UPSTREAM").unwrap_or_else(|_| UPSTREAM_IMAGE.to_string())
-    }
-
-    fn needs_docker_socket(&self) -> bool {
-        false
-    }
-
-    fn volumes(&self) -> Vec<String> {
-        Vec::default()
-    }
-}
-
 pub struct LocalTestRunner;
 
 impl TestRunner for LocalTestRunner {
@@ -408,14 +436,25 @@ impl TestRunner for LocalTestRunner {
         &self,
         outer_env: &Environment,
         inner_env: &Environment,
-        _features: Option<&[String]>,
         args: &[String],
-        _reuse_image: bool,
-        _build: bool,
+        coverage: bool,
+        coverage_env: Option<&str>,
     ) -> Result<()> {
-        let mut command = Command::new(TEST_COMMAND[0]);
-        command.args(&TEST_COMMAND[1..]);
+        let test_cmd = if coverage {
+            COVERAGE_COMMAND
+        } else {
+            LOCAL_TEST_COMMAND
+        };
+        let mut command = Command::new(test_cmd[0]);
+        command.args(&test_cmd[1..]);
         command.args(args);
+        if coverage {
+            let coverage_dir = local_coverage_output_dir();
+            std::fs::create_dir_all(&coverage_dir)?;
+            command.arg("--lcov");
+            command.arg("--output-path");
+            command.arg(coverage_dir.join(coverage_filename(coverage_env)));
+        }
 
         for (key, value) in outer_env {
             if let Some(value) = value {
@@ -429,5 +468,33 @@ impl TestRunner for LocalTestRunner {
         }
 
         command.check_run()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn locked_build_runs_build_and_follow_up_under_one_lock() {
+        let args = ["--features".to_string(), "a,b".to_string()];
+        assert_eq!(
+            locked_build_command(&args, "cp x y"),
+            [
+                "flock",
+                "/home/target/.vdev-build.lock",
+                "sh",
+                "-c",
+                r#""$@" && cp x y"#,
+                "sh",
+                "cargo",
+                "nextest",
+                "run",
+                "--no-run",
+                "--no-default-features",
+                "--features",
+                "a,b",
+            ]
+        );
     }
 }

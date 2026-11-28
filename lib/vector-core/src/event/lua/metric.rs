@@ -7,22 +7,22 @@ use super::{
         Metric, MetricKind, MetricValue, StatisticKind,
         metric::{self, MetricSketch, MetricTags, TagValue, TagValueSet},
     },
-    util::{table_to_timestamp, timestamp_to_table},
+    util::{LuaInt, table_to_timestamp, timestamp_to_table},
 };
+use crate::event::MetricTagMode;
 use crate::metrics::AgentDDSketch;
 
 pub struct LuaMetric {
     pub metric: Metric,
-    pub multi_value_tags: bool,
+    pub tag_mode: MetricTagMode,
 }
 
 pub struct LuaMetricTags {
     pub tags: MetricTags,
-    pub multi_value_tags: bool,
+    pub tag_mode: MetricTagMode,
 }
 
 impl IntoLua for MetricKind {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             MetricKind::Absolute => "absolute",
@@ -83,12 +83,18 @@ impl FromLua for TagValueSet {
                 for value in table.sequence_values() {
                     match value {
                         Ok(value) => string_values.push(value),
-                        Err(_) => unimplemented!(),
+                        Err(err) => {
+                            return Err(LuaError::FromLuaConversionError {
+                                from: "metric tag value",
+                                to: String::from("string"),
+                                message: Some(err.to_string()),
+                            });
+                        }
                     }
                 }
                 Ok(Self::from(string_values))
             }
-            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy().to_string()])),
+            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy()])),
             _ => Err(mlua::Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: String::from("metric tag value"),
@@ -106,8 +112,8 @@ impl FromLua for MetricTags {
 
 impl IntoLua for LuaMetricTags {
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
-        if self.multi_value_tags {
-            Ok(LuaValue::Table(lua.create_table_from(
+        match self.tag_mode {
+            MetricTagMode::Full => Ok(LuaValue::Table(lua.create_table_from(
                 self.tags.0.into_iter().map(|(key, value)| {
                     let value: Vec<_> = value
                         .into_iter()
@@ -115,17 +121,16 @@ impl IntoLua for LuaMetricTags {
                         .collect();
                     (key, value)
                 }),
-            )?))
-        } else {
-            Ok(LuaValue::Table(
+            )?)),
+            MetricTagMode::Single => Ok(LuaValue::Table(
                 lua.create_table_from(self.tags.iter_single())?,
-            ))
+            )),
+            MetricTagMode::Auto => unreachable!("Auto is not used by the lua transform"),
         }
     }
 }
 
 impl IntoLua for LuaMetric {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let tbl = lua.create_table()?;
 
@@ -144,7 +149,7 @@ impl IntoLua for LuaMetric {
                 "tags",
                 LuaMetricTags {
                     tags,
-                    multi_value_tags: self.multi_value_tags,
+                    tag_mode: self.tag_mode,
                 },
             )?;
         }
@@ -163,7 +168,7 @@ impl IntoLua for LuaMetric {
             }
             MetricValue::Set { values } => {
                 let set = lua.create_table()?;
-                set.raw_set("values", lua.create_sequence_from(values.into_iter())?)?;
+                set.raw_set("values", lua.create_sequence_from(values)?)?;
                 tbl.raw_set("set", set)?;
             }
             MetricValue::Distribution { samples, statistic } => {
@@ -186,6 +191,8 @@ impl IntoLua for LuaMetric {
                 aggregated_histogram.raw_set("buckets", buckets)?;
                 aggregated_histogram.raw_set("counts", counts)?;
                 aggregated_histogram.raw_set("count", count)?;
+                // An unreported sum leaves the key unset, so a script sees `nil` rather than a
+                // zero it cannot distinguish from a real measurement.
                 aggregated_histogram.raw_set("sum", sum)?;
                 tbl.raw_set("aggregated_histogram", aggregated_histogram)?;
             }
@@ -229,6 +236,10 @@ impl IntoLua for LuaMetric {
     }
 }
 
+fn ints<T>(values: Vec<LuaInt<T>>) -> Vec<T> {
+    values.into_iter().map(|LuaInt(value)| value).collect()
+}
+
 impl FromLua for Metric {
     #[allow(clippy::too_many_lines)]
     fn from_lua(value: LuaValue, _: &Lua) -> LuaResult<Self> {
@@ -248,7 +259,9 @@ impl FromLua for Metric {
             .raw_get::<Option<LuaTable>>("timestamp")?
             .map(table_to_timestamp)
             .transpose()?;
-        let interval_ms: Option<u32> = table.raw_get("interval_ms")?;
+        let interval_ms = table
+            .raw_get::<Option<LuaInt<u32>>>("interval_ms")?
+            .map(|LuaInt(interval_ms)| interval_ms);
         let namespace: Option<String> = table.raw_get("namespace")?;
         let tags: Option<MetricTags> = table.raw_get("tags")?;
         let kind = table
@@ -269,7 +282,7 @@ impl FromLua for Metric {
             }
         } else if let Some(distribution) = table.raw_get::<Option<LuaTable>>("distribution")? {
             let values: Vec<f64> = distribution.raw_get("values")?;
-            let rates: Vec<u32> = distribution.raw_get("sample_rates")?;
+            let rates = ints(distribution.raw_get("sample_rates")?);
             MetricValue::Distribution {
                 samples: metric::zip_samples(values, rates),
                 statistic: distribution.raw_get("statistic")?,
@@ -277,7 +290,7 @@ impl FromLua for Metric {
         } else if let Some(aggregated_histogram) =
             table.raw_get::<Option<LuaTable>>("aggregated_histogram")?
         {
-            let counts: Vec<u64> = aggregated_histogram.raw_get("counts")?;
+            let counts: Vec<u64> = ints(aggregated_histogram.raw_get("counts")?);
             let buckets: Vec<f64> = aggregated_histogram.raw_get("buckets")?;
             let count = counts.iter().sum();
             MetricValue::AggregatedHistogram {
@@ -292,20 +305,20 @@ impl FromLua for Metric {
             let values: Vec<f64> = aggregated_summary.raw_get("values")?;
             MetricValue::AggregatedSummary {
                 quantiles: metric::zip_quantiles(quantiles, values),
-                count: aggregated_summary.raw_get("count")?,
+                count: aggregated_summary.raw_get::<LuaInt<u64>>("count")?.0,
                 sum: aggregated_summary.raw_get("sum")?,
             }
         } else if let Some(sketch) = table.raw_get::<Option<LuaTable>>("sketch")? {
             let sketch_type: String = sketch.raw_get("type")?;
             match sketch_type.as_str() {
                 "ddsketch" => {
-                    let count: u32 = sketch.raw_get("count")?;
+                    let LuaInt(count) = sketch.raw_get("count")?;
                     let min: f64 = sketch.raw_get("min")?;
                     let max: f64 = sketch.raw_get("max")?;
                     let sum: f64 = sketch.raw_get("sum")?;
                     let avg: f64 = sketch.raw_get("avg")?;
-                    let k: Vec<i16> = sketch.raw_get("k")?;
-                    let n: Vec<u16> = sketch.raw_get("n")?;
+                    let k = ints(sketch.raw_get("k")?);
+                    let n = ints(sketch.raw_get("n")?);
 
                     AgentDDSketch::from_raw(count, min, max, sum, avg, &k, &n)
                         .map(|sketch| MetricValue::Sketch {
@@ -350,23 +363,16 @@ mod test {
 
     use super::*;
 
-    fn assert_metric(metric: Metric, multi_value_tags: bool, assertions: Vec<&'static str>) {
+    fn assert_metric(metric: Metric, tag_mode: MetricTagMode, assertions: Vec<&'static str>) {
         let lua = Lua::new();
         lua.globals()
-            .set(
-                "metric",
-                LuaMetric {
-                    metric,
-                    multi_value_tags,
-                },
-            )
+            .set("metric", LuaMetric { metric, tag_mode })
             .unwrap();
 
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
-                "{}",
-                assertion
+                "{assertion}"
             );
         }
     }
@@ -389,7 +395,7 @@ mod test {
 
         assert_metric(
             metric.clone(),
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric) == 'table'",
                 "metric.name == 'example counter'",
@@ -410,7 +416,7 @@ mod test {
         );
         assert_metric(
             metric,
-            true,
+            MetricTagMode::Full,
             vec![
                 "type(metric) == 'table'",
                 "metric.name == 'example counter'",
@@ -448,7 +454,7 @@ mod test {
 
         assert_metric(
             metric,
-            true,
+            MetricTagMode::Full,
             vec![
                 "type(metric.tags) == 'table'",
                 "metric.tags['example tag'][1] == 'a'",
@@ -458,6 +464,23 @@ mod test {
     }
 
     #[test]
+    fn from_lua_tag_value_set_rejects_non_string_element() {
+        let lua = Lua::new();
+
+        let table = lua.create_table().unwrap();
+        table.push("example value").unwrap();
+        table.push(true).unwrap();
+
+        let result = TagValueSet::from_lua(LuaValue::Table(table), &lua);
+
+        assert!(matches!(
+            result,
+            Err(LuaError::FromLuaConversionError { .. })
+        ));
+    }
+
+    #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn into_lua_counter_minimal() {
         let metric = Metric::new(
             "example counter",
@@ -467,10 +490,10 @@ mod test {
             },
         );
 
-        for multi_value_tags in [false, true] {
+        for tag_mode in [MetricTagMode::Single, MetricTagMode::Full] {
             assert_metric(
                 metric.clone(),
-                multi_value_tags,
+                tag_mode,
                 vec![
                     "metric.timestamp == nil",
                     "metric.tags == nil",
@@ -482,6 +505,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn into_lua_gauge() {
         let metric = Metric::new(
             "example gauge",
@@ -490,7 +514,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec!["metric.gauge.value == 1.6180339", "metric.counter == nil"],
         );
     }
@@ -508,7 +532,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.set) == 'table'",
                 "type(metric.set.values) == 'table'",
@@ -531,7 +555,7 @@ mod test {
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.distribution) == 'table'",
                 "#metric.distribution.values == 2",
@@ -552,12 +576,12 @@ mod test {
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
-                sum: 975.2,
+                sum: Some(975.2),
             },
         );
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.aggregated_histogram) == 'table'",
                 "#metric.aggregated_histogram.buckets == 4",
@@ -570,6 +594,53 @@ mod test {
                 "metric.aggregated_histogram.sum == 975.2",
             ],
         );
+    }
+
+    /// A histogram that reports no sum leaves the key unset, so a script sees `nil` and can tell
+    /// "not reported" apart from a measured zero. Note that a script doing arithmetic on `sum`
+    /// without checking will now fail for these histograms.
+    #[test]
+    fn into_lua_aggregated_histogram_without_sum() {
+        let metric = Metric::new(
+            "example histogram",
+            MetricKind::Incremental,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 20, 2.0 => 10],
+                count: 30,
+                sum: None,
+            },
+        );
+        assert_metric(
+            metric,
+            MetricTagMode::Single,
+            vec![
+                "type(metric.aggregated_histogram) == 'table'",
+                "metric.aggregated_histogram.count == 30",
+                "metric.aggregated_histogram.sum == nil",
+            ],
+        );
+    }
+
+    #[test]
+    fn from_lua_aggregated_histogram_without_sum() {
+        let value = r#"{
+            name = "example histogram",
+            kind = "absolute",
+            aggregated_histogram = {
+                buckets = {1.0, 2.0},
+                counts = {20, 10}
+            }
+        }"#;
+        let expected = Metric::new(
+            "example histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 20, 2.0 => 10],
+                count: 30,
+                sum: None,
+            },
+        );
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
     }
 
     #[test]
@@ -588,7 +659,7 @@ mod test {
 
         assert_metric(
             metric,
-            false,
+            MetricTagMode::Single,
             vec![
                 "type(metric.aggregated_summary) == 'table'",
                 "#metric.aggregated_summary.quantiles == 7",
@@ -602,6 +673,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn from_lua_counter_minimal() {
         let value = r#"{
             name = "example counter",
@@ -698,6 +770,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn from_lua_gauge() {
         let value = r#"{
             name = "example gauge",
@@ -731,6 +804,65 @@ mod test {
             },
         );
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
+    }
+
+    #[test]
+    fn from_lua_truncates_fractional_integer_fields() {
+        let value = r#"{
+            name = "example distribution",
+            timestamp = {
+                year = 2018,
+                month = 11,
+                day = 14,
+                hour = 8,
+                min = 9,
+                sec = 10,
+                nanosec = 1e9 / 3
+            },
+            interval_ms = 1000 / 3,
+            distribution = {
+                values = { 1.0 },
+                sample_rates = { 10 / 4 },
+                statistic = "histogram"
+            }
+        }"#;
+        let expected = Metric::new(
+            "example distribution",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 2],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_timestamp(Some(
+            Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+                .single()
+                .and_then(|t| t.with_nanosecond(333_333_333))
+                .expect("invalid timestamp"),
+        ))
+        .with_interval_ms(std::num::NonZeroU32::new(333));
+        assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);
+    }
+
+    #[test]
+    fn from_lua_truncates_fractional_numeric_strings() {
+        let value = r#"{
+            name = "example counter",
+            interval_ms = "333.9",
+            counter = { value = 1 }
+        }"#;
+        let metric = Lua::new().load(value).eval::<Metric>().unwrap();
+        assert_eq!(metric.interval_ms(), std::num::NonZeroU32::new(333));
+    }
+
+    #[test]
+    fn from_lua_rejects_out_of_range_integer_fields() {
+        let value = r#"{
+            name = "example counter",
+            interval_ms = -1.5,
+            counter = { value = 1 }
+        }"#;
+        assert!(Lua::new().load(value).eval::<Metric>().is_err());
     }
 
     #[test]
@@ -770,7 +902,7 @@ mod test {
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
-                sum: 975.2,
+                sum: Some(975.2),
             },
         );
         assert_event_data_eq!(Lua::new().load(value).eval::<Metric>().unwrap(), expected);

@@ -16,7 +16,14 @@ use vector_core::{
 use vrl::value::{Kind, Value, kind::Collection};
 
 use super::{Deserializer, default_lossy};
-use crate::{VALID_FIELD_REGEX, gelf::GELF_TARGET_PATHS, gelf_fields::*};
+use crate::{
+    VALID_FIELD_REGEX,
+    gelf::GELF_TARGET_PATHS,
+    gelf_fields::{
+        FACILITY, FILE, FULL_MESSAGE, GELF_VERSION, HOST, LEVEL, LINE, SHORT_MESSAGE, TIMESTAMP,
+        VERSION,
+    },
+};
 
 // On GELF decoding behavior:
 //   Graylog has a relaxed decoding. They are much more lenient than the spec would
@@ -36,25 +43,46 @@ pub struct GelfDeserializerConfig {
     pub gelf: GelfDeserializerOptions,
 }
 
+/// Configures the decoding validation mode.
+#[configurable_component]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ValidationMode {
+    /// Uses strict validation that closely follows the GELF spec.
+    #[default]
+    Strict,
+
+    /// Uses more relaxed validation that skips strict GELF specification checks.
+    ///
+    /// This mode does not treat specification violations as errors, allowing the decoder
+    /// to accept messages from sources that don't strictly follow the GELF spec.
+    Relaxed,
+}
+
 impl GelfDeserializerConfig {
     /// Creates a new `GelfDeserializerConfig`.
+    #[must_use]
     pub fn new(options: GelfDeserializerOptions) -> Self {
         Self { gelf: options }
     }
 
     /// Build the `GelfDeserializer` from this configuration.
+    #[must_use]
     pub fn build(&self) -> GelfDeserializer {
         GelfDeserializer {
             lossy: self.gelf.lossy,
+            validation: self.gelf.validation,
         }
     }
 
     /// Return the type of event built by this deserializer.
+    #[must_use]
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema produced by the deserializer.
+    #[must_use]
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         schema::Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),
@@ -92,6 +120,10 @@ pub struct GelfDeserializerOptions {
     )]
     #[derivative(Default(value = "default_lossy()"))]
     pub lossy: bool,
+
+    /// Configures the decoding validation mode.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    pub validation: ValidationMode,
 }
 
 /// Deserializer that builds an `Event` from a byte frame containing a GELF log message.
@@ -100,31 +132,34 @@ pub struct GelfDeserializerOptions {
 pub struct GelfDeserializer {
     #[derivative(Default(value = "default_lossy()"))]
     lossy: bool,
+
+    validation: ValidationMode,
 }
 
 impl GelfDeserializer {
     /// Create a new `GelfDeserializer`.
-    pub fn new(lossy: bool) -> GelfDeserializer {
-        GelfDeserializer { lossy }
+    #[must_use]
+    pub fn new(lossy: bool, validation: ValidationMode) -> GelfDeserializer {
+        GelfDeserializer { lossy, validation }
     }
 
-    /// Builds a LogEvent from the parsed GelfMessage.
+    /// Builds a `LogEvent` from the parsed `GelfMessage`.
     /// The logic follows strictly the documented GELF standard.
     fn message_to_event(&self, parsed: &GelfMessage) -> vector_common::Result<Event> {
-        let mut log = LogEvent::from_str_legacy(parsed.short_message.to_string());
+        let mut log = LogEvent::from_str_legacy(parsed.short_message.clone());
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
-        if parsed.version != GELF_VERSION {
+        if self.validation == ValidationMode::Strict && parsed.version != GELF_VERSION {
             return Err(
                 format!("{VERSION} does not match GELF spec version ({GELF_VERSION})").into(),
             );
         }
 
-        log.insert(&GELF_TARGET_PATHS.version, parsed.version.to_string());
-        log.insert(&GELF_TARGET_PATHS.host, parsed.host.to_string());
+        log.insert(&GELF_TARGET_PATHS.version, parsed.version.clone());
+        log.insert(&GELF_TARGET_PATHS.host, parsed.host.clone());
 
         if let Some(full_message) = &parsed.full_message {
-            log.insert(&GELF_TARGET_PATHS.full_message, full_message.to_string());
+            log.insert(&GELF_TARGET_PATHS.full_message, full_message.clone());
         }
 
         if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
@@ -140,7 +175,7 @@ impl GelfDeserializer {
             log.insert(&GELF_TARGET_PATHS.level, level);
         }
         if let Some(facility) = &parsed.facility {
-            log.insert(&GELF_TARGET_PATHS.facility, facility.to_string());
+            log.insert(&GELF_TARGET_PATHS.facility, facility.clone());
         }
         if let Some(line) = parsed.line {
             log.insert(
@@ -149,17 +184,17 @@ impl GelfDeserializer {
             );
         }
         if let Some(file) = &parsed.file {
-            log.insert(&GELF_TARGET_PATHS.file, file.to_string());
+            log.insert(&GELF_TARGET_PATHS.file, file.clone());
         }
 
         if let Some(add) = &parsed.additional_fields {
-            for (key, val) in add.iter() {
+            for (key, val) in add {
                 // per GELF spec, filter out _id
                 if key == "_id" {
                     continue;
                 }
                 // per GELF spec, Additional field names must be prefixed with an underscore
-                if !key.starts_with('_') {
+                if self.validation == ValidationMode::Strict && !key.starts_with('_') {
                     return Err(format!(
                         "'{key}' field is invalid. \
                                        Additional field names must be prefixed with an underscore."
@@ -167,7 +202,7 @@ impl GelfDeserializer {
                     .into());
                 }
                 // per GELF spec, Additional field names must be characters dashes or dots
-                if !VALID_FIELD_REGEX.is_match(key) {
+                if self.validation == ValidationMode::Strict && !VALID_FIELD_REGEX.is_match(key) {
                     return Err(format!(
                         "'{key}' field contains invalid characters. Field names may \
                                        contain only letters, numbers, underscores, dashes and dots."
@@ -176,7 +211,7 @@ impl GelfDeserializer {
                 }
 
                 // per GELF spec, Additional field values must be either strings or numbers
-                if val.is_string() || val.is_number() {
+                if self.validation != ValidationMode::Strict || val.is_string() || val.is_number() {
                     let vector_val: Value = val.into();
                     log.insert(event_path!(key.as_str()), vector_val);
                 } else {
@@ -220,9 +255,10 @@ impl Deserializer for GelfDeserializer {
         bytes: Bytes,
         _log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let parsed: GelfMessage = match self.lossy {
-            true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
-            false => serde_json::from_slice(&bytes),
+        let parsed: GelfMessage = if self.lossy {
+            serde_json::from_str(&String::from_utf8_lossy(&bytes))
+        } else {
+            serde_json::from_slice(&bytes)
         }?;
         let event = self.message_to_event(&parsed)?;
 
@@ -244,8 +280,9 @@ mod tests {
 
     fn deserialize_gelf_input(
         input: &serde_json::Value,
+        options: GelfDeserializerOptions,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let config = GelfDeserializerConfig::default();
+        let config = GelfDeserializerConfig::new(options);
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
         deserializer.parse(buffer, LogNamespace::Legacy)
@@ -262,7 +299,7 @@ mod tests {
             HOST: "example.org",
             SHORT_MESSAGE: "A short message that helps you identify what is going on",
             FULL_MESSAGE: "Backtrace here\n\nmore stuff",
-            TIMESTAMP: 1385053862.3072,
+            TIMESTAMP: 1_385_053_862.307_2,
             LEVEL: 1,
             FACILITY: "foo",
             LINE: 42,
@@ -272,45 +309,43 @@ mod tests {
         });
 
         // Ensure that we can parse the gelf json successfully
-        let events = deserialize_gelf_input(&input).unwrap();
+        let events = deserialize_gelf_input(&input, GelfDeserializerOptions::default()).unwrap();
         assert_eq!(events.len(), 1);
 
         let log = events[0].as_log();
 
         assert_eq!(
-            log.get(VERSION),
-            Some(&Value::Bytes(Bytes::from_static(b"1.1")))
+            log.get(event_path!(VERSION)),
+            Some(&Value::from_static_str("1.1"))
         );
         assert_eq!(
-            log.get(HOST),
-            Some(&Value::Bytes(Bytes::from_static(b"example.org")))
+            log.get(event_path!(HOST)),
+            Some(&Value::from_static_str("example.org"))
         );
         assert_eq!(
             log.get(log_schema().message_key_target_path().unwrap()),
-            Some(&Value::Bytes(Bytes::from_static(
-                b"A short message that helps you identify what is going on"
-            )))
+            Some(&Value::from_static_str(
+                "A short message that helps you identify what is going on"
+            ))
         );
         assert_eq!(
-            log.get(FULL_MESSAGE),
-            Some(&Value::Bytes(Bytes::from_static(
-                b"Backtrace here\n\nmore stuff"
-            )))
+            log.get(event_path!(FULL_MESSAGE)),
+            Some(&Value::from_static_str("Backtrace here\n\nmore stuff"))
         );
-        let dt = DateTime::from_timestamp(1385053862, 307_200_000).expect("invalid timestamp");
-        assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(dt)));
-        assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
+        let dt = DateTime::from_timestamp(1_385_053_862, 307_200_000).expect("invalid timestamp");
+        assert_eq!(log.get(event_path!(TIMESTAMP)), Some(&Value::Timestamp(dt)));
+        assert_eq!(log.get(event_path!(LEVEL)), Some(&Value::Integer(1)));
         assert_eq!(
-            log.get(FACILITY),
-            Some(&Value::Bytes(Bytes::from_static(b"foo")))
+            log.get(event_path!(FACILITY)),
+            Some(&Value::from_static_str("foo"))
         );
         assert_eq!(
-            log.get(LINE),
+            log.get(event_path!(LINE)),
             Some(&Value::Float(ordered_float::NotNan::new(42.0).unwrap()))
         );
         assert_eq!(
-            log.get(FILE),
-            Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
+            log.get(event_path!(FILE)),
+            Some(&Value::from_static_str("/tmp/bar"))
         );
         assert_eq!(
             log.get(event_path!(add_on_int_in)),
@@ -320,7 +355,7 @@ mod tests {
         );
         assert_eq!(
             log.get(event_path!(add_on_str_in)),
-            Some(&Value::Bytes(Bytes::from_static(b"A Space Odyssey")))
+            Some(&Value::from_static_str("A Space Odyssey"))
         );
     }
 
@@ -334,7 +369,8 @@ mod tests {
                 SHORT_MESSAGE: "foobar",
                 VERSION: "1.1",
             });
-            let events = deserialize_gelf_input(&input).unwrap();
+            let events =
+                deserialize_gelf_input(&input, GelfDeserializerOptions::default()).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
             assert!(log.contains(log_schema().message_key_target_path().unwrap()));
@@ -348,7 +384,8 @@ mod tests {
                 VERSION: "1.1",
                 "_id": "S3creTz",
             });
-            let events = deserialize_gelf_input(&input).unwrap();
+            let events =
+                deserialize_gelf_input(&input, GelfDeserializerOptions::default()).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
             assert!(!log.contains(event_path!("_id")));
@@ -359,7 +396,7 @@ mod tests {
     #[test]
     fn gelf_deserializing_err() {
         fn validate_err(input: &serde_json::Value) {
-            assert!(deserialize_gelf_input(input).is_err());
+            assert!(deserialize_gelf_input(input, GelfDeserializerOptions::default()).is_err());
         }
         //  invalid character in field name
         validate_err(&json!({
@@ -403,5 +440,56 @@ mod tests {
             SHORT_MESSAGE: "foobar",
             LEVEL: "baz",
         }));
+    }
+
+    /// Validates the relaxed validation mode
+    #[test]
+    fn gelf_deserialize_relaxed() {
+        let incorrect_extra_field = "incorrect^_extra_field";
+        let input = json!({
+            VERSION: "1.0",
+            HOST: "example.org",
+            SHORT_MESSAGE: "A short message that helps you identify what is going on",
+            FULL_MESSAGE: "Backtrace here\n\nmore stuff",
+            TIMESTAMP: 1_385_053_862.307_2,
+            LEVEL: 1,
+            FACILITY: "foo",
+            LINE: 42,
+            FILE: "/tmp/bar",
+            incorrect_extra_field: null,
+        });
+
+        assert!(
+            deserialize_gelf_input(
+                &input,
+                GelfDeserializerOptions {
+                    validation: ValidationMode::Strict,
+                    ..Default::default()
+                }
+            )
+            .is_err()
+        );
+
+        let events = deserialize_gelf_input(
+            &input,
+            GelfDeserializerOptions {
+                validation: ValidationMode::Relaxed,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(events.len(), 1);
+
+        let log = events[0].as_log();
+
+        assert_eq!(
+            log.get(event_path!(VERSION)),
+            Some(&Value::from_static_str("1.0"))
+        );
+
+        assert_eq!(
+            log.get(event_path!(incorrect_extra_field)),
+            Some(&Value::Null)
+        );
     }
 }

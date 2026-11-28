@@ -28,6 +28,7 @@ pub enum DocumentVersionType {
 }
 
 impl DocumentVersionType {
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             DocumentVersionType::External => VersionType::External.as_str(),

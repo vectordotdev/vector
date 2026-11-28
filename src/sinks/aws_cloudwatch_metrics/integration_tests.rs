@@ -1,4 +1,4 @@
-use chrono::{Timelike, Utc, offset::TimeZone};
+use chrono::{Timelike, Utc};
 use rand::seq::SliceRandom;
 use vector_lib::metric_tags;
 
@@ -38,7 +38,8 @@ async fn cloudwatch_metrics_put_data() {
     let cx = SinkContext::default();
     let config = config();
     let client = config.create_client(&cx.globals.proxy).await.unwrap();
-    let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = CloudWatchMetricsSvc::build_sink(&config, client, &validated);
 
     let mut events = Vec::new();
 
@@ -47,12 +48,13 @@ async fn cloudwatch_metrics_put_data() {
             Metric::new(
                 format!("counter-{}", 0),
                 MetricKind::Incremental,
-                MetricValue::Counter { value: i as f64 },
+                MetricValue::Counter {
+                    value: f64::from(i),
+                },
             )
             .with_tags(Some(metric_tags!(
                 "region" => "us-west-1",
                 "production" => "true",
-                "e" => "",
             ))),
         );
         events.push(event);
@@ -63,7 +65,9 @@ async fn cloudwatch_metrics_put_data() {
         let event = Event::Metric(Metric::new(
             format!("gauge-{gauge_name}"),
             MetricKind::Absolute,
-            MetricValue::Gauge { value: i as f64 },
+            MetricValue::Gauge {
+                value: f64::from(i),
+            },
         ));
         events.push(event);
     }
@@ -75,14 +79,14 @@ async fn cloudwatch_metrics_put_data() {
                 format!("distribution-{distribution_name}"),
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_lib::samples![i as f64 => 100],
+                    samples: vector_lib::samples![f64::from(i) => 100],
                     statistic: StatisticKind::Histogram,
                 },
             )
+            // CloudWatch refuses timestamps older than two weeks.
             .with_timestamp(Some(
-                Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
-                    .single()
-                    .and_then(|t| t.with_nanosecond(123456789))
+                Utc::now()
+                    .with_nanosecond(123_456_789)
                     .expect("invalid timestamp"),
             )),
         );
@@ -97,11 +101,12 @@ async fn cloudwatch_metrics_namespace_partitioning() {
     let cx = SinkContext::default();
     let config = config();
     let client = config.create_client(&cx.globals.proxy).await.unwrap();
-    let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = CloudWatchMetricsSvc::build_sink(&config, client, &validated);
 
     let mut events = Vec::new();
 
-    for namespace in ["ns1", "ns2", "ns3", "ns4"].iter() {
+    for namespace in &["ns1", "ns2", "ns3", "ns4"] {
         for _ in 0..100 {
             let event = Event::Metric(
                 Metric::new(

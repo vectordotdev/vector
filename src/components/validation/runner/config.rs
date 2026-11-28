@@ -7,14 +7,17 @@ use super::{
 use crate::{
     components::validation::{
         ComponentConfiguration, ComponentType, ValidationConfiguration,
-        component_names::*,
+        component_names::{
+            TEST_INPUT_SOURCE_NAME, TEST_OUTPUT_SINK_NAME, TEST_SINK_NAME, TEST_SOURCE_NAME,
+            TEST_TRANSFORM_NAME,
+        },
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
     },
     config::{BoxedSink, BoxedSource, BoxedTransform, ConfigBuilder},
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::vector::VectorConfig as VectorSourceConfig,
-    test_util::next_addr,
+    test_util::addr::next_addr,
 };
 
 pub struct TopologyBuilder {
@@ -25,6 +28,10 @@ pub struct TopologyBuilder {
 
 impl TopologyBuilder {
     /// Creates a component topology for the given component configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration has no component configuration for `config_name`.
     pub fn from_configuration(
         configuration: &ValidationConfiguration,
         config_name: Option<&String>,
@@ -125,7 +132,8 @@ impl TopologyBuilder {
 }
 
 fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedSource>) {
-    let input_listen_addr = GrpcAddress::from(next_addr());
+    // TODO: This needs refactoring to properly hold the PortGuard for the lifetime of the topology.
+    let input_listen_addr = GrpcAddress::from(next_addr().1);
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
 
     let mut input_source = VectorSourceConfig::from_address(input_listen_addr.as_socket_addr());
@@ -138,10 +146,11 @@ fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedS
 }
 
 fn build_output_edge() -> (OutputEdge, impl Into<BoxedSink>) {
-    let output_listen_addr = GrpcAddress::from(next_addr());
+    // TODO: This needs refactoring to properly hold the PortGuard for the lifetime of the topology.
+    let output_listen_addr = GrpcAddress::from(next_addr().1);
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 
-    let mut output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
+    let mut output_sink = VectorSinkConfig::from_address(&output_listen_addr.as_uri());
 
     // We want to ensure that the output sink is flushed as soon as possible, so
     // we set the batch timeout to a very low value. We also disable retries, as

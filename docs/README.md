@@ -1,8 +1,8 @@
 # Vector Internal Documentation
 
-**_This folder contains internal documentation for Vector contributors. If
+_**This folder contains internal documentation for Vector contributors. If
 you're a Vector user, please visit <https://vector.dev/docs>, which is powered by
-the [website](../website) directory._**
+the [website](../website) directory.**_
 
 ## Getting started
 
