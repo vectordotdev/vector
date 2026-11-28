@@ -8,6 +8,4 @@ conditions, and unit tests. Example paths include:
 - `.aggregated_summary.quantiles`
 - `.sketch.count`, `.sketch.min`, `.sketch.max`, `.sketch.sum`, and `.sketch.avg`
 
-These fields are read-only: assignments and `del()` leave the metric's value unchanged.
-
 authors: JinchengCao

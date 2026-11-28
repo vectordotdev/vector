@@ -476,6 +476,22 @@ impl<T: MergeFinalizable> GroupedFinalizable for T {
     }
 }
 
+impl<T: Finalizable> Finalizable for Option<T> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        match self {
+            Some(item) => item.take_finalizers(),
+            None => EventFinalizers::default(),
+        }
+    }
+
+    fn take_finalizer_groups(&mut self) -> EventFinalizerGroups {
+        match self {
+            Some(item) => item.take_finalizer_groups(),
+            None => EventFinalizerGroups::default(),
+        }
+    }
+}
+
 impl<T: Finalizable> Finalizable for Vec<T> {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.iter_mut()

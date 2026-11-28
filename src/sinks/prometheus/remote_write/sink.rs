@@ -56,11 +56,15 @@ pub(super) struct PrometheusTenantIdPartitioner;
 impl Partitioner for PrometheusTenantIdPartitioner {
     type Item = RemoteWriteMetric;
     type Key = PartitionKey;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        PartitionKey {
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        Ok(PartitionDecision::Route(PartitionKey {
             tenant_id: item.tenant_id.clone(),
-        }
+        }))
     }
 }
 
@@ -191,6 +195,7 @@ where
                         .as_reducer_config(ByteSizeOfItemSize, EventCollection::new(self.aggregate))
                 },
             )
+            .unwrap_infallible()
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {

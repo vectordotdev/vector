@@ -82,12 +82,7 @@ where
             .batched_partitioned(partitioner, settings.timeout, |_| {
                 settings.as_byte_size_config()
             })
-            .filter_map(|(key, batch)| async move {
-                // We don't need to emit an error here if the event is dropped since this will occur if the template
-                // couldn't be rendered during the partitioning. A `TemplateRenderingError` is already emitted when
-                // that occurs.
-                key.map(move |k| (k, batch))
-            })
+            .filter_map(|result| async move { result.ok() })
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -126,6 +121,7 @@ impl OpenDalService {
 /// metadata.
 #[derive(Clone)]
 pub struct OpenDalRequest {
+    finalizers: EventFinalizers,
     pub payload: Bytes,
     pub metadata: OpenDalMetadata,
     pub request_metadata: RequestMetadata,
@@ -143,7 +139,7 @@ impl MetaDescriptive for OpenDalRequest {
 
 impl Finalizable for OpenDalRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.metadata.finalizers)
+        std::mem::take(&mut self.finalizers)
     }
 }
 
@@ -153,7 +149,6 @@ pub struct OpenDalMetadata {
     pub partition_key: String,
     pub count: usize,
     pub byte_size: JsonSize,
-    pub finalizers: EventFinalizers,
 }
 
 /// `OpenDalRequestBuilder` will collect and encode input events to build a
@@ -182,24 +177,29 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
     fn split_input(
         &self,
         input: (String, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
         let opendal_metadata = OpenDalMetadata {
             partition_key,
             count: events.len(),
             byte_size: events.estimated_json_encoded_size_of(),
-            finalizers,
         };
 
         let builder = RequestMetadataBuilder::from_events(&events);
 
-        (opendal_metadata, builder, events)
+        RequestParts {
+            metadata: opendal_metadata,
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         mut metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -210,6 +210,7 @@ impl RequestBuilder<(String, Vec<Event>)> for OpenDalRequestBuilder {
         metadata.partition_key = format!("{}{name}.{extension}", metadata.partition_key);
 
         OpenDalRequest {
+            finalizers,
             metadata,
             payload: payload.into_payload(),
             request_metadata,

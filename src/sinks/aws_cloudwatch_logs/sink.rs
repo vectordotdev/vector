@@ -5,9 +5,9 @@ use chrono::{Duration, Utc};
 use futures::{StreamExt, future, stream::BoxStream};
 use tower::Service;
 use vector_lib::{
-    partition::Partitioner,
+    partition::{PartitionDecision, Partitioner},
     request_metadata::{MetaDescriptive, RequestMetadata},
-    sink::StreamSink,
+    sink::{PreparationError, StreamSink},
     stream::{BatcherSettings, DriverResponse},
 };
 
@@ -52,6 +52,7 @@ where
             .batched_partitioned(CloudwatchPartitioner, batcher_settings.timeout, |_| {
                 batcher_settings.as_byte_size_config()
             })
+            .unwrap_infallible()
             .map(|(key, events)| {
                 let metadata = RequestMetadata::from_batch(
                     events.iter().map(|req| req.get_metadata().clone()),
@@ -97,9 +98,13 @@ struct CloudwatchPartitioner;
 impl Partitioner for CloudwatchPartitioner {
     type Item = CloudwatchRequest;
     type Key = CloudwatchKey;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.key.clone()
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        Ok(PartitionDecision::Route(item.key.clone()))
     }
 }
 

@@ -126,6 +126,7 @@ impl ApmStatsSender {
         let request_metadata = RequestMetadata::default();
         let trace_api_request = build_request(
             (metadata, request_metadata),
+            EventFinalizers::default(),
             compressed_payload,
             self.compression,
             &self.endpoint_configuration,
@@ -155,7 +156,6 @@ impl ApmStatsSender {
         let metadata = DDTracesMetadata {
             api_key,
             endpoint: DatadogTracesEndpoint::APMStats,
-            finalizers: EventFinalizers::default(),
             uncompressed_size,
             content_type: "application/msgpack".to_string(),
         };

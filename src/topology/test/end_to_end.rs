@@ -136,3 +136,64 @@ async fn http_to_http_delivered() {
 async fn http_to_http_failed() {
     http_to_http(StatusCode::FORBIDDEN, StatusCode::BAD_REQUEST).await;
 }
+
+#[tokio::test]
+async fn http_to_http_rejects_partition_failure() {
+    test_util::trace_init();
+
+    let (sink_uri, mut requests) = http_server(Arc::new(Mutex::new(())), StatusCode::OK).await;
+    let sink_uri = sink_uri.to_string();
+    let sink_base = sink_uri.trim_end_matches('/');
+    let (_guard, address) = test_util::addr::next_addr();
+    let config = config::load_from_str(
+        &format!(
+            r#"
+sources:
+  in:
+    type: http_server
+    address: "{address}"
+    acknowledgements:
+      enabled: true
+    decoding:
+      codec: json
+sinks:
+  out:
+    type: http
+    inputs: [in]
+    uri: "{sink_base}/{{{{ route }}}}"
+    encoding:
+      codec: json
+    batch:
+      max_events: 1
+"#,
+        ),
+        Format::Yaml,
+    )
+    .unwrap();
+    let diff = ConfigDiff::initial(&config);
+    let pieces = TopologyPiecesBuilder::new(&config, &diff)
+        .build_or_log_errors()
+        .await
+        .unwrap();
+    let (topology, _) = RunningTopology::start_validated(config, diff, pieces)
+        .await
+        .unwrap();
+    test_util::wait_for_tcp(address).await;
+
+    let (_rejected_ready, rejected) = http_client(address, r#"{"message":"missing route"}"#);
+    let rejected = timeout(Duration::from_secs(5), rejected)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(rejected.status(), StatusCode::BAD_REQUEST);
+    assert!(requests.try_recv().is_err());
+
+    let (_delivered_ready, delivered) = http_client(address, r#"{"message":"valid","route":"ok"}"#);
+    let delivered = timeout(Duration::from_secs(5), delivered)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(delivered.status(), StatusCode::OK);
+    assert_eq!(requests.try_recv(), Ok(()));
+    topology.stop().await;
+}

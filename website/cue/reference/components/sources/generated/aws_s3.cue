@@ -170,11 +170,7 @@ generated: components: sources: aws_s3: configuration: {
 			[requester_pays]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/RequesterPaysBuckets.html
 			"""
 		required: false
-		type: string: enum: requester: """
-			Enables retrieving objects from [S3 Requester Pays buckets][requester_pays].
-
-			The requester accepts the S3 request and data transfer charges.
-			"""
+		type: string: enum: requester: "The requester accepts the S3 request and data transfer charges."
 	}
 	sqs: {
 		description: "Configuration options for SQS."

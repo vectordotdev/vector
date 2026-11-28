@@ -14,8 +14,9 @@ use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
     sinks::util::{
-        Compression, RequestBuilder, metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
+        Compression, RequestBuilder,
+        metadata::RequestMetadataBuilder,
+        request_builder::{EncodeResult, RequestParts},
     },
 };
 
@@ -27,7 +28,6 @@ pub struct KinesisRequestBuilder<R> {
 }
 
 pub struct KinesisMetadata {
-    pub finalizers: EventFinalizers,
     pub partition_key: String,
 }
 
@@ -102,20 +102,26 @@ where
     fn split_input(
         &self,
         mut processed_event: KinesisProcessedEvent,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
+        let finalizers = processed_event.event.take_finalizers();
         let kinesis_metadata = KinesisMetadata {
-            finalizers: processed_event.event.take_finalizers(),
             partition_key: processed_event.metadata.partition_key,
         };
         let event = Event::from(processed_event.event);
         let builder = RequestMetadataBuilder::from_event(&event);
 
-        (kinesis_metadata, builder, event)
+        RequestParts {
+            metadata: kinesis_metadata,
+            request_metadata_builder: builder,
+            events: event,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         kinesis_metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -125,10 +131,10 @@ where
 
         KinesisRequest {
             key: KinesisKey {
-                partition_key: kinesis_metadata.partition_key.clone(),
+                partition_key: kinesis_metadata.partition_key,
             },
             record,
-            finalizers: kinesis_metadata.finalizers,
+            finalizers,
             metadata,
         }
     }

@@ -50,7 +50,7 @@ use crate::{
             TowerRequestConfig,
             encoding::{Encoder, as_tracked_write},
             metadata::RequestMetadataBuilder,
-            request_builder::EncodeResult,
+            request_builder::{EncodeResult, RequestParts},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -547,7 +547,7 @@ impl AsRef<[u8]> for ChronicleRequestPayload {
 }
 
 impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = (ChroniclePartitionKey, Vec<Event>);
     type Encoder = ChronicleEncoder;
     type Payload = ChronicleRequestPayload;
@@ -565,17 +565,23 @@ impl RequestBuilder<(ChroniclePartitionKey, Vec<Event>)> for ChronicleRequestBui
     fn split_input(
         &self,
         input: (ChroniclePartitionKey, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
 
         let builder = RequestMetadataBuilder::from_events(&events);
-        (finalizers, builder, (partition_key, events))
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events: (partition_key, events),
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        finalizers: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {

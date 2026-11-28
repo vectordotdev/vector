@@ -7,15 +7,17 @@ use std::{
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
-use datadog_agent_metrics_v3::V3EncodeError;
 use datadog_proto::agentpayload as ddmetric_proto;
 use prost_reflect::DescriptorPool;
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use vector_common::constants::ZSTD_SMALL_INPUT_THRESHOLD;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, metric::MetricSketch},
+    event::{
+        DatadogMetricOriginMetadata, EventFinalizers, Finalizable, Metric, MetricTags, MetricValue,
+        metric::MetricSketch,
+    },
     metrics::AgentDDSketch,
     request_metadata::GroupedCountByteSize,
 };
@@ -73,13 +75,18 @@ impl EncoderError {
     }
 }
 
+pub(super) type MetricEncodeError = (EncoderError, EventFinalizers);
+
 #[derive(Debug, Snafu)]
 pub(super) enum FinishError {
     #[snafu(display(
         "Failure occurred during writing to or finalizing the compressor: {}",
         source
     ))]
-    CompressionFailed { source: io::Error },
+    CompressionFailed {
+        source: io::Error,
+        finalizers: EventFinalizers,
+    },
 
     #[snafu(display("Finished payload exceeded the (un)compressed size limits"))]
     TooLarge {
@@ -88,7 +95,10 @@ pub(super) enum FinishError {
     },
 
     #[snafu(display("Failed to encode V3 payload to Protocol Buffers: {}", source))]
-    V3EncodingFailed { source: protobuf::Error },
+    V3EncodingFailed {
+        source: protobuf::Error,
+        finalizers: EventFinalizers,
+    },
 }
 
 impl FinishError {
@@ -101,20 +111,6 @@ impl FinishError {
             Self::TooLarge { .. } => "too_large",
             Self::V3EncodingFailed { .. } => "v3_encoding_failed",
         }
-    }
-}
-
-impl From<V3EncodeError> for FinishError {
-    fn from(err: V3EncodeError) -> Self {
-        FinishError::V3EncodingFailed {
-            source: err.into_inner(),
-        }
-    }
-}
-
-impl From<protobuf::Error> for FinishError {
-    fn from(source: protobuf::Error) -> Self {
-        FinishError::V3EncodingFailed { source }
     }
 }
 
@@ -211,7 +207,7 @@ impl DatadogMetricsEncoder {
         mem::take(&mut self.state)
     }
 
-    fn encode_single_metric(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    fn encode_single_metric(&mut self, metric: &Metric) -> Result<bool, EncoderError> {
         // We take special care in this method to capture errors which are not indicative of the
         // metric itself causing a failure in order to be able to return the metric to the caller.
         // The contract of the encoder is such that when an encoding attempt fails for normal
@@ -227,7 +223,7 @@ impl DatadogMetricsEncoder {
 
         self.state
             .byte_size
-            .add_event(&metric, metric.estimated_json_encoded_size_of());
+            .add_event(metric, metric.estimated_json_encoded_size_of());
 
         // For V2 Series metrics, and Sketches: We encode a single Series or Sketch metric incrementally,
         // which means that we specifically write it as if we were writing a single field entry in the
@@ -252,7 +248,7 @@ impl DatadogMetricsEncoder {
                 | MetricValue::Set { .. }
                 | MetricValue::AggregatedSummary { .. } => {
                     let series_proto = series_to_proto_message(
-                        &metric,
+                        metric,
                         &self.default_namespace,
                         self.log_schema,
                         self.origin_product_value,
@@ -283,7 +279,7 @@ impl DatadogMetricsEncoder {
                 MetricValue::Sketch { sketch } => match sketch {
                     MetricSketch::AgentDDSketch(ddsketch) => {
                         if let Some(sketch_proto) = sketch_to_proto_message(
-                            &metric,
+                            metric,
                             ddsketch,
                             &self.default_namespace,
                             self.log_schema,
@@ -309,13 +305,7 @@ impl DatadogMetricsEncoder {
         }
 
         // Try and see if our temporary buffer can be written to the compressor.
-        match self.try_compress_buffer() {
-            Err(_) | Ok(false) => Ok(Some(metric)),
-            Ok(true) => {
-                self.state.processed.push(metric);
-                Ok(None)
-            }
-        }
+        Ok(self.try_compress_buffer().unwrap_or(false))
     }
 
     fn try_compress_buffer(&mut self) -> io::Result<bool> {
@@ -379,8 +369,18 @@ impl DatadogMetricsEncoder {
     /// # Errors
     ///
     /// If an error is encountered while attempting to encode the metric, an error variant will be returned.
-    pub(super) fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
-        self.encode_single_metric(metric)
+    pub(super) fn try_encode(
+        &mut self,
+        mut metric: Metric,
+    ) -> Result<Option<Metric>, MetricEncodeError> {
+        match self.encode_single_metric(&metric) {
+            Ok(true) => {
+                self.state.processed.push(metric);
+                Ok(None)
+            }
+            Ok(false) => Ok(Some(metric)),
+            Err(error) => Err((error, metric.take_finalizers())),
+        }
     }
 
     pub(super) fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
@@ -389,12 +389,15 @@ impl DatadogMetricsEncoder {
 
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
+        let mut processed = state.processed;
         let payload = state
             .writer
             .finish()
-            .context(CompressionFailedSnafu)?
+            .map_err(|source| FinishError::CompressionFailed {
+                source,
+                finalizers: processed.take_finalizers(),
+            })?
             .freeze();
-        let processed = state.processed;
 
         // We should have configured our limits such that if all calls to `try_compress_buffer` have
         // succeeded up until this point, then our payload should be within the limits after
@@ -1245,7 +1248,7 @@ mod tests {
         let series_result = sketch_encoder.try_encode(get_simple_counter());
         assert!(matches!(
             series_result.err(),
-            Some(EncoderError::InvalidMetric { .. })
+            Some((EncoderError::InvalidMetric { .. }, _))
         ));
 
         // And sketches can't go to the series endpoint.
@@ -1254,7 +1257,7 @@ mod tests {
         let sketch_result = series_v2_encoder.try_encode(get_simple_sketch());
         assert!(matches!(
             sketch_result.err(),
-            Some(EncoderError::InvalidMetric { .. })
+            Some((EncoderError::InvalidMetric { .. }, _))
         ));
     }
 
@@ -1529,7 +1532,7 @@ mod tests {
                         hit_limit = true;
                         next_pending.push(returned_metric);
                     }
-                    Err(error) => panic!("unexpected encoding error: {error}"),
+                    Err((error, _)) => panic!("unexpected encoding error: {error}"),
                 }
             }
 
@@ -1761,7 +1764,7 @@ mod tests {
             match encoder.try_encode(metric) {
                 Ok(None) => accepted += 1,
                 Ok(Some(_)) => break,
-                Err(e) => panic!("unexpected encoding error: {e}"),
+                Err((error, _)) => panic!("unexpected encoding error: {error}"),
             }
         }
 
@@ -1832,7 +1835,7 @@ mod tests {
             match encoder.try_encode(metric) {
                 Ok(None) => accepted += 1,
                 Ok(Some(_)) => break,
-                Err(e) => panic!("unexpected encoding error: {e}"),
+                Err((error, _)) => panic!("unexpected encoding error: {error}"),
             }
         }
 
@@ -1927,7 +1930,7 @@ mod tests {
             match encoder.try_encode(metric) {
                 Ok(None) => {}
                 Ok(Some(_)) => panic!("unexpected rejection at i={i} with unlimited limits"),
-                Err(e) => panic!("unexpected error at i={i}: {e}"),
+                Err((error, _)) => panic!("unexpected error at i={i}: {error}"),
             }
 
             let curr = encoder.buffered_bound();
