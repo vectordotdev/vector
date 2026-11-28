@@ -26,7 +26,7 @@ use vrl::{
 use warp::reject;
 
 use super::{
-    Compression,
+    COMMON_ATTRIBUTES_KEY, Compression, REQUEST_ID_KEY, SOURCE_ARN_KEY, TIMESTAMP_KEY,
     errors::{ParseRecordsSnafu, RequestError},
     models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse},
 };
@@ -44,6 +44,10 @@ use crate::{
         util::decompression::{CappedDecoder, is_decompressed_size_limit_error},
     },
 };
+
+const SOURCE_TYPE_KEY: &str = "source_type";
+const INGEST_TIMESTAMP_KEY: &str = "ingest_timestamp";
+const VECTOR_KEY: &str = "vector";
 
 #[derive(Clone)]
 pub(super) struct Context {
@@ -109,16 +113,22 @@ pub(super) async fn firehose(
                             log_namespace.insert_vector_metadata(
                                 log,
                                 log_schema().source_type_key(),
-                                path!("source_type"),
+                                path!(SOURCE_TYPE_KEY),
                                 Value::from_static_str(AwsKinesisFirehoseConfig::NAME),
                             );
                             // This handles the transition from the original timestamp logic. Originally the
                             // `timestamp_key` was always populated by the `request.timestamp` time.
                             match log_namespace {
                                 LogNamespace::Vector => {
-                                    log.insert(metadata_path!("vector", "ingest_timestamp"), now);
                                     log.insert(
-                                        metadata_path!(AwsKinesisFirehoseConfig::NAME, "timestamp"),
+                                        metadata_path!(VECTOR_KEY, INGEST_TIMESTAMP_KEY),
+                                        now,
+                                    );
+                                    log.insert(
+                                        metadata_path!(
+                                            AwsKinesisFirehoseConfig::NAME,
+                                            TIMESTAMP_KEY
+                                        ),
                                         request.timestamp,
                                     );
                                 }
@@ -135,15 +145,15 @@ pub(super) async fn firehose(
                             log_namespace.insert_source_metadata(
                                 AwsKinesisFirehoseConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!("request_id"))),
-                                path!("request_id"),
+                                Some(LegacyKey::InsertIfEmpty(path!(REQUEST_ID_KEY))),
+                                path!(REQUEST_ID_KEY),
                                 request_id.clone(),
                             );
                             log_namespace.insert_source_metadata(
                                 AwsKinesisFirehoseConfig::NAME,
                                 log,
-                                Some(LegacyKey::InsertIfEmpty(path!("source_arn"))),
-                                path!("source_arn"),
+                                Some(LegacyKey::InsertIfEmpty(path!(SOURCE_ARN_KEY))),
+                                path!(SOURCE_ARN_KEY),
                                 source_arn.clone(),
                             );
 
@@ -151,8 +161,8 @@ pub(super) async fn firehose(
                                 log_namespace.insert_source_metadata(
                                     AwsKinesisFirehoseConfig::NAME,
                                     log,
-                                    Some(LegacyKey::InsertIfEmpty(path!("common_attributes"))),
-                                    path!("common_attributes"),
+                                    Some(LegacyKey::InsertIfEmpty(path!(COMMON_ATTRIBUTES_KEY))),
+                                    path!(COMMON_ATTRIBUTES_KEY),
                                     common_attributes_map.clone(),
                                 );
                             }

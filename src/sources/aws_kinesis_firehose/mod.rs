@@ -29,6 +29,11 @@ mod filters;
 mod handlers;
 mod models;
 
+pub(super) const REQUEST_ID_KEY: &str = "request_id";
+pub(super) const SOURCE_ARN_KEY: &str = "source_arn";
+pub(super) const COMMON_ATTRIBUTES_KEY: &str = "common_attributes";
+pub(super) const TIMESTAMP_KEY: &str = "timestamp";
+
 /// Configuration for the `aws_kinesis_firehose` source.
 #[configurable_component(source(
     "aws_kinesis_firehose",
@@ -223,7 +228,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let common_attributes_path = (!self.common_attributes.is_empty()).then_some(
-            LegacyKey::InsertIfEmpty(owned_value_path!("common_attributes")),
+            LegacyKey::InsertIfEmpty(owned_value_path!(COMMON_ATTRIBUTES_KEY)),
         );
         let schema_definition = self
             .decoding
@@ -231,15 +236,15 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("request_id"))),
-                &owned_value_path!("request_id"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(REQUEST_ID_KEY))),
+                &owned_value_path!(REQUEST_ID_KEY),
                 Kind::bytes(),
                 None,
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("source_arn"))),
-                &owned_value_path!("source_arn"),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(SOURCE_ARN_KEY))),
+                &owned_value_path!(SOURCE_ARN_KEY),
                 Kind::bytes(),
                 None,
             )
@@ -247,7 +252,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             .with_source_metadata(
                 Self::NAME,
                 common_attributes_path,
-                &owned_value_path!("common_attributes"),
+                &owned_value_path!(COMMON_ATTRIBUTES_KEY),
                 Kind::object(Collection::from_unknown(
                     Kind::bytes().or_null().or_undefined(),
                 ))

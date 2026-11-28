@@ -36,6 +36,13 @@ use crate::{
     types,
 };
 
+const TIMESTAMP_KEY: &str = "timestamp";
+const HOST_KEY: &str = "host";
+const TLS_CLIENT_METADATA_KEY: &str = "tls_client_metadata";
+const SOURCE_TYPE_KEY: &str = "source_type";
+const INGEST_TIMESTAMP_KEY: &str = "ingest_timestamp";
+const VECTOR_KEY: &str = "vector";
+
 /// Configuration for the `logstash` source.
 #[configurable_component(source("logstash", "Collect logs from a Logstash agent."))]
 #[derive(Clone, Debug)]
@@ -96,21 +103,21 @@ impl LogstashConfig {
             .with_source_metadata(
                 LogstashConfig::NAME,
                 None,
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             )
             .with_source_metadata(
                 LogstashConfig::NAME,
                 host_key,
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST_KEY),
                 Kind::bytes(),
-                Some("host"),
+                Some(HOST_KEY),
             )
             .with_source_metadata(
                 Self::NAME,
                 tls_client_metadata_path,
-                &owned_value_path!("tls_client_metadata"),
+                &owned_value_path!(TLS_CLIENT_METADATA_KEY),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
@@ -220,7 +227,7 @@ impl TcpSource for LogstashSource {
             self.log_namespace.insert_vector_metadata(
                 log,
                 log_schema().source_type_key(),
-                path!("source_type"),
+                path!(SOURCE_TYPE_KEY),
                 Value::from_static_str(LogstashConfig::NAME),
             );
 
@@ -237,9 +244,12 @@ impl TcpSource for LogstashSource {
             match self.log_namespace {
                 LogNamespace::Vector => {
                     if let Some(timestamp) = log_timestamp {
-                        log.insert(metadata_path!(LogstashConfig::NAME, "timestamp"), timestamp);
+                        log.insert(
+                            metadata_path!(LogstashConfig::NAME, TIMESTAMP_KEY),
+                            timestamp,
+                        );
                     }
-                    log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+                    log.insert(metadata_path!(VECTOR_KEY, INGEST_TIMESTAMP_KEY), now);
                 }
                 LogNamespace::Legacy => {
                     if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
@@ -257,7 +267,7 @@ impl TcpSource for LogstashSource {
                 self.legacy_host_key_path
                     .as_ref()
                     .map(LegacyKey::InsertIfEmpty),
-                path!("host"),
+                path!(HOST_KEY),
                 host.ip().to_string(),
             );
         }
