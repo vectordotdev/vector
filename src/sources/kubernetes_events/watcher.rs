@@ -14,9 +14,14 @@ use kube::{
     core::response::Status,
     runtime::watcher,
 };
-use tokio::time::sleep;
+use tokio::time::{sleep, timeout};
 
 const WATCH_EOF_RETRY_DELAY: Duration = Duration::from_secs(1);
+/// Server-side watch timeout assumed when none is configured; matches the source default.
+const DEFAULT_WATCH_TIMEOUT: Duration = Duration::from_secs(290);
+/// Extra time, beyond the server-side timeout, to wait for the API server before treating a
+/// request or an open watch as stalled.
+const CLIENT_TIMEOUT_GRACE: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ApplyKind {
@@ -57,6 +62,10 @@ pub(super) enum Error {
     WatchStartFailed(KubeError),
     WatchStatus(Box<Status>),
     WatchFailed(KubeError),
+    TimedOut {
+        operation: &'static str,
+        timeout: Duration,
+    },
     NoResourceVersion,
 }
 
@@ -76,6 +85,11 @@ impl std::fmt::Display for Error {
                 )
             }
             Self::WatchFailed(error) => write!(formatter, "watch stream failed: {error}"),
+            Self::TimedOut { operation, timeout } => write!(
+                formatter,
+                "{operation} received no data from the Kubernetes API for {}s",
+                timeout.as_secs()
+            ),
             Self::NoResourceVersion => {
                 formatter.write_str("no metadata.resourceVersion in Kubernetes API response")
             }
@@ -90,7 +104,7 @@ impl std::error::Error for Error {
             | Self::WatchStartFailed(error)
             | Self::WatchFailed(error) => Some(error),
             Self::WatchStatus(error) => Some(error.as_ref()),
-            Self::NoResourceVersion => None,
+            Self::TimedOut { .. } | Self::NoResourceVersion => None,
         }
     }
 }
@@ -101,6 +115,13 @@ pub(super) fn resumable_watcher(
     config: watcher::Config,
     initial_resource_version: Option<String>,
 ) -> impl Stream<Item = Result<Event, Error>> + Send {
+    // The Kubernetes client has no read timeout, so a connection that stops delivering data
+    // without closing would otherwise block forever. The API server ends each request within the
+    // server-side timeout, so anything silent for longer than that is treated as stalled.
+    let client_timeout = config.timeout.map_or(DEFAULT_WATCH_TIMEOUT, |seconds| {
+        Duration::from_secs(u64::from(seconds))
+    }) + CLIENT_TIMEOUT_GRACE;
+
     stream! {
         let mut resource_version = initial_resource_version;
 
@@ -113,10 +134,17 @@ pub(super) fn resumable_watcher(
 
                 loop {
                     let params = list_params(&config, continue_token.as_deref());
-                    let list = match api.list(&params).await {
-                        Ok(list) => list,
-                        Err(error) => {
+                    let list = match timeout(client_timeout, api.list(&params)).await {
+                        Ok(Ok(list)) => list,
+                        Ok(Err(error)) => {
                             yield Err(Error::InitialListFailed(error));
+                            continue 'restart;
+                        }
+                        Err(_) => {
+                            yield Err(Error::TimedOut {
+                                operation: "initial object list",
+                                timeout: client_timeout,
+                            });
                             continue 'restart;
                         }
                     };
@@ -149,18 +177,38 @@ pub(super) fn resumable_watcher(
             let version = resource_version
                 .as_deref()
                 .expect("resource version is set after initial list");
-            let mut watch = match api.watch(&watch_params(&config), version).await {
-                Ok(watch) => Box::pin(watch),
-                Err(error) => {
+            let mut watch = match timeout(client_timeout, api.watch(&watch_params(&config), version)).await {
+                Ok(Ok(watch)) => Box::pin(watch),
+                Ok(Err(error)) => {
                     if is_gone_error(&error) {
                         resource_version = None;
                     }
                     yield Err(Error::WatchStartFailed(error));
                     continue;
                 }
+                Err(_) => {
+                    yield Err(Error::TimedOut {
+                        operation: "watch request",
+                        timeout: client_timeout,
+                    });
+                    continue;
+                }
             };
 
-            while let Some(result) = watch.next().await {
+            loop {
+                let result = match timeout(client_timeout, watch.next()).await {
+                    Ok(Some(result)) => result,
+                    Ok(None) => break,
+                    Err(_) => {
+                        // Reconnect from the retained resource version.
+                        yield Err(Error::TimedOut {
+                            operation: "watch",
+                            timeout: client_timeout,
+                        });
+                        continue 'restart;
+                    }
+                };
+
                 match result {
                     Ok(WatchEvent::Added(event)) => {
                         let Some(version) = event.metadata.resource_version.clone().filter(|v| !v.is_empty()) else {
@@ -369,6 +417,61 @@ mod tests {
         assert!(matches!(event, Event::Apply { .. }));
         assert!(started_at.elapsed() >= WATCH_EOF_RETRY_DELAY);
         assert_eq!(request_count.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stalled_watch_reconnects_from_retained_resource_version() {
+        use bytes::Bytes;
+        use http_body_util::{BodyExt, Full, StreamBody, combinators::BoxBody};
+
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let service = {
+            let requests = Arc::clone(&requests);
+            service_fn(move |request: Request<Body>| {
+                let mut requests = requests.lock().unwrap();
+                requests.push(request.uri().to_string());
+                let body: BoxBody<Bytes, std::io::Error> = if requests.len() == 1 {
+                    // The watch is established but never sends data or closes.
+                    BodyExt::boxed(StreamBody::new(futures::stream::pending()))
+                } else {
+                    let line = format!(
+                        "{}\n",
+                        serde_json::json!({
+                            "type": "MODIFIED",
+                            "object": make_event("uid", "41", Utc::now()),
+                        })
+                    );
+                    Full::new(Bytes::from(line))
+                        .map_err(|never| match never {})
+                        .boxed()
+                };
+                let response = Response::builder()
+                    .header(CONTENT_TYPE, "application/json")
+                    .body(body)
+                    .unwrap();
+                async move { Ok::<_, std::io::Error>(response) }
+            })
+        };
+        let api = Api::all(Client::new(service, "default"));
+        let config = watcher::Config::default().timeout(10);
+        let mut events = Box::pin(resumable_watcher(api, config, Some("40".to_string())));
+
+        let error = events.next().await.unwrap().unwrap_err();
+        assert!(matches!(
+            error,
+            Error::TimedOut {
+                operation: "watch",
+                ..
+            }
+        ));
+
+        let event = events.next().await.unwrap().unwrap();
+        assert_eq!(event.checkpoint(), Some("41"));
+
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests.len(), 2);
+        assert!(requests[1].contains("watch=true"));
+        assert!(requests[1].contains("resourceVersion=40"));
     }
 
     #[tokio::test]
