@@ -159,6 +159,18 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 		required: false
 		type: string: {}
 	}
+	log_group_class: {
+		description: """
+			The [Log group class][log_group_class] to be set on the log group when a new group gets created. Falls back to `LogGroupClass::Standard` if omitted.
+
+			[log_group_class]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html
+			"""
+		required: false
+		type: string: enum: {
+			infrequent_access: "Infrequent Access log group class with a lower ingestion cost and a reduced feature set."
+			standard:          "Standard log group class with the full set of CloudWatch Logs features."
+		}
+	}
 	region: {
 		description: """
 			The [AWS region][aws_region] of the target service.

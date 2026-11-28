@@ -11,7 +11,7 @@ use aws_sdk_cloudwatchlogs::{
         describe_log_streams::DescribeLogStreamsError, put_log_events::PutLogEventsError,
         put_retention_policy::PutRetentionPolicyError,
     },
-    types::InputLogEvent,
+    types::{InputLogEvent, LogGroupClass},
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use chrono::Duration;
@@ -35,7 +35,7 @@ use vector_lib::{
 use crate::sinks::{
     aws_cloudwatch_logs::{
         CloudwatchKey,
-        config::{CloudwatchLogsSinkConfig, Retention},
+        config::{CloudWatchLogGroupClass, CloudwatchLogsSinkConfig, Retention},
         request,
         retry::CloudwatchRetryLogic,
         sink::BatchCloudwatchRequest,
@@ -226,6 +226,13 @@ impl CloudwatchLogsSvc {
 
         let kms_key = config.kms_key.clone();
         let tags = config.tags;
+        let log_group_class = match config.log_group_class {
+            Some(log_group_class) => Some(match log_group_class {
+                CloudWatchLogGroupClass::Standard => LogGroupClass::Standard,
+                CloudWatchLogGroupClass::InfrequentAccess => LogGroupClass::InfrequentAccess,
+            }),
+            None => None,
+        };
 
         CloudwatchLogsSvc {
             headers,
@@ -237,6 +244,7 @@ impl CloudwatchLogsSvc {
             retention,
             kms_key,
             tags,
+            log_group_class,
             token: None,
             token_rx: None,
         }
@@ -313,6 +321,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 &self.retention,
                 self.kms_key.clone(),
                 self.tags.clone(),
+                self.log_group_class.clone(),
                 event_batches,
                 self.token.take(),
                 tx,
@@ -333,6 +342,7 @@ pub(super) struct CloudwatchLogsSvc {
     retention: Retention,
     kms_key: Option<String>,
     tags: Option<HashMap<String, String>>,
+    log_group_class: Option<LogGroupClass>,
     token: Option<String>,
     token_rx: Option<oneshot::Receiver<Option<String>>>,
 }
