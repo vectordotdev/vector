@@ -108,12 +108,8 @@ generated: components: sinks: aws_s3: configuration: {
 		required: false
 		type: object: options: {
 			codec: {
-				description: """
-					Encodes events in [Apache Parquet][apache_parquet] columnar format.
-
-					[apache_parquet]: https://parquet.apache.org/
-					"""
-				required: true
+				description: "The codec to use for batch encoding events."
+				required:    true
 				type: string: enum: parquet: """
 					Encodes events in [Apache Parquet][apache_parquet] columnar format.
 
@@ -235,8 +231,7 @@ generated: components: sinks: aws_s3: configuration: {
 
 			Directly comparable to the `Content-Type` HTTP header.
 
-			If not specified, the compression scheme used dictates this value.
-			When `compression` is set to `none`, the value `text/x-log` is used.
+			Defaults to `text/x-log`, or `application/vnd.apache.parquet` when Parquet batch encoding is enabled.
 			"""
 		required: false
 		type: string: examples: ["application/gzip"]

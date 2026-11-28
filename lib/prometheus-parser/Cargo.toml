@@ -1,6 +1,6 @@
 [package]
 name = "prometheus-parser"
-version = "0.1.0"
+version.workspace = true
 authors = ["Vector Contributors <vector@datadoghq.com>", "Duy Do <juchiast@gmail.com>"]
 edition = "2024"
 publish = false

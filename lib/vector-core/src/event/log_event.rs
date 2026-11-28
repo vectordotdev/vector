@@ -131,9 +131,9 @@ impl Default for Inner {
     fn default() -> Self {
         Self {
             // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
-            fields: Value::Object(Default::default()),
-            size_cache: Default::default(),
-            json_encoded_size_cache: Default::default(),
+            fields: Value::Object(ObjectMap::default()),
+            size_cache: AtomicCell::default(),
+            json_encoded_size_cache: AtomicCell::default(),
         }
     }
 }
@@ -142,8 +142,8 @@ impl From<Value> for Inner {
     fn from(fields: Value) -> Self {
         Self {
             fields,
-            size_cache: Default::default(),
-            json_encoded_size_cache: Default::default(),
+            size_cache: AtomicCell::default(),
+            json_encoded_size_cache: AtomicCell::default(),
         }
     }
 }
@@ -263,7 +263,7 @@ impl LogEvent {
     #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
-            inner: Default::default(),
+            inner: Arc::default(),
             metadata,
         }
     }

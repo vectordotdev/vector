@@ -2,11 +2,11 @@
 
 ## Before You Begin
 
-The [`mkcert`](https://github.com/FiloSottile/mkcert) utility was used to generate the root CA, client, and server
-certificates/keys.
+The TLS fixtures use a dedicated test CA and the public test keys in this directory. Use OpenSSL 3 to regenerate the
+certificates; do not install this CA in your system trust store.
 
 Additionally, all commands which generate output files -- such as in the TLS and JWT sections -- need to either be run
-from the correct test data directory -- `tests/data/nats` -- or need to have those files moved to that directory.
+from the correct test data directory -- `tests/integration/nats/data` -- or need to have those files moved to that directory.
 
 ## Generating the "NKey"-based configuration/credentials
 
@@ -16,27 +16,56 @@ resource to use, and includes all the required commands configuration snippets n
 
 ## Generating the TLS-based configuration/credentials
 
-First, we'll generate the certificate that the server itself will use. We include both `localhost`/`::1` as well as the
-hostnames used by the integration tests, so the certificate should be usable in both scenarios.
+Run the following from `tests/integration/nats/data`. It reuses the checked-in server and client test keys and creates a
+temporary CA key that is deleted afterward. The certificates remain valid for 20 years to avoid frequent CI interruptions.
+The server names cover local runs and the Compose services; `email@localhost` is required by the mutual TLS user mapping.
 
 ```shell
-# Make sure to change to the `tests/data/nats` directory first before running these commands.
+fixture_tmp=$(mktemp -d)
+trap 'rm -rf "$fixture_tmp"' EXIT
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout "$fixture_tmp/rootCA.key" -out rootCA.pem -days 7301 \
+  -subj '/CN=Vector NATS integration test CA' \
+  -addext 'basicConstraints=critical,CA:TRUE,pathlen:0' \
+  -addext 'keyUsage=critical,keyCertSign,cRLSign' \
+  -addext 'subjectKeyIdentifier=hash'
 
-# Create the server certificate/key. This will also generate a root CA which we'll need to copy as well.
-$ mkcert -cert-file nats-server.pem -key-file nats-server.key localhost ::1 nats-tls nats-tls-client-cert nats-jwt
+cat > "$fixture_tmp/extensions.cnf" <<'EOF'
+[server]
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth
+subjectAltName=DNS:localhost,DNS:nats-tls,DNS:nats-tls-client-cert,DNS:nats-jwt,IP:::1
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer
 
-# Next, move the mkcert root CA to the correct location, and move the server certificate/key.
-$ mv "$(mkcert -CAROOT)/rootCA.pem" tests/data/nats/rootCA.pem
+[client]
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=clientAuth,serverAuth,emailProtection
+subjectAltName=DNS:localhost,DNS:nats-tls,DNS:nats-tls-client-cert,DNS:nats-jwt,IP:::1,email:email@localhost
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer
+EOF
 
-# Now generate the client certificate/key.
-$ mkcert -client -cert-file nats-client.pem -key-file nats-client.key localhost ::1 nats-tls nats-tls-client-cert nats-jwt email@localhost
+for kind in server client; do
+  openssl req -new -key "nats-$kind.key" -out "$fixture_tmp/$kind.csr" \
+    -subj "/CN=Vector NATS integration test $kind"
+  openssl x509 -req -in "$fixture_tmp/$kind.csr" -out "nats-$kind.pem" \
+    -CA rootCA.pem -CAkey "$fixture_tmp/rootCA.key" \
+    -CAcreateserial -CAserial "$fixture_tmp/rootCA.srl" -days 7300 \
+    -extfile "$fixture_tmp/extensions.cnf" -extensions "$kind"
+done
 ```
 
-After that, you can read more about [TLS configuration in
-NATS](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/tls) to learn what to add to the
-configuration file itself. It also covers generating certificates using `mkcert`, but the above commands are specific to
-our existing test configurations, so you can skip read the link,. and simply follow the commands, if all you're doing
-is regenerating the certificates due to expiration, etc.
+Verify the chain and intended certificate usages:
+
+```shell
+openssl verify -CAfile rootCA.pem -purpose sslserver nats-server.pem
+openssl verify -CAfile rootCA.pem -purpose sslclient nats-client.pem
+```
+
+Keep `rootCA.pem`, `nats-server.pem`, and `nats-client.pem` together when updating these fixtures.
 
 ## Generating the JWT-based configuration credentials
 
@@ -48,10 +77,10 @@ Next, we'll need to move the credentials that the above guide had you generate.
 
 ```shell
 # Now move these credentials to the right location, since they don't just drop into the current directory.
-$ mv ~/.nkeys/creds/memory/A/TA.creds tests/data/nats/nats.creds
+$ mv ~/.nkeys/creds/memory/A/TA.creds tests/integration/nats/data/nats.creds
 
 # After that, we make a copy that will act as the "bad" credentials.
 #
 # You'll need to open the "bad" version and change one of the characters in the seed value in order to actually make them "bad". :)
-$ cp tests/data/nats/nats.creds tests/data/nats/nats-bad.creds
+$ cp tests/integration/nats/data/nats.creds tests/integration/nats/data/nats-bad.creds
 ```

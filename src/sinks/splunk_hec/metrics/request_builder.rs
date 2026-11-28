@@ -10,18 +10,19 @@ use super::{encoder::HecMetricsEncoder, sink::HecProcessedEvent};
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
     util::{
-        Compression, RequestBuilder, metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
+        Compression, RequestBuilder,
+        metadata::RequestMetadataBuilder,
+        request_builder::{EncodeResult, RequestParts},
     },
 };
 
-pub struct HecMetricsRequestBuilder {
+pub(super) struct HecMetricsRequestBuilder {
     pub(super) compression: Compression,
     pub(super) encoder: HecMetricsEncoder,
 }
 
 impl HecMetricsRequestBuilder {
-    pub const fn new(compression: Compression, templated_field_keys: Box<[String]>) -> Self {
+    pub(super) const fn new(compression: Compression, templated_field_keys: Box<[String]>) -> Self {
         Self {
             compression,
             encoder: HecMetricsEncoder {
@@ -32,7 +33,7 @@ impl HecMetricsRequestBuilder {
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRequestBuilder {
-    type Metadata = (EventFinalizers, Option<Arc<str>>);
+    type Metadata = Option<Arc<str>>;
     type Events = Vec<HecProcessedEvent>;
     type Encoder = HecMetricsEncoder;
     type Payload = Bytes;
@@ -50,22 +51,27 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
     fn split_input(
         &self,
         input: (Option<Arc<str>>, Vec<HecProcessedEvent>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (passthrough_token, mut events) = input;
         let finalizers = events.take_finalizers();
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
 
-        ((finalizers, passthrough_token), metadata_builder, events)
+        RequestParts {
+            metadata: passthrough_token,
+            request_metadata_builder: metadata_builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        hec_metadata: Self::Metadata,
+        passthrough_token: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (finalizers, passthrough_token) = hec_metadata;
         HecRequest {
             body: payload.into_payload(),
             finalizers,

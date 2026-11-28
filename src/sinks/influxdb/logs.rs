@@ -6,7 +6,7 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use futures::{StreamExt, future, stream::BoxStream};
-use http_1::Uri;
+use http::Uri;
 use indoc::indoc;
 use tower::{Service, ServiceBuilder};
 use vector_lib::{
@@ -15,6 +15,7 @@ use vector_lib::{
     configurable::configurable_component,
     finalization::{EventFinalizers, EventStatus},
     internal_event::CountByteSize,
+    internal_event::emit,
     json_size::JsonSize,
     lookup::{PathPrefix, lookup_v2::OptionalValuePath},
     request_metadata::{GroupedCountByteSize, RequestMetadata},
@@ -35,7 +36,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, KeyString, MetricTags, Value},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::{InfluxdbEncodingError, LargeEventDroppedError, SinkRequestBuildError},
     sinks::{
         Healthcheck, VectorSink,
@@ -44,10 +45,14 @@ use crate::{
             TowerRequestConfig,
             builder::SinkBuilderExt,
             encoding::{Encoder as SinkEncoder, write_all},
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
             metadata::RequestMetadataBuilder,
-            request_builder::{EncodeResult, default_request_builder_concurrency_limit},
+            request_builder::{
+                EncodeResult, RequestParts, default_request_builder_concurrency_limit,
+            },
             service::ServiceBuilderExt,
         },
     },
@@ -69,8 +74,7 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 pub struct InfluxDbLogsConfig {
     /// The name of the InfluxDB measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
-    #[configurable(metadata(docs::required = true))]
-    pub measurement: Option<String>,
+    pub measurement: String,
 
     /// The endpoint to send data to.
     ///
@@ -183,7 +187,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
     type Validated = ValidatedInfluxDbLogs;
 
     fn validate(&self) -> crate::Result<ValidatedInfluxDbLogs> {
-        let measurement = self.get_measurement()?;
+        let measurement = self.measurement.clone();
         let tags: HashSet<KeyString> = self.tags.iter().cloned().collect();
 
         let batch = self.batch.into_batcher_settings()?;
@@ -264,8 +268,7 @@ impl ValidatedSink for InfluxDbLogsConfig {
             source_type_key,
         };
 
-        let service = HttpService::new(client, InfluxDbWriteRequest::new(uri.clone(), token))
-            .with_response_decompression();
+        let service = HttpService::new(client, InfluxDbWriteRequest::new(uri.clone(), token));
         let service = ServiceBuilder::new()
             .settings(request, http_response_retry_logic(RetryStrategy::Default))
             .service(service);
@@ -347,9 +350,9 @@ impl InfluxDbLogsEncoder {
             timestamp,
             &mut output,
         ) {
-            emit!(InfluxdbEncodingError {
+            emit(InfluxdbEncodingError {
                 error_message,
-                count: 1
+                count: 1,
             });
             return None;
         }
@@ -359,7 +362,7 @@ impl InfluxDbLogsEncoder {
 }
 
 impl HttpServiceRequestBuilder<()> for InfluxDbWriteRequest {
-    fn build(&self, mut request: HttpRequest<()>) -> crate::Result<http_1::Request<Bytes>> {
+    fn build(&self, mut request: HttpRequest<()>) -> crate::Result<http::Request<Bytes>> {
         self.request(request.take_payload())
     }
 }
@@ -436,7 +439,7 @@ impl StreamBatchConfig<EncodedLine> for LogBatchConfig {
 
         let max_bytes = self.settings.size_limit;
         if self.batch.lines.is_empty() && line.len() > max_bytes {
-            emit!(LargeEventDroppedError {
+            emit(LargeEventDroppedError {
                 length: line.len(),
                 max_length: max_bytes,
             });
@@ -493,7 +496,7 @@ struct InfluxDbLogsRequestBuilder {
 }
 
 impl RequestBuilder<LogBatch> for InfluxDbLogsRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = LogLines;
     type Encoder = LogLinesEncoder;
     type Payload = Bytes;
@@ -508,10 +511,7 @@ impl RequestBuilder<LogBatch> for InfluxDbLogsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        batch: LogBatch,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, batch: LogBatch) -> RequestParts<Self::Metadata, Self::Events> {
         let LogBatch {
             lines,
             finalizers,
@@ -522,12 +522,18 @@ impl RequestBuilder<LogBatch> for InfluxDbLogsRequestBuilder {
         // Events are reported untagged, with the estimated JSON size of the original events.
         let json_size = GroupedCountByteSize::from(CountByteSize(count, json_size));
         let builder = RequestMetadataBuilder::new(count, byte_size, json_size.clone());
-        (finalizers, builder, LogLines { lines, json_size })
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events: LogLines { lines, json_size },
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        finalizers: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -578,7 +584,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(request) => Some(request),
@@ -606,12 +612,6 @@ where
 }
 
 impl InfluxDbLogsConfig {
-    fn get_measurement(&self) -> Result<String, &'static str> {
-        self.measurement
-            .clone()
-            .ok_or("The `measurement` option is required.")
-    }
-
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let config = self.clone();
 
@@ -682,23 +682,6 @@ mod tests {
         "#};
 
         serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
-    }
-
-    #[test]
-    fn test_config_measurement_required() {
-        let config = indoc! {r#"
-            endpoint: "http://localhost:9999"
-            version: "2"
-            bucket: "my-bucket"
-            org: "my-org"
-            token: "my-token"
-        "#};
-
-        let sink_config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
-        assert_eq!(
-            Err("The `measurement` option is required."),
-            sink_config.get_measurement()
-        );
     }
 
     #[test]
@@ -882,7 +865,7 @@ mod tests {
     #[test]
     fn prepares_valid_config() {
         let config = InfluxDbLogsConfig {
-            measurement: Some("vector".to_string()),
+            measurement: "vector".to_string(),
             endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
             settings: v2_settings(),
             tags: vec![],
@@ -908,7 +891,7 @@ mod tests {
     #[test]
     fn validate_retains_config_keys_without_log_schema_fallback() {
         let config = InfluxDbLogsConfig {
-            measurement: Some("vector".to_string()),
+            measurement: "vector".to_string(),
             endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
             settings: v2_settings(),
             host_key: Some(OptionalValuePath::new("custom_host")),
@@ -1507,7 +1490,7 @@ mod integration_tests {
         let cx = SinkContext::default();
 
         let config = InfluxDbLogsConfig {
-            measurement: Some(measure.clone()),
+            measurement: measure.clone(),
             endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
             tags: Vec::default(),
             settings: InfluxDbSettings::V2(InfluxDb2Settings {

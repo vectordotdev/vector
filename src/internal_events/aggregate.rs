@@ -1,10 +1,10 @@
 use vector_lib::{
     NamedInternalEvent, counter,
-    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
+    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent, emit},
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AggregateEventRecorded;
+pub(crate) struct AggregateEventRecorded;
 
 impl InternalEvent for AggregateEventRecorded {
     fn emit(self) {
@@ -13,7 +13,7 @@ impl InternalEvent for AggregateEventRecorded {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AggregateFlushed;
+pub(crate) struct AggregateFlushed;
 
 impl InternalEvent for AggregateFlushed {
     fn emit(self) {
@@ -22,7 +22,7 @@ impl InternalEvent for AggregateFlushed {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AggregateUpdateFailed;
+pub(crate) struct AggregateUpdateFailed;
 
 impl InternalEvent for AggregateUpdateFailed {
     fn emit(self) {
@@ -32,13 +32,13 @@ impl InternalEvent for AggregateUpdateFailed {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct AggregateEventDropped {
+pub(crate) struct AggregateEventDropped {
     pub reason: &'static str,
 }
 
 impl InternalEvent for AggregateEventDropped {
     fn emit(self) {
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
+        emit(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: self.reason,
         });

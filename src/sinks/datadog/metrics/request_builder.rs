@@ -7,20 +7,23 @@ use tracing::{debug, warn};
 use vector_lib::{
     event::{EventFinalizers, Finalizable, Metric},
     request_metadata::RequestMetadata,
+    sink::PreparationError,
 };
 
 use super::{
     config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration, SeriesApiVersion},
-    encoder::{DatadogMetricsEncoder, EncoderError, FinishError},
+    encoder::{DatadogMetricsEncoder, EncoderError, FinishError, MetricEncodeError},
     encoder_v3::DatadogMetricsV3Encoder,
     service::DatadogMetricsRequest,
 };
 use crate::sinks::util::{
-    IncrementalRequestBuilder, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
+    IncrementalRequestBuilder,
+    metadata::RequestMetadataBuilder,
+    request_builder::{EncodeResult, EncodedChunk, IncrementalPayloads},
 };
 
 #[derive(Debug, Snafu)]
-pub enum RequestBuilderError {
+pub(super) enum RequestBuilderError {
     #[snafu(context(false), display("Failed to encode metric: {source}"))]
     FailedToEncode { source: EncoderError },
 
@@ -37,7 +40,7 @@ pub enum RequestBuilderError {
 impl RequestBuilderError {
     /// Converts this error into its constituent parts: the error reason, the error type, and how
     /// many events were dropped as a result.
-    pub fn into_parts(self) -> (String, &'static str, u64) {
+    pub(super) fn into_parts(self) -> (String, &'static str, u64) {
         match self {
             // Encoding errors always happen at the per-metric level, so we could only ever drop a
             // single metric/event at a time.
@@ -61,21 +64,20 @@ impl RequestBuilderError {
 }
 
 /// Metadata that the `DatadogMetricsRequestBuilder` sends with each request.
-pub struct DDMetricsMetadata {
+pub(super) struct DDMetricsMetadata {
     api_key: Option<Arc<str>>,
     endpoint: DatadogMetricsEndpoint,
-    finalizers: EventFinalizers,
 }
 
 /// Common shape of the two concrete metrics encoders, so call sites don't need to
 /// know which wire format they're driving.
 trait MetricsEncoder {
-    fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError>;
+    fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, MetricEncodeError>;
     fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError>;
 }
 
 impl MetricsEncoder for DatadogMetricsEncoder {
-    fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, MetricEncodeError> {
         DatadogMetricsEncoder::try_encode(self, metric)
     }
 
@@ -85,7 +87,7 @@ impl MetricsEncoder for DatadogMetricsEncoder {
 }
 
 impl MetricsEncoder for DatadogMetricsV3Encoder {
-    fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, MetricEncodeError> {
         DatadogMetricsV3Encoder::try_encode(self, metric)
     }
 
@@ -102,7 +104,7 @@ enum EncoderKind {
 }
 
 impl MetricsEncoder for EncoderKind {
-    fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, MetricEncodeError> {
         match self {
             Self::V2(enc) => enc.try_encode(metric),
             Self::V3(enc) => enc.try_encode(metric),
@@ -118,14 +120,14 @@ impl MetricsEncoder for EncoderKind {
 }
 
 /// Incremental request builder specific to Datadog metrics.
-pub struct DatadogMetricsRequestBuilder {
+pub(super) struct DatadogMetricsRequestBuilder {
     endpoint_configuration: DatadogMetricsEndpointConfiguration,
     series_encoder: EncoderKind,
     sketches_encoder: DatadogMetricsEncoder,
 }
 
 impl DatadogMetricsRequestBuilder {
-    pub fn new(
+    pub(super) fn new(
         endpoint_configuration: DatadogMetricsEndpointConfiguration,
         default_namespace: Option<String>,
         series_api_version: SeriesApiVersion,
@@ -173,7 +175,7 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
     fn encode_events_incremental(
         &mut self,
         input: ((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<Metric>),
-    ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
+    ) -> IncrementalPayloads<Self::Metadata, Self::Payload, Self::Error> {
         let (tmp, metrics) = input;
         let (api_key, endpoint) = tmp;
 
@@ -182,7 +184,12 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
         encode_batch(self.get_encoder(endpoint), api_key, endpoint, metrics)
     }
 
-    fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &mut self,
+        metadata: Self::Metadata,
+        finalizers: EventFinalizers,
+        payload: Self::Payload,
+    ) -> Self::Request {
         let (ddmetrics_metadata, request_metadata) = metadata;
 
         let uri = self
@@ -195,7 +202,7 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
             uri,
             content_type: "application/x-protobuf",
             content_encoding: "zstd",
-            finalizers: ddmetrics_metadata.finalizers,
+            finalizers,
             metadata: request_metadata,
         }
     }
@@ -224,8 +231,48 @@ fn stamp_missing_timestamps(metrics: Vec<Metric>) -> Vec<Metric> {
         .collect()
 }
 
-type EncodedResults =
-    Vec<Result<((DDMetricsMetadata, RequestMetadata), Bytes), RequestBuilderError>>;
+type EncodedMetrics =
+    EncodedChunk<(DDMetricsMetadata, RequestMetadata), Bytes, RequestBuilderError>;
+type EncodedResults = Vec<EncodedMetrics>;
+
+fn encoded_metrics(
+    api_key: Option<Arc<str>>,
+    endpoint: DatadogMetricsEndpoint,
+    payload: EncodeResult<Bytes>,
+    mut metrics: Vec<Metric>,
+) -> EncodedMetrics {
+    let finalizers = metrics.take_finalizers();
+    let metadata = DDMetricsMetadata { api_key, endpoint };
+    let request_metadata = RequestMetadataBuilder::from_events(&metrics).build(&payload);
+    EncodedChunk {
+        result: Ok(((metadata, request_metadata), payload.into_payload())),
+        finalizers,
+    }
+}
+
+fn failed_finish(error: FinishError, dropped_events: u64) -> EncodedMetrics {
+    let error_type = error.as_error_type();
+    let reported = RequestBuilderError::Unexpected {
+        error_type,
+        dropped_events,
+    };
+    let (error, finalizers) = match error {
+        FinishError::CompressionFailed { finalizers, .. } => {
+            (PreparationError::Transient(reported), finalizers)
+        }
+        FinishError::V3EncodingFailed { finalizers, .. } => {
+            (PreparationError::Permanent(reported), finalizers)
+        }
+        FinishError::TooLarge { mut metrics, .. } => (
+            PreparationError::Permanent(reported),
+            metrics.take_finalizers(),
+        ),
+    };
+    EncodedChunk {
+        result: Err(error),
+        finalizers,
+    }
+}
 
 // ── Encoding ────────────────────────────────────────────────────────────────────
 //
@@ -255,7 +302,7 @@ fn encode_batch(
 
     let mut results = Vec::new();
     let mut pending = None;
-    while metric_drain.len() != 0 {
+    while metric_drain.len() != 0 || pending.is_some() {
         let mut n = 0;
 
         loop {
@@ -275,14 +322,32 @@ fn encode_batch(
             match encoder.try_encode(metric) {
                 // We encoded the metric successfully, so update our metadata and continue.
                 Ok(None) => n += 1,
+                Ok(Some(mut metric)) if n == 0 => {
+                    // The metric could not fit even in an empty payload. Reset the encoder
+                    // before taking the next metric.
+                    let finalizers = metric.take_finalizers();
+                    let mut failed = match encoder.finish() {
+                        Ok(_) | Err(FinishError::TooLarge { .. }) => EncodedChunk {
+                            result: Err(PreparationError::Permanent(
+                                RequestBuilderError::FailedToSplit { dropped_events: 1 },
+                            )),
+                            finalizers: EventFinalizers::default(),
+                        },
+                        Err(error) => failed_finish(error, 1),
+                    };
+                    failed.finalizers.merge(finalizers);
+                    results.push(failed);
+                    break;
+                }
                 Ok(Some(metric)) => {
-                    // The encoded metric would not fit within the configured limits, so we need
-                    // to finish the current encoder and generate our payload, and keep going.
                     pending = Some(metric);
                     break;
                 }
-                Err(e) => {
-                    results.push(Err(e.into()));
+                Err((error, finalizers)) => {
+                    results.push(EncodedChunk {
+                        result: Err(PreparationError::Permanent(error.into())),
+                        finalizers,
+                    });
                     break;
                 }
             }
@@ -291,21 +356,13 @@ fn encode_batch(
         // If we encoded one or more metrics this pass, finalize the payload.
         if n > 0 {
             match encoder.finish() {
-                Ok((encode_result, mut processed)) => {
-                    let finalizers = processed.take_finalizers();
-                    let metadata = DDMetricsMetadata {
-                        api_key: api_key.clone(),
+                Ok((payload, processed)) => {
+                    results.push(encoded_metrics(
+                        api_key.clone(),
                         endpoint,
-                        finalizers,
-                    };
-
-                    let request_metadata =
-                        RequestMetadataBuilder::from_events(&processed).build(&encode_result);
-
-                    results.push(Ok((
-                        (metadata, request_metadata),
-                        encode_result.into_payload(),
-                    )));
+                        payload,
+                        processed,
+                    ));
                 }
                 Err(FinishError::TooLarge {
                     metrics,
@@ -319,13 +376,7 @@ fn encode_batch(
 
                     results.extend(split_and_encode(encoder, &api_key, endpoint, metrics));
                 }
-                Err(suberr) => {
-                    // Not an error we can do anything about, so just forward it on.
-                    results.push(Err(RequestBuilderError::Unexpected {
-                        error_type: suberr.as_error_type(),
-                        dropped_events: n as u64,
-                    }));
-                }
+                Err(error) => results.push(failed_finish(error, n as u64)),
             }
         }
     }
@@ -340,7 +391,7 @@ enum ChunkError {
     TooLarge(Vec<Metric>),
 
     /// The chunk could not be encoded at all, so its events are dropped.
-    Failed { dropped_events: u64 },
+    Failed(EncodedMetrics),
 }
 
 /// Re-encodes an oversized batch by repeatedly halving it until every piece fits.
@@ -385,7 +436,6 @@ fn split_and_encode(
         }
 
         match encode_chunk(encoder, api_key.clone(), endpoint, chunk) {
-            Ok(result) => results.push(Ok(result)),
             Err(ChunkError::TooLarge(mut metrics)) => {
                 if metrics.len() == 1 {
                     // A single metric that doesn't fit on its own can't be split any further,
@@ -394,9 +444,12 @@ fn split_and_encode(
                         message = "Dropping oversized Datadog metric that cannot be split further.",
                         internal_log_rate_limit = true,
                     );
-                    results.push(Err(RequestBuilderError::FailedToSplit {
-                        dropped_events: 1,
-                    }));
+                    results.push(EncodedChunk {
+                        result: Err(PreparationError::Permanent(
+                            RequestBuilderError::FailedToSplit { dropped_events: 1 },
+                        )),
+                        finalizers: metrics.take_finalizers(),
+                    });
                     continue;
                 }
 
@@ -404,9 +457,7 @@ fn split_and_encode(
                 pending.push_front(remainder);
                 pending.push_front(metrics);
             }
-            Err(ChunkError::Failed { dropped_events }) => {
-                results.push(Err(RequestBuilderError::FailedToSplit { dropped_events }));
-            }
+            Ok(result) | Err(ChunkError::Failed(result)) => results.push(result),
         }
     }
 
@@ -420,7 +471,7 @@ fn encode_chunk(
     api_key: Option<Arc<str>>,
     endpoint: DatadogMetricsEndpoint,
     metrics: Vec<Metric>,
-) -> Result<((DDMetricsMetadata, RequestMetadata), Bytes), ChunkError> {
+) -> Result<EncodedMetrics, ChunkError> {
     let metrics_len = metrics.len();
     let mut remaining = metrics.into_iter();
     let mut rejected = None;
@@ -436,10 +487,28 @@ fn encode_chunk(
                 rejected = Some(metric);
                 break;
             }
-            Err(_) => {
-                return Err(ChunkError::Failed {
-                    dropped_events: metrics_len as u64,
-                });
+            Err((_, mut finalizers)) => {
+                // Reset the encoder and account for the whole chunk, including the
+                // metrics accepted before the error and those we have yet to encode.
+                match encoder.finish() {
+                    Ok((_, mut metrics)) | Err(FinishError::TooLarge { mut metrics, .. }) => {
+                        finalizers.merge(metrics.take_finalizers());
+                    }
+                    Err(error) => finalizers.merge(failed_finish(error, 0).finalizers),
+                }
+                finalizers.merge(
+                    remaining
+                        .map(|mut metric| metric.take_finalizers())
+                        .collect(),
+                );
+                return Err(ChunkError::Failed(EncodedChunk {
+                    result: Err(PreparationError::Permanent(
+                        RequestBuilderError::FailedToSplit {
+                            dropped_events: metrics_len as u64,
+                        },
+                    )),
+                    finalizers,
+                }));
             }
         }
     }
@@ -457,20 +526,7 @@ fn encode_chunk(
                 return Err(ChunkError::TooLarge(processed));
             }
 
-            let finalizers = processed.take_finalizers();
-            let ddmetrics_metadata = DDMetricsMetadata {
-                api_key,
-                endpoint,
-                finalizers,
-            };
-
-            let request_metadata =
-                RequestMetadataBuilder::from_events(&processed).build(&encode_result);
-
-            Ok((
-                (ddmetrics_metadata, request_metadata),
-                encode_result.into_payload(),
-            ))
+            Ok(encoded_metrics(api_key, endpoint, encode_result, processed))
         }
         Err(FinishError::TooLarge {
             mut metrics,
@@ -480,9 +536,17 @@ fn encode_chunk(
             metrics.extend(remaining);
             Err(ChunkError::TooLarge(metrics))
         }
-        Err(_) => Err(ChunkError::Failed {
-            dropped_events: metrics_len as u64,
-        }),
+        Err(error) => {
+            let mut failed = failed_finish(error, metrics_len as u64);
+            failed.finalizers.merge(
+                rejected
+                    .into_iter()
+                    .chain(remaining)
+                    .map(|mut metric| metric.take_finalizers())
+                    .collect(),
+            );
+            Err(ChunkError::Failed(failed))
+        }
     }
 }
 
@@ -549,7 +613,7 @@ mod tests {
     }
 
     impl MetricsEncoder for SizeLimitedEncoder {
-        fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+        fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, MetricEncodeError> {
             // Mirrors V3: accept everything, discover the size at `finish()`.
             self.pending.push(metric);
             Ok(None)
@@ -609,9 +673,11 @@ mod tests {
 
         let dropped: u64 = results
             .iter()
-            .filter_map(|r| r.as_ref().err())
+            .filter_map(|r| r.result.as_ref().err())
             .map(|error| match error {
-                RequestBuilderError::FailedToSplit { dropped_events } => *dropped_events,
+                PreparationError::Permanent(RequestBuilderError::FailedToSplit {
+                    dropped_events,
+                }) => *dropped_events,
                 other => panic!("unexpected error: {other:?}"),
             })
             .sum();
@@ -623,7 +689,7 @@ mod tests {
 
         let delivered: usize = results
             .iter()
-            .filter_map(|r| r.as_ref().ok())
+            .filter_map(|r| r.result.as_ref().ok())
             .map(|((_, request_metadata), _)| request_metadata.event_count())
             .sum();
         assert_eq!(
@@ -649,12 +715,14 @@ mod tests {
             metrics,
         );
 
-        assert!(results.iter().all(Result::is_err));
+        assert!(results.iter().all(|chunk| chunk.result.is_err()));
         let dropped: u64 = results
             .iter()
-            .filter_map(|r| r.as_ref().err())
+            .filter_map(|r| r.result.as_ref().err())
             .map(|error| match error {
-                RequestBuilderError::FailedToSplit { dropped_events } => *dropped_events,
+                PreparationError::Permanent(RequestBuilderError::FailedToSplit {
+                    dropped_events,
+                }) => *dropped_events,
                 other => panic!("unexpected error: {other:?}"),
             })
             .sum();
@@ -679,13 +747,13 @@ mod tests {
         );
 
         assert!(
-            results.iter().all(Result::is_ok),
+            results.iter().all(|chunk| chunk.result.is_ok()),
             "a batch with no individually-oversized metric must not drop anything"
         );
 
         let delivered: usize = results
             .iter()
-            .filter_map(|r| r.as_ref().ok())
+            .filter_map(|r| r.result.as_ref().ok())
             .map(|((_, request_metadata), _)| request_metadata.event_count())
             .sum();
         assert_eq!(delivered, 16, "every metric must be delivered");
@@ -715,7 +783,7 @@ mod tests {
         // requests would reveal reordering of the halves.
         let counts: Vec<usize> = results
             .iter()
-            .filter_map(|r| r.as_ref().ok())
+            .filter_map(|r| r.result.as_ref().ok())
             .map(|((_, request_metadata), _)| request_metadata.event_count())
             .collect();
         assert_eq!(
@@ -739,7 +807,10 @@ mod tests {
         );
 
         assert_eq!(results.len(), 1, "expected exactly one result");
-        assert!(results[0].is_err(), "the oversized metric must be dropped");
+        assert!(
+            results[0].result.is_err(),
+            "the oversized metric must be dropped"
+        );
     }
 
     // ── Timestamp resolution ───────────────────────────────────────────────

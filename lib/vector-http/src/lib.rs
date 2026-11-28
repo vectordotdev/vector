@@ -31,10 +31,11 @@ use http_body_util::{BodyExt, Empty, Full, combinators::UnsyncBoxBody};
 use hyper::body::Incoming;
 use hyper_util::{
     client::legacy::{Builder, Client},
-    rt::{TokioExecutor, TokioTimer},
+    rt::TokioTimer,
 };
 use rand::RngExt as _;
 use tower::Service;
+use vector_common::cpu_time::spawn_timed_without_span;
 use vector_core::{config::proxy::ProxyConfig, tls::MaybeTlsSettings};
 
 use crate::connector::{ForwardProxyAlpn, HttpProxyConnector, Route, RoutePlanner};
@@ -53,9 +54,9 @@ pub struct HttpError {
 
 impl HttpError {
     /// Wraps a retriable transport error.
-    pub fn new(source: impl Error + Send + Sync + 'static) -> Self {
+    pub fn new(source: impl Into<BoxError>) -> Self {
         Self {
-            source: Box::new(source),
+            source: source.into(),
             retriable: true,
         }
     }
@@ -108,6 +109,7 @@ type PooledClient = Client<HttpProxyConnector, RequestBody>;
 pub struct ConnectionOptions {
     max_connection_age: Option<Duration>,
     max_connection_age_jitter_factor: f64,
+    connect_timeout: Option<Duration>,
 }
 
 impl ConnectionOptions {
@@ -128,6 +130,17 @@ impl ConnectionOptions {
         self.max_connection_age_jitter_factor = jitter_factor;
         self
     }
+
+    /// Limits connection setup, that is the TCP connect, the TLS handshake and a proxy
+    /// `CONNECT` tunnel, to this duration. A connection that is not ready in time fails with an
+    /// [`std::io::Error`] of kind [`std::io::ErrorKind::TimedOut`] in the error's source chain.
+    ///
+    /// `None`, the default, disables the limit.
+    #[must_use]
+    pub const fn connect_timeout(mut self, connect_timeout: Option<Duration>) -> Self {
+        self.connect_timeout = connect_timeout;
+        self
+    }
 }
 
 /// Randomizes a connection's age limit by the given fraction, clamped to `0.0..=1.0`.
@@ -145,6 +158,22 @@ pub fn jittered_duration(duration: Duration, jitter_factor: f64) -> Duration {
     duration.mul_f64(random_jitter_factor)
 }
 
+/// Spawns hyper's background tasks (client and server connections, pool maintenance) so that they
+/// inherit the CPU counter of the component that created them. For clients, this is where TLS
+/// encryption and socket writes of request bodies happen.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CpuTimedExecutor;
+
+impl<F> hyper::rt::Executor<F> for CpuTimedExecutor
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    fn execute(&self, future: F) {
+        spawn_timed_without_span(future);
+    }
+}
+
 /// An HTTP/1.1 and HTTP/2 client that routes requests through the configured proxy.
 ///
 /// Sending takes two steps, so a caller can observe the request with its proxy credentials
@@ -153,9 +182,26 @@ pub fn jittered_duration(duration: Duration, jitter_factor: f64) -> Duration {
 #[derive(Clone)]
 pub struct HttpClient {
     // Shared by every clone so that a TLS reload reaches all of them.
-    client: Arc<ArcSwap<PooledClient>>,
+    pool: Arc<ArcSwap<Pool>>,
     routes: Arc<RoutePlanner>,
     options: ConnectionOptions,
+}
+
+/// A connection pool and the connector it was built from, which
+/// [`HttpClient::with_options`] reuses.
+struct Pool {
+    client: PooledClient,
+    connector: HttpProxyConnector,
+}
+
+impl Pool {
+    fn new(connector: HttpProxyConnector) -> Self {
+        // The pool timer closes idle connections in the background, as the Hyper 0.14 client did.
+        let client = Client::builder(CpuTimedExecutor)
+            .pool_timer(TokioTimer::new())
+            .build(connector.clone());
+        Self { client, connector }
+    }
 }
 
 impl fmt::Debug for HttpClient {
@@ -188,13 +234,29 @@ impl HttpClient {
         options: ConnectionOptions,
     ) -> Result<Self, BoxError> {
         let routes = Arc::new(RoutePlanner::new(proxy)?);
-        let client = Self::build_client(tls, &routes, options)?;
+        let pool = Self::build_pool(tls, &routes, options)?;
 
         Ok(Self {
-            client: Arc::new(ArcSwap::from_pointee(client)),
+            pool: Arc::new(ArcSwap::from_pointee(pool)),
             routes,
             options,
         })
+    }
+
+    /// Returns a client with the TLS settings and proxy routes of this one, the given
+    /// connection `options`, and a connection pool of its own. Unlike
+    /// [`HttpClient::new_with_options`], this cannot fail, because it reuses the connector this
+    /// client already built.
+    ///
+    /// The new client has its own TLS reload handle: reloading this client does not reach it.
+    #[must_use]
+    pub fn with_options(&self, options: ConnectionOptions) -> Self {
+        let connector = self.pool.load().connector.clone().with_options(options);
+        Self {
+            pool: Arc::new(ArcSwap::from_pointee(Pool::new(connector))),
+            routes: Arc::clone(&self.routes),
+            options,
+        }
     }
 
     /// Returns a handle that replaces the TLS settings of this client and of every clone of it,
@@ -202,20 +264,20 @@ impl HttpClient {
     #[must_use]
     pub fn tls_reload_handle(&self) -> TlsReloadHandle {
         TlsReloadHandle {
-            client: Arc::downgrade(&self.client),
+            pool: Arc::downgrade(&self.pool),
             routes: Arc::clone(&self.routes),
             options: self.options,
         }
     }
 
-    fn build_client(
+    fn build_pool(
         tls: MaybeTlsSettings,
         routes: &Arc<RoutePlanner>,
         options: ConnectionOptions,
-    ) -> Result<PooledClient, BoxError> {
+    ) -> Result<Pool, BoxError> {
         let connector = HttpProxyConnector::new(tls, Arc::clone(routes), ForwardProxyAlpn::Http1)?
             .with_options(options);
-        Ok(Client::builder(TokioExecutor::new()).build(connector))
+        Ok(Pool::new(connector))
     }
 
     /// Inserts the forward proxy credentials that the route of `request` needs, unless it
@@ -242,7 +304,7 @@ impl HttpClient {
         request: Request<RequestBody>,
     ) -> Result<Response<Incoming>, HttpError> {
         // The response future owns a client clone, so the guard is dropped before awaiting.
-        let response = self.client.load().request(request);
+        let response = self.pool.load().client.request(request);
         response.await.map_err(HttpError::new)
     }
 }
@@ -251,7 +313,7 @@ impl HttpClient {
 /// [`HttpClient::tls_reload_handle`].
 #[derive(Clone)]
 pub struct TlsReloadHandle {
-    client: Weak<ArcSwap<PooledClient>>,
+    pool: Weak<ArcSwap<Pool>>,
     routes: Arc<RoutePlanner>,
     options: ConnectionOptions,
 }
@@ -268,7 +330,7 @@ impl TlsReloadHandle {
     /// Returns `true` once the client and all of its clones have been dropped.
     #[must_use]
     pub fn is_closed(&self) -> bool {
-        self.client.strong_count() == 0
+        self.pool.strong_count() == 0
     }
 
     /// Replaces the client's TLS settings. Later requests use a new connection pool; in-flight
@@ -278,11 +340,11 @@ impl TlsReloadHandle {
     ///
     /// Returns an error, keeping the previous settings, if `tls` cannot build a connector.
     pub fn reload(&self, tls: MaybeTlsSettings) -> Result<bool, BoxError> {
-        let Some(client) = self.client.upgrade() else {
+        let Some(pool) = self.pool.upgrade() else {
             return Ok(false);
         };
-        let rebuilt = HttpClient::build_client(tls, &self.routes, self.options)?;
-        client.store(Arc::new(rebuilt));
+        let rebuilt = HttpClient::build_pool(tls, &self.routes, self.options)?;
+        pool.store(Arc::new(rebuilt));
         Ok(true)
     }
 }

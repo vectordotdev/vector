@@ -4,8 +4,7 @@ use bytes::Bytes;
 use chrono::{SubsecRound, Utc};
 use datadog_proto::agentpayload as ddmetric_proto;
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
-use http::request::Parts;
-use hyper::StatusCode;
+use http::{StatusCode, request::Parts};
 use indoc::indoc;
 use prost::Message;
 use rand::{RngExt, rng};
@@ -253,10 +252,6 @@ fn validate_common(request: &(Parts, Bytes)) {
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[expect(
-    clippy::float_cmp,
-    reason = "The input counter values and their sum are exact integers."
-)]
 fn validate_protobuf_counters(request: &(Parts, Bytes)) {
     assert_eq!(
         request.0.headers.get("Content-Type").unwrap(),
@@ -274,7 +269,10 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
 
     let series = payload.series;
 
-    assert!(!series.is_empty());
+    assert_ne!(
+        series,
+        [] as [datadog_proto::agentpayload::metric_payload::MetricSeries; 0]
+    );
 
     // check metrics are sorted by name, which helps HTTP compression
     let metric_names: Vec<String> = series.iter().map(|serie| serie.metric.clone()).collect();
@@ -309,7 +307,7 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
         assert_eq!(serie.tags.first().unwrap(), "cool_tag_name:i_know_right");
 
         // unit
-        assert!(serie.unit.is_empty());
+        assert_eq!(serie.unit, "");
 
         // interval
         assert_eq!(serie.interval, 0);
@@ -333,10 +331,6 @@ fn validate_protobuf_counters(request: &(Parts, Bytes)) {
 }
 
 // https://github.com/vectordotdev/vector/issues/23659
-#[expect(
-    clippy::float_cmp,
-    reason = "The encoded values are exact integers or an exact division by two."
-)]
 #[allow(
     clippy::cast_precision_loss,
     reason = "Preserve the existing numeric conversion and precision until its bounds are audited."

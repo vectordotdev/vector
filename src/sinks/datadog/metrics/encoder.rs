@@ -7,15 +7,17 @@ use std::{
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
-use datadog_agent_metrics_v3::V3EncodeError;
 use datadog_proto::agentpayload as ddmetric_proto;
 use prost_reflect::DescriptorPool;
-use snafu::{ResultExt, Snafu};
+use snafu::Snafu;
 use vector_common::constants::ZSTD_SMALL_INPUT_THRESHOLD;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, metric::MetricSketch},
+    event::{
+        DatadogMetricOriginMetadata, EventFinalizers, Finalizable, Metric, MetricTags, MetricValue,
+        metric::MetricSketch,
+    },
     metrics::AgentDDSketch,
     request_metadata::GroupedCountByteSize,
 };
@@ -23,7 +25,9 @@ use vector_lib::{
 use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::DATADOG_METRIC_RESOURCE_TAG_PREFIX,
-    sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
+    sinks::util::{
+        Compression, Compressor, encode_metric_tag, encode_namespace, request_builder::EncodeResult,
+    },
 };
 
 pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
@@ -40,7 +44,7 @@ pub(super) static ORIGIN_PRODUCT_VALUE: LazyLock<u32> = LazyLock::new(|| {
 });
 
 #[derive(Debug, Snafu)]
-pub enum EncoderError {
+pub(super) enum EncoderError {
     #[snafu(display(
         "Invalid metric value '{}' was given; '{}' expected",
         metric_value,
@@ -63,7 +67,7 @@ impl EncoderError {
     /// Gets the telemetry-friendly string version of this error.
     ///
     /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
+    pub(super) const fn as_error_type(&self) -> &'static str {
         match self {
             Self::InvalidMetric { .. } => "invalid_metric",
             Self::ProtoEncodingFailed => "failed_to_encode_sketch",
@@ -71,13 +75,18 @@ impl EncoderError {
     }
 }
 
+pub(super) type MetricEncodeError = (EncoderError, EventFinalizers);
+
 #[derive(Debug, Snafu)]
-pub enum FinishError {
+pub(super) enum FinishError {
     #[snafu(display(
         "Failure occurred during writing to or finalizing the compressor: {}",
         source
     ))]
-    CompressionFailed { source: io::Error },
+    CompressionFailed {
+        source: io::Error,
+        finalizers: EventFinalizers,
+    },
 
     #[snafu(display("Finished payload exceeded the (un)compressed size limits"))]
     TooLarge {
@@ -86,33 +95,22 @@ pub enum FinishError {
     },
 
     #[snafu(display("Failed to encode V3 payload to Protocol Buffers: {}", source))]
-    V3EncodingFailed { source: protobuf::Error },
+    V3EncodingFailed {
+        source: protobuf::Error,
+        finalizers: EventFinalizers,
+    },
 }
 
 impl FinishError {
     /// Gets the telemetry-friendly string version of this error.
     ///
     /// The value will be a short string with only lowercase letters and underscores.
-    pub const fn as_error_type(&self) -> &'static str {
+    pub(super) const fn as_error_type(&self) -> &'static str {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
             Self::TooLarge { .. } => "too_large",
             Self::V3EncodingFailed { .. } => "v3_encoding_failed",
         }
-    }
-}
-
-impl From<V3EncodeError> for FinishError {
-    fn from(err: V3EncodeError) -> Self {
-        FinishError::V3EncodingFailed {
-            source: err.into_inner(),
-        }
-    }
-}
-
-impl From<protobuf::Error> for FinishError {
-    fn from(source: protobuf::Error) -> Self {
-        FinishError::V3EncodingFailed { source }
     }
 }
 
@@ -147,7 +145,7 @@ impl Default for EncoderState {
     }
 }
 
-pub struct DatadogMetricsEncoder {
+pub(super) struct DatadogMetricsEncoder {
     endpoint: DatadogMetricsEndpoint,
     default_namespace: Option<Arc<str>>,
     uncompressed_limit: usize,
@@ -161,7 +159,7 @@ pub struct DatadogMetricsEncoder {
 
 impl DatadogMetricsEncoder {
     /// Creates a new `DatadogMetricsEncoder` for the given endpoint.
-    pub fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
+    pub(super) fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
         let payload_limits = endpoint.payload_limits();
 
         Self {
@@ -181,7 +179,7 @@ impl DatadogMetricsEncoder {
     /// Creates a new `DatadogMetricsEncoder` for the given endpoint, with specific payload limits.
     ///
     /// Only available in tests; production code always uses the API-defined limits via `new`.
-    pub fn with_payload_limits(
+    pub(super) fn with_payload_limits(
         endpoint: DatadogMetricsEndpoint,
         default_namespace: Option<String>,
         uncompressed_limit: usize,
@@ -209,7 +207,7 @@ impl DatadogMetricsEncoder {
         mem::take(&mut self.state)
     }
 
-    fn encode_single_metric(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    fn encode_single_metric(&mut self, metric: &Metric) -> Result<bool, EncoderError> {
         // We take special care in this method to capture errors which are not indicative of the
         // metric itself causing a failure in order to be able to return the metric to the caller.
         // The contract of the encoder is such that when an encoding attempt fails for normal
@@ -225,7 +223,7 @@ impl DatadogMetricsEncoder {
 
         self.state
             .byte_size
-            .add_event(&metric, metric.estimated_json_encoded_size_of());
+            .add_event(metric, metric.estimated_json_encoded_size_of());
 
         // For V2 Series metrics, and Sketches: We encode a single Series or Sketch metric incrementally,
         // which means that we specifically write it as if we were writing a single field entry in the
@@ -250,7 +248,7 @@ impl DatadogMetricsEncoder {
                 | MetricValue::Set { .. }
                 | MetricValue::AggregatedSummary { .. } => {
                     let series_proto = series_to_proto_message(
-                        &metric,
+                        metric,
                         &self.default_namespace,
                         self.log_schema,
                         self.origin_product_value,
@@ -281,7 +279,7 @@ impl DatadogMetricsEncoder {
                 MetricValue::Sketch { sketch } => match sketch {
                     MetricSketch::AgentDDSketch(ddsketch) => {
                         if let Some(sketch_proto) = sketch_to_proto_message(
-                            &metric,
+                            metric,
                             ddsketch,
                             &self.default_namespace,
                             self.log_schema,
@@ -307,13 +305,7 @@ impl DatadogMetricsEncoder {
         }
 
         // Try and see if our temporary buffer can be written to the compressor.
-        match self.try_compress_buffer() {
-            Err(_) | Ok(false) => Ok(Some(metric)),
-            Ok(true) => {
-                self.state.processed.push(metric);
-                Ok(None)
-            }
-        }
+        Ok(self.try_compress_buffer().unwrap_or(false))
     }
 
     fn try_compress_buffer(&mut self) -> io::Result<bool> {
@@ -377,22 +369,35 @@ impl DatadogMetricsEncoder {
     /// # Errors
     ///
     /// If an error is encountered while attempting to encode the metric, an error variant will be returned.
-    pub fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
-        self.encode_single_metric(metric)
+    pub(super) fn try_encode(
+        &mut self,
+        mut metric: Metric,
+    ) -> Result<Option<Metric>, MetricEncodeError> {
+        match self.encode_single_metric(&metric) {
+            Ok(true) => {
+                self.state.processed.push(metric);
+                Ok(None)
+            }
+            Ok(false) => Ok(Some(metric)),
+            Err(error) => Err((error, metric.take_finalizers())),
+        }
     }
 
-    pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
+    pub(super) fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         let raw_bytes_written = self.state.written;
         let byte_size = self.state.byte_size.clone();
 
         // Consume the encoder state so we can do our final checks and return the necessary data.
         let state = self.reset_state();
+        let mut processed = state.processed;
         let payload = state
             .writer
             .finish()
-            .context(CompressionFailedSnafu)?
+            .map_err(|source| FinishError::CompressionFailed {
+                source,
+                finalizers: processed.take_finalizers(),
+            })?
             .freeze();
-        let processed = state.processed;
 
         // We should have configured our limits such that if all calls to `try_compress_buffer` have
         // succeeded up until this point, then our payload should be within the limits after
@@ -626,7 +631,7 @@ pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> Seri
             tags.push(encode_tag(tag, value));
         }
     }
-    tags.sort();
+    tags.sort_unstable();
 
     SeriesTags {
         tags,
@@ -771,15 +776,14 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
 
 fn encode_tag_pairs<'a>(pairs: impl Iterator<Item = (&'a str, Option<&'a str>)>) -> Vec<String> {
     let mut pairs: Vec<_> = pairs.map(|(name, value)| encode_tag(name, value)).collect();
-    pairs.sort();
+    pairs.sort_unstable();
     pairs
 }
 
 fn encode_tag(name: &str, value: Option<&str>) -> String {
-    match value {
-        Some(value) => format!("{name}:{value}"),
-        None => name.into(),
-    }
+    let mut encoded = String::new();
+    encode_metric_tag(&mut encoded, name, value);
+    encoded
 }
 
 fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
@@ -1234,7 +1238,7 @@ mod tests {
         assert!(series_proto.resources.iter().any(|resource| {
             resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
         }));
-        assert!(series_proto.tags.is_empty());
+        assert_eq!(series_proto.tags, [] as [std::string::String; 0]);
     }
 
     #[test]
@@ -1244,7 +1248,7 @@ mod tests {
         let series_result = sketch_encoder.try_encode(get_simple_counter());
         assert!(matches!(
             series_result.err(),
-            Some(EncoderError::InvalidMetric { .. })
+            Some((EncoderError::InvalidMetric { .. }, _))
         ));
 
         // And sketches can't go to the series endpoint.
@@ -1253,15 +1257,11 @@ mod tests {
         let sketch_result = series_v2_encoder.try_encode(get_simple_sketch());
         assert!(matches!(
             sketch_result.err(),
-            Some(EncoderError::InvalidMetric { .. })
+            Some((EncoderError::InvalidMetric { .. }, _))
         ));
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::float_cmp,
-        reason = "The encoder must preserve this deterministic rate value exactly."
-    )]
     #[test]
     fn encode_counter_with_interval_as_rate() {
         // When a counter explicitly has an interval, we need to encode it as a rate. This means
@@ -1292,10 +1292,6 @@ mod tests {
     }
 
     // https://github.com/vectordotdev/vector/issues/23659
-    #[expect(
-        clippy::float_cmp,
-        reason = "The encoder must preserve this gauge value exactly."
-    )]
     #[test]
     fn encode_non_rate_metric_with_interval() {
         // It is possible that the Agent sends Gauges with an interval set. This
@@ -1530,13 +1526,13 @@ mod tests {
             let mut next_pending = Vec::new();
             let mut hit_limit = false;
             for metric in pending.drain(..) {
-                match encoder.try_encode(metric.clone()) {
+                match encoder.try_encode(metric) {
                     Ok(None) => {}
                     Ok(Some(returned_metric)) => {
                         hit_limit = true;
                         next_pending.push(returned_metric);
                     }
-                    Err(error) => panic!("unexpected encoding error: {error}"),
+                    Err((error, _)) => panic!("unexpected encoding error: {error}"),
                 }
             }
 
@@ -1768,7 +1764,7 @@ mod tests {
             match encoder.try_encode(metric) {
                 Ok(None) => accepted += 1,
                 Ok(Some(_)) => break,
-                Err(e) => panic!("unexpected encoding error: {e}"),
+                Err((error, _)) => panic!("unexpected encoding error: {error}"),
             }
         }
 
@@ -1839,7 +1835,7 @@ mod tests {
             match encoder.try_encode(metric) {
                 Ok(None) => accepted += 1,
                 Ok(Some(_)) => break,
-                Err(e) => panic!("unexpected encoding error: {e}"),
+                Err((error, _)) => panic!("unexpected encoding error: {error}"),
             }
         }
 
@@ -1934,7 +1930,7 @@ mod tests {
             match encoder.try_encode(metric) {
                 Ok(None) => {}
                 Ok(Some(_)) => panic!("unexpected rejection at i={i} with unlimited limits"),
-                Err(e) => panic!("unexpected error at i={i}: {e}"),
+                Err((error, _)) => panic!("unexpected error at i={i}: {error}"),
             }
 
             let curr = encoder.buffered_bound();

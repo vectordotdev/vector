@@ -64,12 +64,12 @@ pub enum Compression {
     Zstd,
 }
 
-impl From<Compression> for Option<arrow::ipc::CompressionType> {
+impl From<Compression> for databricks_zerobus_ingest_sdk::ArrowCompression {
     fn from(value: Compression) -> Self {
         match value {
-            Compression::None => None,
-            Compression::Lz4Frame => Some(arrow::ipc::CompressionType::LZ4_FRAME),
-            Compression::Zstd => Some(arrow::ipc::CompressionType::ZSTD),
+            Compression::None => Self::Uncompressed,
+            Compression::Lz4Frame => Self::IpcLz4,
+            Compression::Zstd => Self::IpcZstd,
         }
     }
 }
@@ -605,18 +605,20 @@ auth:
     }
 
     #[test]
-    fn test_compression_maps_to_arrow_ipc() {
+    fn test_compression_maps_to_sdk_arrow_compression() {
+        use databricks_zerobus_ingest_sdk::ArrowCompression;
+
         assert_eq!(
-            Option::<arrow::ipc::CompressionType>::from(Compression::None),
-            None,
+            ArrowCompression::from(Compression::None),
+            ArrowCompression::Uncompressed,
         );
         assert_eq!(
-            Option::<arrow::ipc::CompressionType>::from(Compression::Lz4Frame),
-            Some(arrow::ipc::CompressionType::LZ4_FRAME),
+            ArrowCompression::from(Compression::Lz4Frame),
+            ArrowCompression::IpcLz4,
         );
         assert_eq!(
-            Option::<arrow::ipc::CompressionType>::from(Compression::Zstd),
-            Some(arrow::ipc::CompressionType::ZSTD),
+            ArrowCompression::from(Compression::Zstd),
+            ArrowCompression::IpcZstd,
         );
     }
 
@@ -629,6 +631,7 @@ auth:
 
         use arrow::array::Int32Array;
         use arrow::datatypes::{DataType, Field, Schema};
+        use arrow::ipc::CompressionType;
         use arrow::ipc::writer::{IpcWriteOptions, StreamWriter};
         use arrow::record_batch::RecordBatch;
 
@@ -639,10 +642,9 @@ auth:
         )
         .expect("batch should build");
 
-        for codec in [Compression::Lz4Frame, Compression::Zstd] {
-            let compression: Option<arrow::ipc::CompressionType> = codec.into();
+        for codec in [CompressionType::LZ4_FRAME, CompressionType::ZSTD] {
             let options = IpcWriteOptions::default()
-                .try_with_compression(compression)
+                .try_with_compression(Some(codec))
                 .unwrap_or_else(|e| panic!("{codec:?} not enabled in arrow build: {e}"));
 
             let mut buf = Vec::new();

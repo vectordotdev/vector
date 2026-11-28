@@ -2,7 +2,7 @@ use std::{io, time::SystemTime};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt, future, stream::BoxStream};
-use http_1::{Request, StatusCode, Uri, uri::InvalidUri};
+use http::{Request, StatusCode, Uri, uri::InvalidUri};
 use serde_json::{
     json,
     value::{RawValue, to_raw_value},
@@ -15,11 +15,12 @@ use vector_lib::{
     configurable::configurable_component,
     finalization::{EventFinalizers, EventStatus, Finalizable},
     internal_event::CountByteSize,
+    internal_event::emit,
     json_size::JsonSize,
-    partition::Partitioner,
+    partition::{PartitionDecision, Partitioner},
     request_metadata::{GroupedCountByteSize, RequestMetadata},
     sensitive_string::SensitiveString,
-    sink::StreamSink,
+    sink::{PreparationError, StreamSink},
     stream::{
         BatcherSettings, DriverResponse,
         batcher::{config::BatchConfigParts, limiter::BatchLimiter},
@@ -36,20 +37,24 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::Event,
-    http::{Auth, client_v1::HttpClient},
+    http::{Auth, HttpClient},
     internal_events::{LargeEventDroppedError, SinkRequestBuildError},
     schema,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         util::{
             BatchConfig, Compression, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             RequestBuilder, ServiceBuilderExt, SinkBuilderExt, TowerRequestConfig,
             TowerRequestSettings,
             encoding::{Encoder as SinkEncoder, write_all},
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
             metadata::RequestMetadataBuilder,
-            request_builder::{EncodeResult, default_request_builder_concurrency_limit},
+            request_builder::{
+                EncodeResult, RequestParts, default_request_builder_concurrency_limit,
+            },
         },
     },
     template::{TemplateRenderingError, UnconfinedTemplate},
@@ -201,8 +206,7 @@ impl ValidatedSink for MezmoConfig {
                 password: SensitiveString::default(),
             },
         };
-        let service =
-            HttpService::new(client.clone(), service_request_builder).with_response_decompression();
+        let service = HttpService::new(client.clone(), service_request_builder);
         let service = ServiceBuilder::new()
             .settings(
                 request_settings.clone(),
@@ -299,7 +303,7 @@ impl MezmoEventEncoder {
         let key = self
             .render_key(&event)
             .map_err(|(field, error)| {
-                emit!(crate::internal_events::TemplateRenderingError {
+                emit(crate::internal_events::TemplateRenderingError {
                     error,
                     field,
                     drop_event: true,
@@ -361,7 +365,7 @@ impl MezmoEventEncoder {
         // batch is dropped, but its finalizers and sizes stay in a batch.
         let length = line.get().len();
         let line = if length + 1 >= self.max_bytes {
-            emit!(LargeEventDroppedError {
+            emit(LargeEventDroppedError {
                 length,
                 max_length: self.max_bytes,
             });
@@ -385,9 +389,13 @@ struct MezmoPartitioner;
 impl Partitioner for MezmoPartitioner {
     type Item = MezmoLine;
     type Key = PartitionKey;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &MezmoLine) -> PartitionKey {
-        item.key.clone()
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        Ok(PartitionDecision::Route(item.key.clone()))
     }
 }
 
@@ -486,7 +494,7 @@ struct MezmoRequestBuilder {
 }
 
 impl RequestBuilder<(PartitionKey, Vec<MezmoLine>)> for MezmoRequestBuilder {
-    type Metadata = (PartitionKey, EventFinalizers);
+    type Metadata = PartitionKey;
     type Events = Vec<MezmoLine>;
     type Encoder = MezmoBodyEncoder;
     type Payload = Bytes;
@@ -504,7 +512,7 @@ impl RequestBuilder<(PartitionKey, Vec<MezmoLine>)> for MezmoRequestBuilder {
     fn split_input(
         &self,
         (key, mut lines): (PartitionKey, Vec<MezmoLine>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let finalizers = lines.take_finalizers();
         let events_byte_size = lines.iter().map(|line| line.byte_size).sum();
         // `RequestMetadataBuilder::build` takes the grouped JSON size from the encoder.
@@ -513,12 +521,18 @@ impl RequestBuilder<(PartitionKey, Vec<MezmoLine>)> for MezmoRequestBuilder {
             events_byte_size,
             GroupedCountByteSize::new_untagged(),
         );
-        ((key, finalizers), builder, lines)
+        RequestParts {
+            metadata: key,
+            request_metadata_builder: builder,
+            events: lines,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        (key, finalizers): Self::Metadata,
+        key: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -570,9 +584,9 @@ impl HttpServiceRequestBuilder<PartitionKey> for MezmoServiceRequestBuilder {
         let mut http_request = Request::post(uri)
             .header("Content-Type", "application/json")
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)?;
+            .context(HTTPRequestBuilderSnafu)?;
 
-        self.auth.apply_v1(&mut http_request);
+        self.auth.apply(&mut http_request);
 
         Ok(http_request)
     }
@@ -603,6 +617,7 @@ where
             .batched_partitioned(MezmoPartitioner, batch_settings.timeout, move |_| {
                 batch_config(batch_settings)
             })
+            .unwrap_infallible()
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 MezmoRequestBuilder {
@@ -612,7 +627,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(request) => Some(request),
@@ -920,6 +935,7 @@ mod tests {
             .batched_partitioned(MezmoPartitioner, settings.timeout, |_| {
                 batch_config(settings)
             })
+            .unwrap_infallible()
             .map(|(_, batch)| {
                 batch
                     .into_iter()
@@ -1007,7 +1023,12 @@ mod tests {
         let request_builder = MezmoRequestBuilder {
             encoder: MezmoBodyEncoder,
         };
-        let ((_, finalizers), metadata_builder, events) = request_builder.split_input((key, lines));
+        let RequestParts {
+            finalizers,
+            request_metadata_builder: metadata_builder,
+            events,
+            ..
+        } = request_builder.split_input((key, lines));
         let payload = request_builder.encode_events(events).unwrap();
         let metadata = metadata_builder.build(&payload);
 

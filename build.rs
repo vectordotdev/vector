@@ -154,9 +154,9 @@ fn main() {
             .file_descriptor_set_path(protobuf_fds_path)
             .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
-        tonic_build::configure()
+        tonic_prost_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")
-            .compile_protos_with_config(
+            .compile_with_config(
                 prost_build,
                 &[
                     "lib/vector-core/proto/event.proto",
@@ -183,9 +183,6 @@ fn main() {
     let pkg_name = tracker
         .get_env_var("CARGO_PKG_NAME")
         .expect("Cargo-provided environment variables should always exist!");
-    let pkg_version = tracker
-        .get_env_var("CARGO_PKG_VERSION")
-        .expect("Cargo-provided environment variables should always exist!");
     let pkg_description = tracker
         .get_env_var("CARGO_PKG_DESCRIPTION")
         .expect("Cargo-provided environment variables should always exist!");
@@ -208,6 +205,16 @@ fn main() {
         .get_env_var("CARGO_PKG_RUST_VERSION")
         .expect("Cargo-provided environment variables should always exist!");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
+
+    if target_os == "windows" {
+        // Use Cargo's version, including prerelease suffixes, in Explorer's Details tab.
+        winresource::WindowsResource::new()
+            .set("ProductName", "Vector")
+            .set("FileDescription", &pkg_description)
+            .set("OriginalFilename", "vector.exe")
+            .compile_for("vector")
+            .expect("Failed to compile Windows version information");
+    }
 
     // Get the git short hash of the HEAD.
     // Note that if Vector is compiled within a container, proper git permissions must be set for
@@ -232,11 +239,6 @@ fn main() {
         rust_version,
     );
     constants.add_required_constant("PKG_NAME", "The full name of this package.", pkg_name);
-    constants.add_required_constant(
-        "PKG_VERSION",
-        "The full version of this package.",
-        pkg_version,
-    );
     constants.add_required_constant(
         "PKG_DESCRIPTION",
         "The description of this package.",

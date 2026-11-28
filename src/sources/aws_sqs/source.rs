@@ -25,7 +25,7 @@ use tokio::{
 use vector_lib::{
     config::LogNamespace,
     finalizer::UnorderedFinalizer,
-    internal_event::{EventsReceived, Registered},
+    internal_event::{EventsReceived, Registered, emit, register},
 };
 
 use crate::{
@@ -59,7 +59,7 @@ pub(super) enum PollOutcome {
 }
 
 #[derive(Clone)]
-pub struct SqsSource {
+pub(super) struct SqsSource {
     pub client: SqsClient,
     pub queue_url: String,
     pub decoder: Decoder,
@@ -72,7 +72,7 @@ pub struct SqsSource {
 }
 
 impl SqsSource {
-    pub async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub(super) async fn run(self, out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let finalizer = self.acknowledgements.then(|| {
             let (finalizer, mut ack_stream) = Finalizer::new(Some(shutdown.clone()));
             let client = self.client.clone();
@@ -86,7 +86,7 @@ impl SqsSource {
             });
             Arc::new(finalizer)
         });
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         let max_concurrency = self.max_concurrency;
 
         run_adaptive_concurrency(
@@ -134,7 +134,7 @@ impl SqsSource {
         let receive_message_output = match result {
             Ok(output) => output,
             Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
+                emit(SqsMessageReceiveError { error: &err });
                 return PollOutcome::ReceiveError;
             }
         };
@@ -151,10 +151,10 @@ impl SqsSource {
             .iter()
             .map(|message| message.body().map_or(0, str::len))
             .sum();
-        emit!(EndpointBytesReceived {
+        emit(EndpointBytesReceived {
             byte_size,
             protocol: "http",
-            endpoint: &self.queue_url
+            endpoint: &self.queue_url,
         });
 
         let mut receipts_to_ack = Vec::with_capacity(messages.len());
@@ -201,7 +201,7 @@ impl SqsSource {
             }
             PollOutcome::Messages(message_count)
         } else {
-            emit!(StreamClosedError { count });
+            emit(StreamClosedError { count });
             PollOutcome::StreamClosed
         }
     }
@@ -273,7 +273,7 @@ fn spawn_worker_task<F, Fut>(
                     PollOutcome::Messages(_) | PollOutcome::ReceiveError => {
                         busy_flag_worker.store(false, Ordering::Release);
                         let scaled_down = concurrency_worker
-                            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |c| {
+                            .try_update(Ordering::SeqCst, Ordering::SeqCst, |c| {
                                 (c > 1).then_some(c - 1)
                             })
                             .is_ok();
@@ -429,7 +429,7 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
             );
         }
         if let Err(err) = batch.send().await {
-            emit!(SqsMessageDeleteError { error: &err });
+            emit(SqsMessageDeleteError { error: &err });
         }
     }
 }
@@ -733,7 +733,7 @@ mod tests {
             Some(now),
             &None,
             LogNamespace::Vector,
-            &register!(EventsReceived),
+            &register(EventsReceived),
         )
         .collect();
         assert_eq!(events.len(), 1);
@@ -786,7 +786,7 @@ mod tests {
             Some(now),
             &None,
             LogNamespace::Legacy,
-            &register!(EventsReceived),
+            &register(EventsReceived),
         )
         .collect();
         assert_eq!(events.len(), 1);

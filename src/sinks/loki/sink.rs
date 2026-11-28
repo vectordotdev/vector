@@ -1,4 +1,5 @@
 use std::{collections::HashMap, num::NonZeroUsize};
+use vector_lib::internal_event::emit;
 
 use bytes::{Bytes, BytesMut};
 use snafu::Snafu;
@@ -6,13 +7,13 @@ use tokio_util::codec::Encoder as _;
 use vrl::path::{OwnedTargetPath, parse_target_path};
 
 use super::{
-    config::{LokiConfig, OutOfOrderAction, ValidatedLokiSink},
+    config::{ExpandedKeyCase, LokiConfig, OutOfOrderAction, ValidatedLokiSink},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
 use crate::{
     common::expansion::pair_expansion,
-    http::{client_v1::HttpClient, get_http_scheme_from_uri},
+    http::{HttpClient, get_http_scheme_from_uri},
     internal_events::{
         LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
         LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,
@@ -41,10 +42,10 @@ pub(super) fn confine_template_keys(
 }
 
 #[derive(Clone)]
-pub struct KeyPartitioner(Option<ConfinedTemplate>);
+pub(super) struct KeyPartitioner(Option<ConfinedTemplate>);
 
 impl KeyPartitioner {
-    pub const fn new(template: Option<ConfinedTemplate>) -> Self {
+    pub(super) const fn new(template: Option<ConfinedTemplate>) -> Self {
         Self(template)
     }
 
@@ -64,7 +65,7 @@ impl KeyPartitioner {
                         error,
                         crate::template::TemplateRenderingError::Confined { .. }
                     );
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("tenant_id"),
                         drop_event: confined,
@@ -76,37 +77,32 @@ impl KeyPartitioner {
     }
 }
 
-impl Partitioner for KeyPartitioner {
-    type Item = Event;
-    type Key = Option<String>;
-
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        // Non-confined render failures fall back to "no tenant"; Confined is
-        // handled via render_tenant_id in encode_event which actually drops.
-        self.render_tenant_id(item).unwrap_or(None)
-    }
-}
-
 #[derive(Default)]
 struct RecordPartitioner;
 
 impl Partitioner for RecordPartitioner {
     type Item = Option<FilteredRecord>;
     type Key = Option<PartitionKey>;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.as_ref().map(FilteredRecord::partition)
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        Ok(PartitionDecision::Route(
+            item.as_ref().map(FilteredRecord::partition),
+        ))
     }
 }
 
 #[derive(Clone)]
-pub struct LokiRequestBuilder {
+pub(super) struct LokiRequestBuilder {
     compression: Compression,
     encoder: LokiBatchEncoder,
 }
 
 #[derive(Debug, Snafu)]
-pub enum RequestBuildError {
+pub(super) enum RequestBuildError {
     #[snafu(display("Failed to build payload with error: {}", error))]
     Io { error: std::io::Error },
 }
@@ -118,7 +114,7 @@ impl From<std::io::Error> for RequestBuildError {
 }
 
 impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
-    type Metadata = (Option<String>, EventFinalizers);
+    type Metadata = Option<String>;
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
     type Payload = Bytes;
@@ -136,22 +132,27 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     fn split_input(
         &self,
         input: (PartitionKey, Vec<LokiRecord>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (key, mut events) = input;
 
         let metadata_builder = RequestMetadataBuilder::from_events(&events);
         let finalizers = events.take_finalizers();
 
-        ((key.tenant_id, finalizers), metadata_builder, events)
+        RequestParts {
+            metadata: key.tenant_id,
+            request_metadata_builder: metadata_builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        loki_metadata: Self::Metadata,
+        tenant_id: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (tenant_id, finalizers) = loki_metadata;
         let compression = self.compression;
 
         LokiRequest {
@@ -174,6 +175,7 @@ pub(super) struct EventEncoder {
     structured_metadata: HashMap<ConfinedTemplate, UnconfinedTemplate>,
     remove_structured_metadata_fields: bool,
     remove_timestamp: bool,
+    expanded_key_case: ExpandedKeyCase,
 }
 
 /// Returns `true` if a `TemplateRenderingError` is a confinement violation.
@@ -188,12 +190,14 @@ const fn is_confined(err: &crate::template::TemplateRenderingError) -> bool {
 ///
 /// `key_kind` / `value_kind` are used in `TemplateRenderingError` field names.
 /// `pair_kind` is used in warning messages (e.g. `"label"` or `"structured_metadata"`).
+/// `lowercase_keys` controls whether keys expanded from `*` are lowercased.
 /// Returns `Err(())` if a key template triggers a confinement violation.
 fn build_template_pair_map(
     pairs: &HashMap<ConfinedTemplate, UnconfinedTemplate>,
     key_kind: &str,
     value_kind: &str,
     pair_kind: &str,
+    lowercase_keys: bool,
     event: &Event,
 ) -> Result<Vec<(String, String)>, ()> {
     let mut static_map: HashMap<String, String> = HashMap::new();
@@ -205,9 +209,13 @@ fn build_template_pair_map(
             value_template.render_string(event),
         ) {
             (Ok(key_s), Ok(value_s)) => {
-                if let Err(err) =
-                    pair_expansion(&key_s, &value_s, &mut static_map, &mut dynamic_map)
-                {
+                if let Err(err) = pair_expansion(
+                    &key_s,
+                    &value_s,
+                    &mut static_map,
+                    &mut dynamic_map,
+                    lowercase_keys,
+                ) {
                     warn!(
                         value = %value_s,
                         error = %err,
@@ -217,22 +225,22 @@ fn build_template_pair_map(
             }
             (Err(key_err), Err(val_err)) => {
                 let key_confined = is_confined(&key_err);
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     field: Some(
                         format!(
                             "{key_kind} \"{key_template}\" with {value_kind} \"{value_template}\""
                         )
-                        .as_str()
+                        .as_str(),
                     ),
                     drop_event: key_confined,
                     error: key_err,
                 });
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     field: Some(
                         format!(
                             "{value_kind} \"{value_template}\" with {key_kind} \"{key_template}\""
                         )
-                        .as_str()
+                        .as_str(),
                     ),
                     drop_event: false,
                     error: val_err,
@@ -243,12 +251,12 @@ fn build_template_pair_map(
             }
             (Err(key_err), Ok(_)) => {
                 let key_confined = is_confined(&key_err);
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     field: Some(
                         format!(
                             "{key_kind} \"{key_template}\" with {value_kind} \"{value_template}\""
                         )
-                        .as_str()
+                        .as_str(),
                     ),
                     drop_event: key_confined,
                     error: key_err,
@@ -258,12 +266,12 @@ fn build_template_pair_map(
                 }
             }
             (Ok(_), Err(val_err)) => {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     field: Some(
                         format!(
                             "{value_kind} \"{value_template}\" with {key_kind} \"{key_template}\""
                         )
-                        .as_str()
+                        .as_str(),
                     ),
                     drop_event: false,
                     error: val_err,
@@ -299,7 +307,14 @@ impl EventEncoder {
     /// confined value — the caller must drop the event as an intentional
     /// security discard (matches the `tenant_id` contract).
     fn build_labels(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
-        build_template_pair_map(&self.labels, "label_key", "label_value", "label", event)
+        build_template_pair_map(
+            &self.labels,
+            "label_key",
+            "label_value",
+            "label",
+            self.expanded_key_case.lowercases(),
+            event,
+        )
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
@@ -321,6 +336,7 @@ impl EventEncoder {
             "structured_metadata_key",
             "structured_metadata_value",
             "structured_metadata",
+            self.expanded_key_case.lowercases(),
             event,
         )
     }
@@ -362,7 +378,7 @@ impl EventEncoder {
                     timestamp
                 } else {
                     finalizers.update_status(EventStatus::Errored);
-                    emit!(LokiTimestampNonParsableEventsDropped);
+                    emit(LokiTimestampNonParsableEventsDropped);
                     return None;
                 }
             }
@@ -385,7 +401,7 @@ impl EventEncoder {
         // `{agent="vector"}` label. This can happen if the only
         // label is a templatable one but the event doesn't match.
         if labels.is_empty() {
-            emit!(LokiEventUnlabeledError);
+            emit(LokiEventUnlabeledError);
             labels = vec![("agent".to_string(), "vector".to_string())];
         }
 
@@ -412,22 +428,28 @@ struct FilteredRecord {
 }
 
 impl FilteredRecord {
-    pub const fn rewritten(inner: LokiRecord) -> Self {
+    const fn rewritten(inner: LokiRecord) -> Self {
         Self {
             rewritten: true,
             inner,
         }
     }
 
-    pub const fn valid(inner: LokiRecord) -> Self {
+    const fn valid(inner: LokiRecord) -> Self {
         Self {
             rewritten: false,
             inner,
         }
     }
 
-    pub fn partition(&self) -> PartitionKey {
+    fn partition(&self) -> PartitionKey {
         self.inner.partition.clone()
+    }
+}
+
+impl Finalizable for FilteredRecord {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.inner.take_finalizers()
     }
 }
 
@@ -456,7 +478,7 @@ impl RecordFilter {
 }
 
 impl RecordFilter {
-    pub fn filter_record(&mut self, mut record: LokiRecord) -> Option<FilteredRecord> {
+    fn filter_record(&mut self, mut record: LokiRecord) -> Option<FilteredRecord> {
         if let Some(latest) = self.timestamps.get_mut(&record.partition) {
             if record.event.timestamp < *latest {
                 match self.out_of_order_action {
@@ -479,7 +501,7 @@ impl RecordFilter {
     }
 }
 
-pub struct LokiSink {
+pub(super) struct LokiSink {
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
     batch_settings: BatcherSettings,
@@ -490,7 +512,7 @@ pub struct LokiSink {
 
 impl LokiSink {
     #[cfg(test)]
-    pub fn new(config: &LokiConfig, client: HttpClient) -> crate::Result<Self> {
+    pub(super) fn new(config: &LokiConfig, client: HttpClient) -> crate::Result<Self> {
         let validated = config.validate()?;
         Self::from_validated(config, validated, client)
     }
@@ -498,7 +520,7 @@ impl LokiSink {
     /// Builds the sink from already-validated state. No pure validation is
     /// repeated here: auth, request limits, encoder, confined templates and
     /// batch settings all come from `validated`.
-    pub fn from_validated(
+    pub(super) fn from_validated(
         config: &LokiConfig,
         validated: ValidatedLokiSink,
         client: HttpClient,
@@ -536,6 +558,7 @@ impl LokiSink {
                 remove_label_fields: config.remove_label_fields,
                 remove_structured_metadata_fields: config.remove_structured_metadata_fields,
                 remove_timestamp: config.remove_timestamp,
+                expanded_key_case: config.expanded_key_case,
             },
             batch_settings: validated.batch_settings,
             out_of_order_action: config.out_of_order_action,
@@ -565,6 +588,7 @@ impl LokiSink {
             .batched_partitioned(RecordPartitioner, batch_settings.timeout, |_| {
                 batch_settings.as_byte_size_config()
             })
+            .unwrap_infallible()
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;
@@ -579,11 +603,11 @@ impl LokiSink {
                         })
                         .collect::<Vec<_>>();
                     if count > 0 {
-                        emit!(LokiOutOfOrderEventRewritten { count });
+                        emit(LokiOutOfOrderEventRewritten { count });
                     }
                     Some((partition, result))
                 } else {
-                    emit!(LokiOutOfOrderEventDroppedError { count: batch.len() });
+                    emit(LokiOutOfOrderEventDroppedError { count: batch.len() });
                     None
                 }
             })
@@ -591,7 +615,7 @@ impl LokiSink {
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -628,7 +652,7 @@ mod tests {
     use crate::{
         codecs::Encoder,
         config::log_schema,
-        sinks::loki::config::{LokiConfig, OutOfOrderAction},
+        sinks::loki::config::{ExpandedKeyCase, LokiConfig, OutOfOrderAction},
         template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
         test_util::random_lines,
     };
@@ -692,6 +716,7 @@ mod tests {
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Lowercase,
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
@@ -733,6 +758,7 @@ mod tests {
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Lowercase,
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
@@ -784,6 +810,7 @@ mod tests {
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Lowercase,
         };
 
         let message = r#"
@@ -830,6 +857,7 @@ mod tests {
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Lowercase,
         };
 
         let message = r#"
@@ -867,6 +895,7 @@ mod tests {
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Lowercase,
         };
 
         let msg: ObjectMap = serde_json::from_str("{}")?;
@@ -890,6 +919,7 @@ mod tests {
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: true,
+            expanded_key_case: ExpandedKeyCase::Lowercase,
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
@@ -921,6 +951,7 @@ mod tests {
             remove_label_fields: true,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Lowercase,
         };
         let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
@@ -956,6 +987,7 @@ mod tests {
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Lowercase,
         };
 
         let message = r#"
@@ -1000,6 +1032,94 @@ mod tests {
         Ok(())
     }
 
+    fn encode_structured_metadata_keys(
+        expanded_key_case: ExpandedKeyCase,
+    ) -> Result<HashMap<String, String>, serde_json::Error> {
+        let mut structured_metadata = HashMap::default();
+        structured_metadata.insert(confined_label("*"), unconfined_value("{{ attributes }}"));
+        structured_metadata.insert(confined_label("ClusterName"), unconfined_value("ops"));
+
+        let mut encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            transformer: Transformer::default(),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+            labels: HashMap::default(),
+            structured_metadata,
+            remove_label_fields: false,
+            remove_structured_metadata_fields: false,
+            remove_timestamp: false,
+            expanded_key_case,
+        };
+
+        let message = r#"
+        {
+        	"attributes": {
+        		"userId": "1",
+        		"userid": "2",
+        		"workspace.Id": "3"
+        	}
+        }
+        "#;
+        let msg: ObjectMap = serde_json::from_str(message)?;
+        let event = Event::Log(LogEvent::from(msg));
+        let record = encoder.encode_event(event).unwrap();
+        Ok(record.event.structured_metadata.into_iter().collect())
+    }
+
+    #[test]
+    fn encoder_lowercases_expanded_structured_metadata_keys_by_default()
+    -> Result<(), serde_json::Error> {
+        let structured_metadata = encode_structured_metadata_keys(ExpandedKeyCase::Lowercase)?;
+
+        // `userId` and `userid` collide after lowercasing, so only one of them is kept.
+        assert_eq!(structured_metadata.len(), 3);
+        assert!(structured_metadata.contains_key("userid"));
+        assert!(!structured_metadata.contains_key("userId"));
+        assert_eq!(structured_metadata["workspace_id"], "3");
+        assert_eq!(structured_metadata["ClusterName"], "ops");
+        Ok(())
+    }
+
+    #[test]
+    fn encoder_keeps_expanded_label_key_case() -> Result<(), serde_json::Error> {
+        let mut labels = HashMap::default();
+        labels.insert(confined_label("*"), unconfined_value("{{ attributes }}"));
+
+        let mut encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            transformer: Transformer::default(),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+            labels,
+            structured_metadata: HashMap::default(),
+            remove_label_fields: false,
+            remove_structured_metadata_fields: false,
+            remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Preserve,
+        };
+
+        let message = r#"{"attributes": {"appName": "web", "appname": "worker"}}"#;
+        let msg: ObjectMap = serde_json::from_str(message)?;
+        let event = Event::Log(LogEvent::from(msg));
+        let record = encoder.encode_event(event).unwrap();
+
+        let labels: HashMap<String, String> = record.labels.into_iter().collect();
+        assert_eq!(labels.get("appName").map(String::as_str), Some("web"));
+        assert_eq!(labels.get("appname").map(String::as_str), Some("worker"));
+        Ok(())
+    }
+
+    #[test]
+    fn encoder_keeps_expanded_structured_metadata_key_case() -> Result<(), serde_json::Error> {
+        let structured_metadata = encode_structured_metadata_keys(ExpandedKeyCase::Preserve)?;
+
+        assert_eq!(structured_metadata.len(), 4);
+        assert_eq!(structured_metadata["userId"], "1");
+        assert_eq!(structured_metadata["userid"], "2");
+        assert_eq!(structured_metadata["workspace_Id"], "3");
+        assert_eq!(structured_metadata["ClusterName"], "ops");
+        Ok(())
+    }
+
     #[tokio::test]
     async fn filter_encoder_drop() {
         let mut encoder = EventEncoder {
@@ -1011,6 +1131,7 @@ mod tests {
             remove_label_fields: false,
             remove_structured_metadata_fields: false,
             remove_timestamp: false,
+            expanded_key_case: ExpandedKeyCase::Lowercase,
         };
         let base = chrono::Utc::now();
         let events = random_lines(100)

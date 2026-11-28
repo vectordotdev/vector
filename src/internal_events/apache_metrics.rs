@@ -7,7 +7,7 @@ use vector_lib::{
 use crate::sources::apache_metrics;
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ApacheMetricsEventsReceived<'a> {
+pub(crate) struct ApacheMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
     pub endpoint: &'a str,
@@ -31,7 +31,7 @@ impl InternalEvent for ApacheMetricsEventsReceived<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct ApacheMetricsParseError<'a> {
+pub(crate) struct ApacheMetricsParseError<'a> {
     pub error: apache_metrics::ParseError,
     pub endpoint: &'a str,
 }

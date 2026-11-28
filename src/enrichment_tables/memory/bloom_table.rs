@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, RwLock},
     time::Duration,
 };
+use vector_lib::internal_event::{emit, register};
 
 use async_trait::async_trait;
 use bloomy::{BloomFilter, bloom};
@@ -119,9 +120,9 @@ impl BloomMemoryTable {
                 .write()
                 .expect("rwlock poisoned")
                 .insert(&k.to_string());
-            emit!(MemoryEnrichmentTableInserted {
+            emit(MemoryEnrichmentTableInserted {
                 key: k,
-                include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                include_key_metric_tag: self.config.internal_metrics.include_key_tag,
             });
         }
     }
@@ -158,9 +159,9 @@ impl Table for BloomMemoryTable {
             Some(Condition::Equals { value, .. }) => {
                 let key = value.to_string_lossy().to_string();
                 if self.filter.read().expect("rwlock poisoned").contains(&key) {
-                    emit!(MemoryEnrichmentTableRead {
+                    emit(MemoryEnrichmentTableRead {
                         key: &key,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                     });
                     let result = ObjectMap::from([
                         (KeyString::from("key"), Value::from(key)),
@@ -168,9 +169,9 @@ impl Table for BloomMemoryTable {
                     ]);
                     Ok(vec![result])
                 } else {
-                    emit!(MemoryEnrichmentTableReadFailed {
+                    emit(MemoryEnrichmentTableReadFailed {
                         key: &key,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag,
                     });
                     Ok(Vec::default())
                 }
@@ -217,8 +218,8 @@ impl StreamSink<Event> for BloomMemoryTable {
         reason = "Keep the existing branching and control flow during the lint rollout."
     )]
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let events_sent = register!(EventsSent::from(Output(None)));
-        let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
+        let events_sent = register(EventsSent::from(Output(None)));
+        let bytes_sent = register(BytesSent::from(Protocol("memory_enrichment_table".into())));
         let mut flush_interval: Pin<Box<dyn Stream<Item = Instant> + Send>> = self
             .config
             .flush_interval
@@ -255,7 +256,7 @@ impl StreamSink<Event> for BloomMemoryTable {
 
                 Some(_) = flush_interval.next() => {
                     let filter = self.filter.read().expect("rwlock poisoned");
-                    emit!(MemoryEnrichmentTableFlushed {
+                    emit(MemoryEnrichmentTableFlushed {
                         new_objects_count: filter.count(),
                         new_byte_size: filter.bits() / 8
                     });

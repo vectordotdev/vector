@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    http::{Auth, MaybeAuth, client_v1::HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{
         prelude::*,
@@ -68,7 +68,6 @@ pub struct LokiConfig {
     /// [label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
     #[configurable(metadata(docs::examples = "loki_labels_examples()"))]
     #[configurable(metadata(docs::additional_props_description = "A Loki label."))]
-    #[configurable(metadata(docs::required = true))]
     pub labels: HashMap<Template, UnconfinedTemplate>,
 
     /// Whether or not to delete fields from the event when they are used as labels.
@@ -91,6 +90,9 @@ pub struct LokiConfig {
     /// Whether or not to delete fields from the event when they are used in structured metadata.
     #[serde(default = "crate::serde::default_false")]
     pub remove_structured_metadata_fields: bool,
+
+    #[serde(default)]
+    pub expanded_key_case: ExpandedKeyCase,
 
     /// Whether or not to remove the timestamp from the event payload.
     ///
@@ -191,6 +193,32 @@ pub enum OutOfOrderAction {
 
     /// Drop the event.
     Drop,
+}
+
+/// Case of label and structured metadata keys that are expanded from `*` or from a prefix ending
+/// with `*`.
+///
+/// Loki label names and structured metadata keys are case-sensitive. Characters other than ASCII
+/// letters, digits, and `_` are replaced with `_` in both modes. Keys that are not expanded are
+/// never changed.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExpandedKeyCase {
+    /// Lowercase expanded keys, for example `userId` becomes `userid`.
+    ///
+    /// Keys that differ only by case collide, and only one of their values is kept.
+    #[default]
+    Lowercase,
+
+    /// Keep expanded keys in the case they have in the event, for example `userId` stays `userId`.
+    Preserve,
+}
+
+impl ExpandedKeyCase {
+    pub(super) const fn lowercases(self) -> bool {
+        matches!(self, Self::Lowercase)
+    }
 }
 
 impl GenerateConfig for LokiConfig {
@@ -343,6 +371,13 @@ impl ValidatedSink for LokiConfig {
 }
 
 #[must_use]
+#[cfg_attr(
+    not(feature = "loki-benches"),
+    expect(
+        unreachable_pub,
+        reason = "Re-exported for the Loki benchmarks only when `loki-benches` is enabled"
+    )
+)]
 pub fn valid_label_name(label: &Template) -> bool {
     label.is_dynamic() || {
         // Loki follows prometheus on this https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels

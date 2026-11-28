@@ -3,6 +3,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
+use vector_lib::internal_event::emit;
 
 use bytes::Bytes;
 use pulsar::{
@@ -17,12 +18,13 @@ use crate::{
 
 #[derive(Clone)]
 pub(super) struct PulsarRequest {
+    pub(super) finalizers: EventFinalizers,
     pub body: Bytes,
     pub metadata: PulsarMetadata,
     pub request_metadata: RequestMetadata,
 }
 
-pub struct PulsarResponse {
+pub(super) struct PulsarResponse {
     byte_size: usize,
     event_byte_size: GroupedCountByteSize,
 }
@@ -43,7 +45,7 @@ impl DriverResponse for PulsarResponse {
 
 impl Finalizable for PulsarRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.metadata.finalizers)
+        std::mem::take(&mut self.finalizers)
     }
 }
 
@@ -57,7 +59,7 @@ impl MetaDescriptive for PulsarRequest {
     }
 }
 
-pub struct PulsarService<Exe: Executor> {
+pub(super) struct PulsarService<Exe: Executor> {
     // NOTE: the reason for the Mutex here is because the `Producer` from the pulsar crate
     // needs to be `mut`, and the `Service::call()` returns a Future.
     producer: Arc<Mutex<MultiTopicProducer<Exe>>>,
@@ -141,15 +143,15 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
                             .into_events_estimated_json_encoded_byte_size(),
                     }),
                     Err(e) => {
-                        emit!(PulsarSendingError {
+                        emit(PulsarSendingError {
                             error: Box::new(PulsarError::Custom("failed to send".to_string())),
-                            count: 1
+                            count: 1,
                         });
                         Err(e)
                     }
                 },
                 Err(e) => {
-                    emit!(PulsarSendingError {
+                    emit(PulsarSendingError {
                         error: Box::new(PulsarError::Custom("failed to send".to_string())),
                         count: 1,
                     });

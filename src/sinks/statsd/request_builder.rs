@@ -13,19 +13,21 @@ use super::{encoder::StatsdEncoder, service::StatsdRequest};
 use crate::{
     internal_events::SocketMode,
     sinks::util::{
-        IncrementalRequestBuilder, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
+        IncrementalRequestBuilder,
+        metadata::RequestMetadataBuilder,
+        request_builder::{EncodeResult, EncodedChunk, IncrementalPayloads},
     },
 };
 
 /// Incremental request builder specific to `StatsD`.
-pub struct StatsdRequestBuilder {
+pub(super) struct StatsdRequestBuilder {
     encoder: StatsdEncoder,
     request_max_size: usize,
     encode_buf: BytesMut,
 }
 
 impl StatsdRequestBuilder {
-    pub fn new(default_namespace: Option<String>, socket_mode: SocketMode) -> Self {
+    pub(super) fn new(default_namespace: Option<String>, socket_mode: SocketMode) -> Self {
         let encoder = StatsdEncoder::new(default_namespace);
         let request_max_size = match socket_mode {
             // Following the recommended advice [1], we use a datagram size that should reasonably
@@ -59,7 +61,7 @@ impl Clone for StatsdRequestBuilder {
 }
 
 impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
-    type Metadata = (EventFinalizers, RequestMetadata);
+    type Metadata = RequestMetadata;
     type Payload = Vec<u8>;
     type Request = StatsdRequest;
     type Error = Infallible;
@@ -67,7 +69,7 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
     fn encode_events_incremental(
         &mut self,
         mut input: Vec<Metric>,
-    ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
+    ) -> IncrementalPayloads<Self::Metadata, Self::Payload, Self::Error> {
         let mut results = Vec::new();
         let mut pending = None;
 
@@ -131,18 +133,22 @@ impl IncrementalRequestBuilder<Vec<Metric>> for StatsdRequestBuilder {
                 let encode_result = EncodeResult::uncompressed(request_buf, byte_size);
                 let request_metadata = request_metadata_builder.build(&encode_result);
 
-                results.push(Ok((
-                    (finalizers, request_metadata),
-                    encode_result.into_payload(),
-                )));
+                results.push(EncodedChunk {
+                    result: Ok((request_metadata, encode_result.into_payload())),
+                    finalizers,
+                });
             }
         }
 
         results
     }
 
-    fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (finalizers, metadata) = metadata;
+    fn build_request(
+        &mut self,
+        metadata: Self::Metadata,
+        finalizers: EventFinalizers,
+        payload: Self::Payload,
+    ) -> Self::Request {
         StatsdRequest {
             payload,
             finalizers,

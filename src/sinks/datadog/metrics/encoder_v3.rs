@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{Metric, MetricValue},
+    event::{Finalizable, Metric, MetricValue},
     request_metadata::GroupedCountByteSize,
 };
 
@@ -23,8 +23,8 @@ use protobuf::{CodedOutputStream, rt::WireType};
 use super::{
     config::DatadogMetricsEndpoint,
     encoder::{
-        EncoderError, FinishError, ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE, SeriesTags,
-        generate_origin_metadata, split_series_tags,
+        EncoderError, FinishError, MetricEncodeError, ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE,
+        SeriesTags, generate_origin_metadata, split_series_tags,
     },
 };
 use crate::common::datadog::DATADOG_ORIGIN_METRIC_TYPE_NO_INDEX;
@@ -49,7 +49,7 @@ pub(super) struct DatadogMetricsV3Encoder {
 }
 
 impl DatadogMetricsV3Encoder {
-    pub fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
+    pub(super) fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
         let limits = endpoint.payload_limits();
         Self {
             default_namespace: default_namespace.map(Arc::from),
@@ -68,7 +68,7 @@ impl DatadogMetricsV3Encoder {
     /// Only available in tests; production code always uses the API-defined limits via `new`.
     /// Mirrors `DatadogMetricsEncoder::with_payload_limits`.
     #[cfg(test)]
-    pub fn with_payload_limits(
+    pub(super) fn with_payload_limits(
         default_namespace: Option<String>,
         uncompressed_limit: usize,
         compressed_limit: usize,
@@ -87,7 +87,10 @@ impl DatadogMetricsV3Encoder {
     ///
     /// Always returns `Ok(None)` — the V3 encoder cannot detect payload overflow
     /// until `finish()` time.  Caller must respect the batch event-count cap.
-    pub fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+    pub(super) fn try_encode(
+        &mut self,
+        mut metric: Metric,
+    ) -> Result<Option<Metric>, MetricEncodeError> {
         self.byte_size
             .add_event(&metric, metric.estimated_json_encoded_size_of());
         encode_metric_to_v3(
@@ -96,7 +99,8 @@ impl DatadogMetricsV3Encoder {
             &self.default_namespace,
             self.log_schema,
             self.origin_product_value,
-        )?;
+        )
+        .map_err(|error| (error, metric.take_finalizers()))?;
         self.pending.push(metric);
         Ok(None)
     }
@@ -110,9 +114,9 @@ impl DatadogMetricsV3Encoder {
         clippy::cast_possible_truncation,
         reason = "Preserve the existing numeric conversion until its bounds and overflow behavior are audited."
     )]
-    pub fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
+    pub(super) fn finish(&mut self) -> Result<(EncodeResult<Bytes>, Vec<Metric>), FinishError> {
         let writer = mem::replace(&mut self.writer, V3Writer::new());
-        let metrics = mem::take(&mut self.pending);
+        let mut metrics = mem::take(&mut self.pending);
         let byte_size = mem::replace(
             &mut self.byte_size,
             telemetry().create_request_count_byte_size(),
@@ -126,34 +130,43 @@ impl DatadogMetricsV3Encoder {
             ));
         }
 
-        let metric_data = writer.finalize()?.payload;
+        let metric_data = writer
+            .finalize()
+            .map_err(|error| FinishError::V3EncodingFailed {
+                source: error.into_inner(),
+                finalizers: metrics.take_finalizers(),
+            })?
+            .payload;
 
         // The wire payload isn't the bare `MetricData` message — the intake API expects it
         // wrapped as field 3 (`metricData`) of the outer `Payload` message (see
         // `intake_v3.proto`). Without this envelope the backend can't parse the bytes at all.
         let mut header_buf = [0u8; 16];
-        let header_len = {
+        let header_len = (|| {
             let mut header_writer = CodedOutputStream::bytes(&mut header_buf);
             header_writer.write_tag(3, WireType::LengthDelimited)?;
             header_writer.write_uint64_no_tag(metric_data.len() as u64)?;
             header_writer.flush()?;
-            header_writer.total_bytes_written() as usize
-        };
+            Ok::<_, protobuf::Error>(header_writer.total_bytes_written() as usize)
+        })()
+        .map_err(|source| FinishError::V3EncodingFailed {
+            source,
+            finalizers: metrics.take_finalizers(),
+        })?;
 
         let uncompressed_size = header_len + metric_data.len();
 
         // Note, V3 only supports zstd.
         let mut compressor: Compressor = Compression::zstd_default().into();
 
-        compressor
-            .write_all(&header_buf[..header_len])
-            .map_err(|source| FinishError::CompressionFailed { source })?;
-        compressor
-            .write_all(&metric_data)
-            .map_err(|source| FinishError::CompressionFailed { source })?;
         let compressed = compressor
-            .finish()
-            .map_err(|source| FinishError::CompressionFailed { source })?
+            .write_all(&header_buf[..header_len])
+            .and_then(|()| compressor.write_all(&metric_data))
+            .and_then(|()| compressor.finish())
+            .map_err(|source| FinishError::CompressionFailed {
+                source,
+                finalizers: metrics.take_finalizers(),
+            })?
             .freeze();
 
         // Both limits are inclusive: the intake accepts a payload whose encoded size is exactly
@@ -380,7 +393,7 @@ mod tests {
         );
         let (result, metrics) = enc.finish().unwrap();
         assert!(result.into_payload().is_empty());
-        assert!(metrics.is_empty());
+        assert_eq!(metrics, [] as [vector_lib::event::Metric; 0]);
     }
 
     /// Encodes one gauge and reports `(uncompressed_size, compressed_size)` for it.
@@ -637,7 +650,7 @@ mod tests {
         )
         .unwrap();
         let encoded = writer.finalize().unwrap();
-        assert!(!encoded.payload.is_empty());
+        assert_ne!(encoded.payload, [] as [u8; 0]);
 
         // `host_metrics` maps to OriginService 211 in V2's `source_type_to_service` table;
         // V3 reuses that same mapping via the shared `generate_origin_metadata` function.

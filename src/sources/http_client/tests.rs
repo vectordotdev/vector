@@ -5,7 +5,7 @@ use vector_lib::codecs::decoding::NewlineDelimitedDecoderConfig;
 use vector_lib::codecs::decoding::framing::OversizedAction;
 use vector_lib::config::proxy::NoProxy;
 
-use http::{Method, Uri, header};
+use http::Uri;
 use tokio::time::Duration;
 use vector_lib::{
     codecs::{
@@ -29,10 +29,10 @@ use crate::{
     test_util::{
         addr::next_addr,
         components::{
-            HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
-            run_and_assert_source_compliance_advanced,
+            COMPONENT_ERROR_TAGS, HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
+            run_and_assert_source_compliance_advanced, run_and_assert_source_error,
         },
-        http::spawn_authenticated_http_proxy,
+        http::{SlowBody, spawn_authenticated_http_proxy, spawn_slow_body_http_server},
         test_generate_config, wait_for_tcp,
     },
 };
@@ -47,7 +47,7 @@ pub(crate) async fn run_compliance(config: HttpClientConfig) -> Vec<Event> {
         run_and_assert_source_compliance(config, Duration::from_secs(3), &HTTP_PULL_SOURCE_TAGS)
             .await;
 
-    assert!(!events.is_empty());
+    assert_ne!(events, [] as [vector_lib::event::Event; 0]);
 
     events
 }
@@ -89,6 +89,45 @@ impl ValidatableComponent for HttpClientConfig {
 }
 
 register_validatable_component!(HttpClientConfig);
+
+/// Asserts that a request whose body doesn't finish in time fails with an error.
+async fn run_slow_body_error(body: SlowBody) {
+    let uri = spawn_slow_body_http_server(body).await;
+
+    let events = run_and_assert_source_error(
+        HttpClientConfig {
+            endpoint: uri.to_string(),
+            interval: INTERVAL,
+            timeout: TIMEOUT,
+            query: HashMap::new(),
+            decoding: default_decoding(),
+            framing: default_framing_message_based(),
+            headers: HashMap::new(),
+            method: HttpMethod::Get,
+            body: None,
+            tls: None,
+            auth: None,
+            log_namespace: None,
+        },
+        Duration::from_secs(3),
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
+
+    assert_eq!(events, [] as [vector_lib::event::Event; 0]);
+}
+
+/// The headers arrive in time, so only a timeout that also covers the body read can end this.
+#[tokio::test]
+async fn timeout_covers_stalled_response_body() {
+    run_slow_body_error(SlowBody::Stall).await;
+}
+
+/// A body that keeps arriving in small chunks must not extend the deadline.
+#[tokio::test]
+async fn timeout_covers_slow_response_body() {
+    run_slow_body_error(SlowBody::Trickle(Duration::from_millis(100))).await;
+}
 
 /// Bytes should be decoded and HTTP header set to text/plain.
 #[tokio::test]
@@ -139,6 +178,35 @@ async fn json_decoding_newline_delimited() {
         query: HashMap::new(),
         decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
         framing: FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig::default()),
+        headers: HashMap::new(),
+        method: HttpMethod::Get,
+        body: None,
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+}
+
+/// JSON with the default framing should be decoded and HTTP header set to application/json.
+#[tokio::test]
+async fn json_decoding_default_framing() {
+    let (_guard, in_addr) = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::header::exact("Accept", "application/json"))
+        .map(|| r#"{"data" : "foo"}"#);
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    run_compliance(HttpClientConfig {
+        endpoint: format!("http://{in_addr}/endpoint"),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json(JsonDeserializerConfig::default()),
+        framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
         body: None,
@@ -829,7 +897,7 @@ async fn requests_through_authenticated_proxy() {
     )
     .await;
 
-    assert!(!events.is_empty());
+    assert_ne!(events, [] as [vector_lib::event::Event; 0]);
     for event in events {
         assert_eq!(
             event
@@ -843,7 +911,7 @@ async fn requests_through_authenticated_proxy() {
     }
 
     let observation = proxy.next_request().await;
-    assert_eq!(observation.method, Method::GET);
+    assert_eq!(observation.method, http::Method::GET);
     assert_eq!(
         observation.uri.to_string(),
         format!("http://{in_addr}/endpoint")
@@ -851,6 +919,6 @@ async fn requests_through_authenticated_proxy() {
     assert!(
         observation
             .headers
-            .contains_key(header::PROXY_AUTHORIZATION)
+            .contains_key(http::header::PROXY_AUTHORIZATION)
     );
 }

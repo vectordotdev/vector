@@ -4,7 +4,7 @@ use vector_lib::{
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct FileDescriptorReadError<E> {
+pub(crate) struct FileDescriptorReadError<E> {
     pub error: E,
 }
 

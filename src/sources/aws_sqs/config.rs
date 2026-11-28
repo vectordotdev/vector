@@ -18,6 +18,8 @@ use crate::{
     tls::TlsConfig,
 };
 
+const TIMESTAMP_KEY: &str = "timestamp";
+
 /// Configuration for the `aws_sqs` source.
 #[configurable_component(source("aws_sqs", "Collect logs from AWS SQS."))]
 #[derive(Clone, Debug, Derivative)]
@@ -143,10 +145,10 @@ impl SourceConfig for AwsSqsConfig {
             .with_standard_vector_source_metadata()
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
+                Some(LegacyKey::Overwrite(owned_value_path!(TIMESTAMP_KEY))),
+                &owned_value_path!(TIMESTAMP_KEY),
                 Kind::timestamp().or_undefined(),
-                Some("timestamp"),
+                Some(TIMESTAMP_KEY),
             );
 
         vec![SourceOutput::new_maybe_logs(
@@ -176,7 +178,7 @@ impl AwsSqsConfig {
                 );
                 legacy.get()
             }
-            (None, None) => crate::num_threads(),
+            (None, None) => vector_lib::num_threads(),
         }
     }
 
@@ -217,7 +219,7 @@ mod tests {
     #[test]
     fn resolve_max_concurrency_defaults_to_num_threads() {
         let config = AwsSqsConfig::default();
-        assert_eq!(config.resolve_max_concurrency(), crate::num_threads());
+        assert_eq!(config.resolve_max_concurrency(), vector_lib::num_threads());
     }
 
     #[test]

@@ -1,8 +1,9 @@
 use std::{io, mem, time::Duration};
+use vector_lib::internal_event::emit;
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Bytes, BytesMut};
-use http_1::{Request, Uri, header::CONTENT_TYPE};
+use http::{Request, Uri, header::CONTENT_TYPE};
 use indoc::indoc;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
@@ -12,17 +13,19 @@ use vector_lib::stream::batcher::BatchConfig as StreamBatchConfig;
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
-    http::client_v1::HttpClient,
+    http::HttpClient,
     internal_events::LargeEventDroppedError,
     sinks::{
-        HTTPV1RequestBuilderSnafu,
+        HTTPRequestBuilderSnafu,
         gcs_common::config::healthcheck_status,
         prelude::*,
         util::{
             HttpEndpoint,
             encoding::Encoder as SinkEncoder,
-            http::{HttpRequest, RetryStrategy},
-            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
+            http::{
+                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
+                http_response_retry_logic,
+            },
         },
     },
 };
@@ -173,17 +176,16 @@ impl ValidatedSink for PubsubConfig {
         let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
 
         let healthcheck =
-            healthcheck(client.clone(), uri_base.clone().into_v1(), auth.clone()).boxed();
+            healthcheck(client.clone(), uri_base.as_uri().clone(), auth.clone()).boxed();
         auth.spawn_regenerate_token();
 
         // The suffix is a Google API method that attaches directly to the topic path without a
         // separator.
         let service_request_builder = PubsubServiceRequestBuilder {
-            uri: uri_base.append_raw_suffix(":publish")?.into_v1(),
+            uri: uri_base.append_raw_suffix(":publish")?.into_uri(),
             auth,
         };
-        let service =
-            HttpService::new(client, service_request_builder).with_response_decompression();
+        let service = HttpService::new(client, service_request_builder);
         let service = ServiceBuilder::new()
             .settings(
                 request_settings,
@@ -323,7 +325,7 @@ impl StreamBatchConfig<PubsubMessage> for PubsubBatcher {
         self.batch.finalizers.merge(message.finalizers);
 
         if self.batch.messages.is_empty() && payload_size >= self.settings.size_limit {
-            emit!(LargeEventDroppedError {
+            emit(LargeEventDroppedError {
                 length: message.json.len(),
                 max_length: self.settings.size_limit,
             });
@@ -385,7 +387,7 @@ struct PubsubRequestBuilder {
 }
 
 impl RequestBuilder<PubsubBatch> for PubsubRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = PubsubBatch;
     type Encoder = PubsubBatchEncoder;
     type Payload = Bytes;
@@ -400,26 +402,29 @@ impl RequestBuilder<PubsubBatch> for PubsubRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut batch: PubsubBatch,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut batch: PubsubBatch) -> RequestParts<Self::Metadata, Self::Events> {
         let finalizers = mem::take(&mut batch.finalizers);
         let builder = RequestMetadataBuilder::new(
             batch.event_count,
             batch.events_byte_size,
             batch.events_sent(),
         );
-        (finalizers, builder, batch)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events: batch,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
+        HttpRequest::new(payload.into_payload(), finalizers, request_metadata, ())
     }
 }
 
@@ -434,8 +439,8 @@ impl HttpServiceRequestBuilder<()> for PubsubServiceRequestBuilder {
         let mut request = Request::post(self.uri.clone())
             .header(CONTENT_TYPE, "application/json")
             .body(request.take_payload())
-            .context(HTTPV1RequestBuilderSnafu)?;
-        self.auth.apply_v1(&mut request);
+            .context(HTTPRequestBuilderSnafu)?;
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -482,7 +487,7 @@ where
             .filter_map(|request| {
                 future::ready(match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(request) => Some(request),
@@ -498,7 +503,7 @@ where
 
 async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> crate::Result<()> {
     let mut request = Request::get(uri).body(empty_body())?;
-    auth.apply_v1(&mut request);
+    auth.apply(&mut request);
 
     let response = client.send(request).await?;
     healthcheck_status(response.status(), HealthcheckError::TopicNotFound.into())
@@ -568,11 +573,20 @@ mod tests {
         let builder = PubsubRequestBuilder {
             encoder: PubsubBatchEncoder,
         };
-        let (finalizers, metadata, events) = builder.split_input(batch);
+        let RequestParts {
+            events,
+            finalizers,
+            request_metadata_builder,
+            ..
+        } = builder.split_input(batch);
         let payload = builder
             .encode_events(events)
             .expect("encoding into memory should succeed");
-        (finalizers, metadata.build(&payload), payload)
+        (
+            finalizers,
+            request_metadata_builder.build(&payload),
+            payload,
+        )
     }
 
     /// The legacy body: each message is `{"data": <base64>}` inside a `messages` array.
@@ -707,7 +721,7 @@ mod tests {
 
         let batches = batch(vec![message], size, 1000).await;
         assert_eq!(batches.len(), 1);
-        assert!(batches[0].messages.is_empty());
+        assert_eq!(batches[0].messages, [] as [std::string::String; 0]);
         assert_eq!(batches[0].event_count, 1);
 
         let message = encode(&mut encoder, log_event("message", None));
@@ -850,6 +864,7 @@ mod integration_tests {
                 run_and_assert_sink_error,
             },
             random_events_with_stream, random_metrics_with_stream, random_string, trace_init,
+            wait_for_duration,
         },
     };
 
@@ -961,6 +976,17 @@ mod integration_tests {
     }
 
     async fn create_topic_subscription() -> (String, String) {
+        let endpoint: Uri = gcp::PUBSUB_ADDRESS.parse().unwrap();
+        let address = endpoint.authority().unwrap().as_str().to_owned();
+        wait_for_duration(
+            move || {
+                let address = address.clone();
+                async move { tokio::net::TcpStream::connect(address).await.is_ok() }
+            },
+            Duration::from_secs(30),
+        )
+        .await;
+
         let topic = format!("topic-{}", random_string(10));
         let subscription = format!("subscription-{}", random_string(10));
         request(Method::PUT, &format!("topics/{topic}"), json!({}))

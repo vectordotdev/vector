@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use rdkafka::message::{Header, OwnedHeaders};
+use vector_lib::internal_event::emit;
 use vector_lib::lookup::OwnedTargetPath;
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
     },
 };
 
-pub struct KafkaRequestBuilder {
+pub(crate) struct KafkaRequestBuilder {
     pub key_field: Option<OwnedTargetPath>,
     pub headers_key: Option<OwnedTargetPath>,
     pub encoder: (Transformer, Encoder<()>),
@@ -32,31 +33,35 @@ impl RequestBuilder<(String, Event)> for KafkaRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        input: (String, Event),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, input: (String, Event)) -> RequestParts<Self::Metadata, Self::Events> {
         let (topic, mut event) = input;
         let builder = RequestMetadataBuilder::from_event(&event);
 
+        let finalizers = event.take_finalizers();
         let metadata = KafkaRequestMetadata {
-            finalizers: event.take_finalizers(),
             key: get_key(&event, self.key_field.as_ref()),
             timestamp_millis: get_timestamp_millis(&event),
             headers: get_headers(&event, self.headers_key.as_ref()),
             topic,
         };
 
-        (metadata, builder, event)
+        RequestParts {
+            metadata,
+            request_metadata_builder: builder,
+            events: event,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         KafkaRequest {
+            finalizers,
             body: payload.into_payload(),
             metadata,
             request_metadata,
@@ -111,16 +116,16 @@ fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<O
                                 value: Some(value_bytes.as_ref()),
                             });
                         } else {
-                            emit!(KafkaHeaderExtractionError {
-                                header_field: headers_key
+                            emit(KafkaHeaderExtractionError {
+                                header_field: headers_key,
                             });
                         }
                     }
                     return Some(owned_headers);
                 }
                 _ => {
-                    emit!(KafkaHeaderExtractionError {
-                        header_field: headers_key
+                    emit(KafkaHeaderExtractionError {
+                        header_field: headers_key,
                     });
                 }
             }

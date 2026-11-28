@@ -11,6 +11,7 @@ use snafu::Snafu;
 use vector_lib::{
     event::{EventFinalizers, Finalizable},
     request_metadata::RequestMetadata,
+    sink::PreparationError,
 };
 use vrl::event_path;
 
@@ -25,12 +26,14 @@ use crate::{
     common::datadog::decode_u64_id,
     event::{Event, ObjectMap, TraceEvent, Value},
     sinks::util::{
-        Compression, Compressor, IncrementalRequestBuilder, metadata::RequestMetadataBuilder,
+        Compression, Compressor, IncrementalRequestBuilder,
+        metadata::RequestMetadataBuilder,
+        request_builder::{EncodedChunk, IncrementalPayloads},
     },
 };
 
 #[derive(Debug, Snafu)]
-pub enum RequestBuilderError {
+pub(crate) enum RequestBuilderError {
     #[snafu(display(
         "Building an APM stats request payload failed ({}, {})",
         message,
@@ -51,7 +54,7 @@ pub enum RequestBuilderError {
 }
 
 impl RequestBuilderError {
-    pub fn into_parts(self) -> (&'static str, String, usize) {
+    pub(crate) fn into_parts(self) -> (&'static str, String, usize) {
         match self {
             Self::FailedToBuild {
                 message,
@@ -66,7 +69,7 @@ impl RequestBuilderError {
     }
 }
 
-pub struct DatadogTracesRequestBuilder {
+pub(super) struct DatadogTracesRequestBuilder {
     api_key: Arc<str>,
     endpoint_configuration: DatadogTracesEndpointConfiguration,
     compression: Compression,
@@ -77,7 +80,7 @@ pub struct DatadogTracesRequestBuilder {
 }
 
 impl DatadogTracesRequestBuilder {
-    pub const fn new(
+    pub(super) const fn new(
         api_key: Arc<str>,
         endpoint_configuration: DatadogTracesEndpointConfiguration,
         compression: Compression,
@@ -96,10 +99,9 @@ impl DatadogTracesRequestBuilder {
     }
 }
 
-pub struct DDTracesMetadata {
+pub(crate) struct DDTracesMetadata {
     pub api_key: Arc<str>,
     pub endpoint: DatadogTracesEndpoint,
-    pub finalizers: EventFinalizers,
     pub uncompressed_size: usize,
     pub content_type: String,
 }
@@ -113,7 +115,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
     fn encode_events_incremental(
         &mut self,
         input: (PartitionKey, Vec<Event>),
-    ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
+    ) -> IncrementalPayloads<Self::Metadata, Self::Payload, Self::Error> {
         let (key, events) = input;
         let trace_events = events
             .into_iter()
@@ -129,47 +131,58 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
         encode_traces(&key, trace_events, self.max_size)
             .into_iter()
             .map(|result| {
-                result.and_then(|(payload, mut processed)| {
-                    let uncompressed_size = payload.len();
-                    let metadata = DDTracesMetadata {
-                        api_key: key
-                            .api_key
-                            .clone()
-                            .unwrap_or_else(|| Arc::clone(&self.api_key)),
-                        endpoint: DatadogTracesEndpoint::Traces,
-                        finalizers: processed.take_finalizers(),
-                        uncompressed_size,
-                        content_type: "application/x-protobuf".to_string(),
-                    };
-
-                    // build RequestMetadata
-                    let builder = RequestMetadataBuilder::from_events(&processed);
-
-                    let mut compressor = Compressor::from(self.compression);
-                    match compressor.write_all(&payload) {
-                        Ok(()) => {
-                            let bytes = compressor.into_inner().freeze();
-
-                            let bytes_len = NonZeroUsize::new(bytes.len())
-                                .expect("payload should never be zero length");
-                            let request_metadata = builder.with_request_size(bytes_len);
-
-                            Ok(((metadata, request_metadata), bytes))
-                        }
-                        Err(e) => Err(RequestBuilderError::FailedToBuild {
-                            message: "Payload compression failed.",
-                            reason: e.to_string(),
-                            dropped_events: processed.len(),
-                        }),
+                let (payload, mut processed) = match result {
+                    Ok(encoded) => encoded,
+                    Err((error, finalizers)) => {
+                        return EncodedChunk {
+                            result: Err(PreparationError::Permanent(error)),
+                            finalizers,
+                        };
                     }
-                })
+                };
+                let finalizers = processed.take_finalizers();
+                let metadata = DDTracesMetadata {
+                    api_key: key
+                        .api_key
+                        .clone()
+                        .unwrap_or_else(|| Arc::clone(&self.api_key)),
+                    endpoint: DatadogTracesEndpoint::Traces,
+                    uncompressed_size: payload.len(),
+                    content_type: "application/x-protobuf".to_string(),
+                };
+
+                let builder = RequestMetadataBuilder::from_events(&processed);
+                let mut compressor = Compressor::from(self.compression);
+                let result = compressor
+                    .write_all(&payload)
+                    .and_then(|()| compressor.finish())
+                    .map(|bytes| {
+                        let bytes = bytes.freeze();
+                        let bytes_len = NonZeroUsize::new(bytes.len())
+                            .expect("payload should never be zero length");
+                        ((metadata, builder.with_request_size(bytes_len)), bytes)
+                    })
+                    .map_err(|error| {
+                        PreparationError::Transient(RequestBuilderError::FailedToBuild {
+                            message: "Payload compression failed.",
+                            reason: error.to_string(),
+                            dropped_events: processed.len(),
+                        })
+                    });
+                EncodedChunk { result, finalizers }
             })
             .collect()
     }
 
-    fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &mut self,
+        metadata: Self::Metadata,
+        finalizers: EventFinalizers,
+        payload: Self::Payload,
+    ) -> Self::Request {
         build_request(
             metadata,
+            finalizers,
             payload,
             self.compression,
             &self.endpoint_configuration,
@@ -182,11 +195,13 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 /// # Arguments
 ///
 /// * `metadata`                 - Tuple of Datadog traces specific metadata and the generic `RequestMetadata`.
+/// * `finalizers`               - Finalizers owned by the request.
 /// * `payload`                  - Compressed and encoded bytes to send.
 /// * `compression`              - `Compression` used to reference the Content-Encoding header.
 /// * `endpoint_configuration`   - Endpoint configuration to use when creating the HTTP requests.
-pub fn build_request(
+pub(crate) fn build_request(
     metadata: (DDTracesMetadata, RequestMetadata),
+    finalizers: EventFinalizers,
     payload: Bytes,
     compression: Compression,
     endpoint_configuration: &DatadogTracesEndpointConfiguration,
@@ -204,23 +219,26 @@ pub fn build_request(
     TraceApiRequest {
         body: payload,
         headers,
-        finalizers: ddtraces_metadata.finalizers,
+        finalizers,
         uri: endpoint_configuration.get_uri_for_endpoint(ddtraces_metadata.endpoint),
         uncompressed_size: ddtraces_metadata.uncompressed_size,
         metadata: request_metadata,
     }
 }
 
+/// An encoded payload and the trace events it contains.
+type EncodeResult = Result<(Vec<u8>, Vec<TraceEvent>), (RequestBuilderError, EventFinalizers)>;
+
 fn encode_traces(
     key: &PartitionKey,
     trace_events: Vec<TraceEvent>,
     max_size: usize,
-) -> Vec<Result<(Vec<u8>, Vec<TraceEvent>), RequestBuilderError>> {
+) -> Vec<EncodeResult> {
     let mut results = Vec::new();
     let mut processed = Vec::new();
     let mut payload = build_empty_payload(key);
 
-    for trace in trace_events {
+    for mut trace in trace_events {
         let mut proto = encode_trace(&trace);
 
         loop {
@@ -230,11 +248,14 @@ fn encode_traces(
                 proto = payload.tracer_payloads.pop().expect("just pushed");
                 if payload.tracer_payloads.is_empty() {
                     // this individual trace is too big
-                    results.push(Err(RequestBuilderError::FailedToBuild {
-                        message: "Dropped trace event",
-                        reason: "Trace is larger than allowed payload size".into(),
-                        dropped_events: 1,
-                    }));
+                    results.push(Err((
+                        RequestBuilderError::FailedToBuild {
+                            message: "Dropped trace event",
+                            reason: "Trace is larger than allowed payload size".into(),
+                            dropped_events: 1,
+                        },
+                        trace.take_finalizers(),
+                    )));
 
                     break;
                 }

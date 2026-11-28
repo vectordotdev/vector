@@ -1,6 +1,9 @@
 //! Implementation of the `http` sink.
 
 use std::collections::BTreeMap;
+use vector_lib::internal_event::emit;
+
+use crate::sinks::util::partitioner::render_partition_value;
 
 use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
@@ -49,7 +52,7 @@ where
                 self.batch_settings.timeout,
                 |_| self.batch_settings.as_item_size_config(batch_sizer.clone()),
             )
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|result| async move { result.ok() })
             // Build requests with default concurrency limit.
             .request_builder(
                 default_request_builder_concurrency_limit(),
@@ -59,7 +62,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -90,7 +93,7 @@ where
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, Hash)]
-pub struct PartitionKey {
+pub(super) struct PartitionKey {
     pub uri: String,
     pub headers: BTreeMap<String, String>,
 }
@@ -108,36 +111,29 @@ impl KeyPartitioner {
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = Option<PartitionKey>;
+    type Key = PartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, event: &Event) -> Self::Key {
-        let uri = self
-            .uri
-            .render_string(event)
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some("uri"),
-                    drop_event: true,
-                });
-            })
-            .ok()?;
+    fn partition(
+        &self,
+        event: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        let PartitionDecision::Route(uri) =
+            render_partition_value(self.uri.render_string(event), "uri")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
 
         let mut headers = BTreeMap::new();
         for (name, template) in &self.headers {
-            let value = template
-                .render_string(event)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("headers"),
-                        drop_event: true,
-                    });
-                })
-                .ok()?;
+            let PartitionDecision::Route(value) =
+                render_partition_value(template.render_string(event), "headers")?
+            else {
+                return Ok(PartitionDecision::Discard);
+            };
             headers.insert(name.clone(), value);
         }
 
-        Some(PartitionKey { uri, headers })
+        Ok(PartitionDecision::Route(PartitionKey { uri, headers }))
     }
 }
