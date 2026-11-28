@@ -624,6 +624,213 @@ mod tests {
         );
     }
 
+    fn ts() -> DateTime<Utc> {
+        use chrono::{TimeZone, Timelike};
+        Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10)
+            .single()
+            .and_then(|t| t.with_nanosecond(11))
+            .expect("invalid timestamp")
+    }
+
+    fn tags() -> MetricTags {
+        vector_core::metric_tags!(
+            "normal_tag" => "value",
+            "true_tag" => "true",
+            "empty_tag" => "",
+        )
+    }
+
+    fn assert_fields(value: &str, fields: &[&str]) {
+        let encoded_fields: Vec<&str> = value.split(',').collect();
+
+        assert_eq!(fields.len(), encoded_fields.len());
+
+        for field in fields {
+            assert!(
+                encoded_fields.contains(field),
+                "Fields: {value} has to have: {field}"
+            );
+        }
+    }
+
+    fn all_field_types() -> HashMap<KeyString, Field> {
+        vec![
+            ("field_string".into(), Field::String("string value".into())),
+            (
+                "field_string_escape".into(),
+                Field::String("string\\val\"ue".into()),
+            ),
+            ("field_float".into(), Field::Float(123.45)),
+            ("field_unsigned_int".into(), Field::UnsignedInt(657)),
+            ("field_int".into(), Field::Int(657_646)),
+            ("field_bool_true".into(), Field::Bool(true)),
+            ("field_bool_false".into(), Field::Bool(false)),
+            ("escape key".into(), Field::Float(10.0)),
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    #[test]
+    fn test_encode_tags() {
+        let mut value = BytesMut::new();
+        encode_tags(&tags(), &mut value);
+
+        assert_eq!(value, "normal_tag=value,true_tag=true");
+
+        let tags_to_escape = vec![
+            ("tag".to_owned(), "val=ue".to_owned()),
+            ("name escape".to_owned(), "true".to_owned()),
+            ("value_escape".to_owned(), "value escape".to_owned()),
+            ("a_first_place".to_owned(), "10".to_owned()),
+        ]
+        .into_iter()
+        .collect();
+
+        let mut value = BytesMut::new();
+        encode_tags(&tags_to_escape, &mut value);
+        assert_eq!(
+            value,
+            "a_first_place=10,name\\ escape=true,tag=val\\=ue,value_escape=value\\ escape"
+        );
+    }
+
+    #[test]
+    fn tags_order() {
+        let mut value = BytesMut::new();
+        encode_tags(
+            &vec![
+                ("a", "value"),
+                ("b", "value"),
+                ("c", "value"),
+                ("d", "value"),
+                ("e", "value"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect(),
+            &mut value,
+        );
+        assert_eq!(value, "a=value,b=value,c=value,d=value,e=value");
+    }
+
+    #[test]
+    fn test_encode_fields_v1() {
+        let mut value = BytesMut::new();
+        encode_fields(ProtocolVersion::V1, all_field_types(), &mut value);
+        let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
+        assert_fields(
+            &value,
+            &[
+                "escape\\ key=10",
+                "field_float=123.45",
+                "field_string=\"string value\"",
+                "field_string_escape=\"string\\\\val\\\"ue\"",
+                "field_unsigned_int=657i",
+                "field_int=657646i",
+                "field_bool_true=true",
+                "field_bool_false=false",
+            ],
+        );
+    }
+
+    #[test]
+    fn test_encode_fields() {
+        let mut value = BytesMut::new();
+        encode_fields(ProtocolVersion::V2, all_field_types(), &mut value);
+        let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
+        assert_fields(
+            &value,
+            &[
+                "escape\\ key=10",
+                "field_float=123.45",
+                "field_string=\"string value\"",
+                "field_string_escape=\"string\\\\val\\\"ue\"",
+                "field_unsigned_int=657u",
+                "field_int=657646i",
+                "field_bool_true=true",
+                "field_bool_false=false",
+            ],
+        );
+    }
+
+    #[test]
+    fn test_encode_string() {
+        let mut value = BytesMut::new();
+        encode_string("measurement_name", &mut value);
+        assert_eq!(value, "measurement_name");
+
+        let mut value = BytesMut::new();
+        encode_string("measurement name", &mut value);
+        assert_eq!(value, "measurement\\ name");
+
+        let mut value = BytesMut::new();
+        encode_string("measurement=name", &mut value);
+        assert_eq!(value, "measurement\\=name");
+
+        let mut value = BytesMut::new();
+        encode_string("measurement,name", &mut value);
+        assert_eq!(value, "measurement\\,name");
+    }
+
+    #[test]
+    fn test_encode_timestamp() {
+        let start = Utc::now()
+            .timestamp_nanos_opt()
+            .expect("Timestamp out of range");
+        assert_eq!(encode_timestamp(Some(ts())), 1_542_182_950_000_000_011);
+        assert!(encode_timestamp(None) >= start);
+    }
+
+    #[test]
+    fn encode_histogram_without_sum_omits_sum_field() {
+        let mut serializer =
+            InfluxLineProtocolSerializer::new(InfluxLineProtocolSerializerConfig::default());
+        let metric = Metric::new(
+            "requests",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2],
+                count: 3,
+                sum: None,
+            },
+        )
+        .with_timestamp(Some(ts()));
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(Event::Metric(metric), &mut buffer)
+            .unwrap();
+        let line = String::from_utf8(buffer.to_vec()).unwrap();
+        let (_, fields, _) = split_line(&line);
+        assert_fields(fields, &["bucket_1=1u", "bucket_2.1=2u", "count=3u"]);
+    }
+
+    #[test]
+    fn encode_log_is_rejected() {
+        let mut serializer =
+            InfluxLineProtocolSerializer::new(InfluxLineProtocolSerializerConfig::default());
+        let mut buffer = BytesMut::new();
+        assert!(
+            serializer
+                .encode(
+                    Event::Log(vector_core::event::LogEvent::from("hello")),
+                    &mut buffer
+                )
+                .is_err()
+        );
+        assert!(buffer.is_empty());
+    }
+
+    fn split_line(line: &str) -> (&str, &str, &str) {
+        let mut parts = line.trim_end().splitn(3, ' ');
+        (
+            parts.next().unwrap(),
+            parts.next().unwrap(),
+            parts.next().unwrap(),
+        )
+    }
+
     #[test]
     fn serializer_schema() {
         let config = InfluxLineProtocolSerializerConfig::default();
