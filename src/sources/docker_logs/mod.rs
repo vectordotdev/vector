@@ -63,6 +63,13 @@ const CREATED_AT: &str = "container_created_at";
 const NAME: &str = "container_name";
 const STREAM: &str = "stream";
 const CONTAINER: &str = "container_id";
+const HOST: &str = "host";
+const LABEL: &str = "label";
+const LABELS: &str = "labels";
+const TIMESTAMP: &str = "timestamp";
+const SOURCE_TYPE: &str = "source_type";
+const INGEST_TIMESTAMP: &str = "ingest_timestamp";
+const VECTOR: &str = "vector";
 // Prevent short hostname from being wrongly recognized as a container's short ID.
 const MIN_HOSTNAME_LENGTH: usize = 6;
 
@@ -294,9 +301,9 @@ impl SourceConfig for DockerLogsConfig {
             .with_source_metadata(
                 Self::NAME,
                 host_key,
-                &owned_value_path!("host"),
+                &owned_value_path!(HOST),
                 Kind::bytes().or_undefined(),
-                Some("host"),
+                Some(HOST),
             )
             .with_source_metadata(
                 Self::NAME,
@@ -328,8 +335,8 @@ impl SourceConfig for DockerLogsConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::Overwrite(owned_value_path!("label"))),
-                &owned_value_path!("labels"),
+                Some(LegacyKey::Overwrite(owned_value_path!(LABEL))),
+                &owned_value_path!(LABELS),
                 Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                 None,
             )
@@ -346,19 +353,19 @@ impl SourceConfig for DockerLogsConfig {
                     .timestamp_key()
                     .cloned()
                     .map(LegacyKey::Overwrite),
-                &owned_value_path!("timestamp"),
+                &owned_value_path!(TIMESTAMP),
                 Kind::timestamp(),
-                Some("timestamp"),
+                Some(TIMESTAMP),
             )
             .with_vector_metadata(
                 log_schema().source_type_key(),
-                &owned_value_path!("source_type"),
+                &owned_value_path!(SOURCE_TYPE),
                 Kind::bytes(),
                 None,
             )
             .with_vector_metadata(
                 None,
-                &owned_value_path!("ingest_timestamp"),
+                &owned_value_path!(INGEST_TIMESTAMP),
                 Kind::timestamp(),
                 None,
             );
@@ -916,7 +923,7 @@ fn add_hostname(
             DockerLogsConfig::NAME,
             &mut log,
             legacy_host_key,
-            path!("host"),
+            path!(HOST),
             hostname.clone(),
         );
     }
@@ -1174,8 +1181,8 @@ impl ContainerLogInfo {
                 log_namespace.insert_source_metadata(
                     DockerLogsConfig::NAME,
                     &mut log,
-                    Some(LegacyKey::Overwrite(path!("label", key))),
-                    path!("labels", key),
+                    Some(LegacyKey::Overwrite(path!(LABEL, key))),
+                    path!(LABELS, key),
                     value.clone(),
                 );
             }
@@ -1191,7 +1198,7 @@ impl ContainerLogInfo {
         log_namespace.insert_vector_metadata(
             &mut log,
             log_schema().source_type_key(),
-            path!("source_type"),
+            path!(SOURCE_TYPE),
             Value::from_static_str(DockerLogsConfig::NAME),
         );
 
@@ -1200,13 +1207,10 @@ impl ContainerLogInfo {
         match log_namespace {
             LogNamespace::Vector => {
                 if let Some(timestamp) = timestamp {
-                    log.insert(
-                        metadata_path!(DockerLogsConfig::NAME, "timestamp"),
-                        timestamp,
-                    );
+                    log.insert(metadata_path!(DockerLogsConfig::NAME, TIMESTAMP), timestamp);
                 }
 
-                log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
+                log.insert(metadata_path!(VECTOR, INGEST_TIMESTAMP), Utc::now());
             }
             LogNamespace::Legacy => {
                 if let Some(timestamp) = timestamp
