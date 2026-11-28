@@ -1,10 +1,10 @@
 use std::{collections::BTreeSet, num::NonZeroUsize, path::PathBuf};
 
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
+    config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
     lookup::owned_value_path,
-    schema::Definition,
+    schema::{Definition, meaning},
 };
 use vrl::value::{Kind, kind::Collection};
 
@@ -292,7 +292,26 @@ pub(super) fn schema_definition(log_namespace: LogNamespace) -> Definition {
     let mut namespaces = BTreeSet::new();
     namespaces.insert(log_namespace);
 
-    Definition::new_with_default_metadata(Kind::object(Collection::any()), namespaces)
+    // The log always carries the Kubernetes note as the message (when present) and the event
+    // time as the timestamp, at the global log schema paths, regardless of the log namespace.
+    let mut definition =
+        Definition::new_with_default_metadata(Kind::object(Collection::any()), namespaces);
+    if let Some(message_path) = log_schema().message_key() {
+        definition = definition.with_event_field(
+            message_path,
+            Kind::bytes().or_undefined(),
+            Some(meaning::MESSAGE),
+        );
+    }
+    if let Some(timestamp_path) = log_schema().timestamp_key() {
+        definition = definition.with_event_field(
+            timestamp_path,
+            Kind::timestamp(),
+            Some(meaning::TIMESTAMP),
+        );
+    }
+
+    definition
         .with_standard_vector_source_metadata()
         .with_source_metadata(
             KubernetesEventsConfig::NAME,
@@ -329,4 +348,27 @@ pub(super) fn schema_definition(log_namespace: LogNamespace) -> Definition {
             Kind::bytes().or_undefined(),
             Some("event_type"),
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn schema_registers_message_and_timestamp_meanings() {
+        for log_namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let definition = schema_definition(log_namespace);
+
+            assert_eq!(
+                definition.meaning_path(meaning::MESSAGE),
+                log_schema().message_key_target_path(),
+                "{log_namespace:?}"
+            );
+            assert_eq!(
+                definition.meaning_path(meaning::TIMESTAMP),
+                log_schema().timestamp_key_target_path(),
+                "{log_namespace:?}"
+            );
+        }
+    }
 }
