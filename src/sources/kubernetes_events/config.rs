@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, path::PathBuf};
+use std::{collections::BTreeSet, num::NonZeroUsize, path::PathBuf};
 
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
@@ -10,6 +10,7 @@ use vrl::value::{Kind, kind::Collection};
 
 pub(super) const DEFAULT_MAX_EVENT_AGE_SECS: u64 = 3600;
 pub(super) const DEFAULT_DEDUPE_RETENTION_SECS: u64 = 3600;
+pub(super) const DEFAULT_DEDUPE_MAX_ENTRIES: usize = 100_000;
 pub(super) const DEFAULT_WATCH_TIMEOUT_SECS: u32 = 290;
 pub(super) const MAX_WATCH_TIMEOUT_SECS: u32 = 294;
 pub(super) const DEFAULT_IDENTITY_ENV_VAR: &str = "VECTOR_SELF_POD_NAME";
@@ -38,45 +39,24 @@ pub(super) struct KubernetesEventsConfig {
     #[configurable(metadata(docs::examples = "kube-system"))]
     pub(super) namespaces: Vec<String>,
 
-    /// Field selector applied to the events list/watch request.
-    #[configurable(metadata(docs::examples = "regarding.kind=Pod"))]
-    pub(super) field_selector: Option<String>,
-
-    /// Label selector applied to the events list/watch request.
-    #[configurable(metadata(docs::examples = "type=Warning"))]
-    pub(super) label_selector: Option<String>,
-
-    /// Restricts the source to the specified event types (for example, `Warning`). Empty means all types.
+    /// Kubernetes selectors applied to the events list and watch requests.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "Warning"))]
-    pub(super) include_types: Vec<String>,
+    pub(super) selectors: KubernetesEventsSelectorsConfig,
 
-    /// Restricts the source to the specified reasons. Empty means all reasons.
+    /// Client-side filters applied to received events.
+    ///
+    /// An event is forwarded only if it matches every non-empty list.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "FailedScheduling"))]
-    pub(super) include_reasons: Vec<String>,
-
-    /// Restricts the source to the specified involved object kinds. Empty means all kinds.
-    #[serde(default)]
-    #[configurable(metadata(docs::examples = "Pod"))]
-    pub(super) include_involved_object_kinds: Vec<String>,
+    pub(super) include: KubernetesEventsIncludeConfig,
 
     /// Maximum age of an event to forward.
     #[serde(default = "default_max_event_age_seconds")]
     #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Maximum Event Age"))]
     pub(super) max_event_age_seconds: u64,
 
-    /// Retention window for deduplication state.
-    ///
-    /// Must be greater than zero. This should be at least as large as `max_event_age_seconds`;
-    /// otherwise a watch restart can re-emit events that are older than the retention window but
-    /// still within the maximum age.
-    #[serde(default = "default_dedupe_retention_seconds")]
-    #[configurable(metadata(
-        docs::type_unit = "seconds",
-        docs::human_name = "Deduplication Retention"
-    ))]
-    pub(super) dedupe_retention_seconds: u64,
+    /// Deduplication settings.
+    #[serde(default)]
+    pub(super) deduplication: KubernetesEventsDeduplicationConfig,
 
     /// Timeout applied to the Kubernetes watch call.
     ///
@@ -84,10 +64,6 @@ pub(super) struct KubernetesEventsConfig {
     #[serde(default = "default_watch_timeout_seconds")]
     #[configurable(metadata(docs::type_unit = "seconds", docs::human_name = "Watch Timeout"))]
     pub(super) watch_timeout_seconds: u32,
-
-    /// When enabled, the previous version of the event is included in the emitted payload on updates.
-    #[serde(default)]
-    pub(super) include_previous_event: bool,
 
     /// Lease-based leader election settings for running multiple replicas safely.
     ///
@@ -105,6 +81,92 @@ pub(super) struct KubernetesEventsConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub(super) log_namespace: Option<bool>,
+}
+
+/// Kubernetes selectors applied to the events list and watch requests.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub(super) struct KubernetesEventsSelectorsConfig {
+    /// [Field selector][field_selector] applied to the events list and watch requests.
+    ///
+    /// [field_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/
+    #[configurable(metadata(docs::examples = "regarding.kind=Pod"))]
+    pub(super) field: Option<String>,
+
+    /// [Label selector][label_selector] applied to the events list and watch requests.
+    ///
+    /// This matches the labels of the Event objects themselves, not the labels of the objects they
+    /// refer to. Most Kubernetes components emit Events without labels.
+    ///
+    /// [label_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+    #[configurable(metadata(docs::examples = "app.kubernetes.io/managed-by=helm"))]
+    pub(super) label: Option<String>,
+}
+
+/// Client-side filters applied to received events.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub(super) struct KubernetesEventsIncludeConfig {
+    /// Restricts the source to the specified event types (for example, `Warning`). Empty means all types.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "Warning"))]
+    pub(super) types: Vec<String>,
+
+    /// Restricts the source to the specified reasons. Empty means all reasons.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "FailedScheduling"))]
+    pub(super) reasons: Vec<String>,
+
+    /// Restricts the source to the specified involved object kinds. Empty means all kinds.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "Pod"))]
+    pub(super) involved_object_kinds: Vec<String>,
+}
+
+/// Deduplication settings.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub(super) struct KubernetesEventsDeduplicationConfig {
+    /// Retention window for deduplication state.
+    ///
+    /// Must be greater than zero. This should be at least as large as `max_event_age_seconds`;
+    /// otherwise a watch restart can re-emit events that are older than the retention window but
+    /// still within the maximum age.
+    #[serde(default = "default_dedupe_retention_seconds")]
+    #[configurable(metadata(
+        docs::type_unit = "seconds",
+        docs::human_name = "Deduplication Retention"
+    ))]
+    pub(super) retention_seconds: u64,
+
+    /// Maximum number of events tracked in the deduplication cache.
+    ///
+    /// When the cache is full, the least recently seen event is evicted. An evicted event can be
+    /// emitted again if the watch restarts and lists it, and an update to it is emitted without
+    /// `old_event`.
+    #[serde(default = "default_dedupe_max_entries")]
+    #[configurable(metadata(docs::type_unit = "events"))]
+    pub(super) max_entries: NonZeroUsize,
+
+    /// When enabled, the previous version of the event is included in the emitted payload on updates.
+    ///
+    /// This keeps a full copy of each tracked event in the deduplication cache, which increases
+    /// memory usage.
+    #[serde(default)]
+    pub(super) include_previous_event: bool,
+}
+
+impl Default for KubernetesEventsDeduplicationConfig {
+    fn default() -> Self {
+        Self {
+            retention_seconds: DEFAULT_DEDUPE_RETENTION_SECS,
+            max_entries: default_dedupe_max_entries(),
+            include_previous_event: false,
+        }
+    }
 }
 
 /// Configuration for Kubernetes Lease-based leader election.
@@ -181,15 +243,11 @@ impl Default for KubernetesEventsConfig {
         Self {
             kube_config_file: None,
             namespaces: Vec::new(),
-            field_selector: None,
-            label_selector: None,
-            include_types: Vec::new(),
-            include_reasons: Vec::new(),
-            include_involved_object_kinds: Vec::new(),
+            selectors: KubernetesEventsSelectorsConfig::default(),
+            include: KubernetesEventsIncludeConfig::default(),
             max_event_age_seconds: DEFAULT_MAX_EVENT_AGE_SECS,
-            dedupe_retention_seconds: DEFAULT_DEDUPE_RETENTION_SECS,
+            deduplication: KubernetesEventsDeduplicationConfig::default(),
             watch_timeout_seconds: DEFAULT_WATCH_TIMEOUT_SECS,
-            include_previous_event: false,
             leader_election: KubernetesEventsLeaderElectionConfig::default(),
             log_namespace: None,
         }
@@ -204,6 +262,10 @@ const fn default_max_event_age_seconds() -> u64 {
 
 const fn default_dedupe_retention_seconds() -> u64 {
     DEFAULT_DEDUPE_RETENTION_SECS
+}
+
+const fn default_dedupe_max_entries() -> NonZeroUsize {
+    NonZeroUsize::new(DEFAULT_DEDUPE_MAX_ENTRIES).expect("static non-zero number")
 }
 
 const fn default_watch_timeout_seconds() -> u32 {

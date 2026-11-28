@@ -1,18 +1,22 @@
 //! Deduplication state for Kubernetes events, keyed by object UID and `resourceVersion`.
 
 use std::{
-    collections::HashMap,
+    num::NonZeroUsize,
     time::{Duration, Instant},
 };
 
 use k8s_openapi::api::events::v1::Event as KubeEvent;
+use lru::LruCache;
 
-const MAX_PRUNE_INTERVAL: Duration = Duration::from_secs(60);
-
+/// Deduplication cache keyed by event UID.
+///
+/// Entries are kept in least-recently-seen order, so expired entries are always at the LRU end
+/// and can be pruned without scanning the whole cache. The cache is bounded both by `retention`
+/// and by `max_entries`.
 pub(super) struct Deduper {
-    entries: HashMap<String, CachedEvent>,
+    entries: LruCache<String, CachedEvent>,
     retention: Duration,
-    last_pruned: Instant,
+    max_entries: NonZeroUsize,
 }
 
 struct CachedEvent {
@@ -37,11 +41,13 @@ pub(super) struct PendingDedupeRecord {
 }
 
 impl Deduper {
-    pub(super) fn new(retention: Duration) -> Self {
+    pub(super) fn new(retention: Duration, max_entries: NonZeroUsize) -> Self {
         Self {
-            entries: HashMap::new(),
+            // Unbounded so that capacity is not preallocated; `max_entries` is enforced in
+            // `commit`.
+            entries: LruCache::unbounded(),
             retention,
-            last_pruned: Instant::now(),
+            max_entries,
         }
     }
 
@@ -52,19 +58,15 @@ impl Deduper {
         include_previous: bool,
     ) -> DedupResult {
         let now = Instant::now();
-        self.prune_if_due(now);
-        if self
-            .entries
-            .get(uid)
-            .is_some_and(|entry| entry.is_expired(now, self.retention))
-        {
-            self.entries.remove(uid);
-        }
+        self.prune_at(now);
 
-        match self.entries.get_mut(uid) {
+        // `peek_mut` keeps the LRU order untouched; recency is only refreshed together with
+        // `last_seen` so that the LRU end always holds the oldest entry.
+        match self.entries.peek_mut(uid) {
             Some(entry) => {
                 if resource_version == entry.resource_version {
                     entry.last_seen = now;
+                    self.entries.promote(uid);
                     DedupResult::Duplicate
                 } else {
                     let previous = include_previous
@@ -81,13 +83,18 @@ impl Deduper {
     #[cfg(test)]
     fn contains(&mut self, uid: &str) -> bool {
         self.prune();
-        self.entries.contains_key(uid)
+        self.entries.contains(uid)
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.entries.len()
     }
 
     pub(super) fn commit(&mut self, record: PendingDedupeRecord) {
         let now = Instant::now();
-        self.prune_if_due(now);
-        self.entries.insert(
+        self.prune_at(now);
+        self.entries.put(
             record.uid,
             CachedEvent {
                 event: record.event,
@@ -95,6 +102,20 @@ impl Deduper {
                 last_seen: now,
             },
         );
+
+        let mut evicted = 0usize;
+        while self.entries.len() > self.max_entries.get() {
+            self.entries.pop_lru();
+            evicted += 1;
+        }
+        if evicted > 0 {
+            debug!(
+                message = "Kubernetes events deduplication cache is full; evicted least recently seen entries.",
+                evicted,
+                max_entries = self.max_entries.get(),
+                internal_log_rate_limit = true,
+            );
+        }
     }
 
     #[cfg(test)]
@@ -121,28 +142,26 @@ impl Deduper {
         self.prune_at(Instant::now());
     }
 
-    fn prune_if_due(&mut self, now: Instant) {
-        let interval = self.retention.min(MAX_PRUNE_INTERVAL);
-        if now.saturating_duration_since(self.last_pruned) >= interval {
-            self.prune_at(now);
+    /// Removes expired entries. Because entries are ordered by `last_seen`, this only touches
+    /// expired entries plus one live entry.
+    fn prune_at(&mut self, now: Instant) {
+        while self
+            .entries
+            .peek_lru()
+            .is_some_and(|(_, entry)| entry.is_expired(now, self.retention))
+        {
+            self.entries.pop_lru();
         }
     }
 
-    fn prune_at(&mut self, now: Instant) {
-        let retention = self.retention;
-        self.entries
-            .retain(|_, entry| !entry.is_expired(now, retention));
-        self.last_pruned = now;
-    }
-
     pub(super) fn remove(&mut self, uid: &str) {
-        self.entries.remove(uid);
+        self.entries.pop(uid);
     }
 
     /// Retains resource versions for replay suppression while discarding payloads that may no
     /// longer represent the version most recently delivered by another leader.
     pub(super) fn invalidate_previous_events(&mut self) {
-        for entry in self.entries.values_mut() {
+        for (_, entry) in &mut self.entries {
             entry.event = None;
         }
     }
@@ -160,9 +179,15 @@ mod tests {
     use super::*;
     use chrono::{Duration as ChronoDuration, TimeZone, Utc};
 
+    fn ago(duration: Duration) -> Instant {
+        Instant::now()
+            .checked_sub(duration)
+            .expect("test durations fit before the current instant")
+    }
+
     #[test]
     fn deduper_adds_and_updates_events() {
-        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
         let first_ts = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let later_ts = first_ts + ChronoDuration::seconds(10);
 
@@ -212,7 +237,7 @@ mod tests {
 
     #[test]
     fn deduper_treats_resource_versions_as_opaque_values() {
-        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
         let first_ts = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let later_ts = first_ts + ChronoDuration::seconds(10);
         let event_added = make_event("uid", "z", first_ts);
@@ -246,7 +271,7 @@ mod tests {
 
     #[test]
     fn deduper_defers_new_resource_version_until_commit() {
-        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
         let first_ts = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let later_ts = first_ts + ChronoDuration::seconds(10);
         let first_event = make_event("uid", "1", first_ts);
@@ -257,7 +282,7 @@ mod tests {
             DedupResult::Added
         ));
         assert!(
-            !deduper.entries.contains_key("uid"),
+            !deduper.entries.contains("uid"),
             "new events should not be marked seen before delivery"
         );
 
@@ -272,7 +297,7 @@ mod tests {
             DedupResult::Updated { .. }
         ));
         assert_eq!(
-            deduper.entries.get("uid").and_then(|entry| entry
+            deduper.entries.peek("uid").and_then(|entry| entry
                 .event
                 .as_ref()
                 .and_then(|event| event.metadata.resource_version.as_deref())),
@@ -286,7 +311,7 @@ mod tests {
             event: Some(updated_event),
         });
         assert_eq!(
-            deduper.entries.get("uid").and_then(|entry| entry
+            deduper.entries.peek("uid").and_then(|entry| entry
                 .event
                 .as_ref()
                 .and_then(|event| event.metadata.resource_version.as_deref())),
@@ -297,7 +322,7 @@ mod tests {
     #[test]
     fn deduper_prunes_expired_entries() {
         let retention = Duration::from_millis(5);
-        let mut deduper = Deduper::new(retention);
+        let mut deduper = Deduper::new(retention, NonZeroUsize::MAX);
         let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let event = make_event("uid", "1", timestamp);
 
@@ -307,13 +332,13 @@ mod tests {
         ));
 
         // Age the cached entry beyond the retention window.
-        if let Some(entry) = deduper.entries.get_mut("uid") {
-            entry.last_seen = Instant::now() - retention - Duration::from_millis(1);
+        if let Some(entry) = deduper.entries.peek_mut("uid") {
+            entry.last_seen = ago(retention + Duration::from_millis(1));
         }
 
         deduper.prune();
         assert!(
-            !deduper.entries.contains_key("uid"),
+            !deduper.entries.contains("uid"),
             "entry should be pruned after retention elapses"
         );
     }
@@ -321,7 +346,7 @@ mod tests {
     #[test]
     fn deduper_contains_prunes_expired_entries() {
         let retention = Duration::from_millis(5);
-        let mut deduper = Deduper::new(retention);
+        let mut deduper = Deduper::new(retention, NonZeroUsize::MAX);
         let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let event = make_event("uid", "1", timestamp);
 
@@ -331,21 +356,21 @@ mod tests {
             event: Some(event),
         });
 
-        if let Some(entry) = deduper.entries.get_mut("uid") {
-            entry.last_seen = Instant::now() - retention - Duration::from_millis(1);
+        if let Some(entry) = deduper.entries.peek_mut("uid") {
+            entry.last_seen = ago(retention + Duration::from_millis(1));
         }
 
         assert!(
             !deduper.contains("uid"),
             "contains should ignore entries past the retention window"
         );
-        assert!(!deduper.entries.contains_key("uid"));
+        assert!(!deduper.entries.contains("uid"));
     }
 
     #[test]
     fn deduper_refreshes_ttl_for_replayed_resource_version() {
         let retention = Duration::from_secs(60);
-        let mut deduper = Deduper::new(retention);
+        let mut deduper = Deduper::new(retention, NonZeroUsize::MAX);
         let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let event = make_event("uid", "1", timestamp);
 
@@ -354,8 +379,8 @@ mod tests {
             DedupResult::Added
         ));
 
-        if let Some(entry) = deduper.entries.get_mut("uid") {
-            entry.last_seen = Instant::now() - retention + Duration::from_secs(1);
+        if let Some(entry) = deduper.entries.peek_mut("uid") {
+            entry.last_seen = ago(retention.saturating_sub(Duration::from_secs(1)));
         }
 
         assert!(matches!(
@@ -365,7 +390,7 @@ mod tests {
 
         deduper.prune();
         assert!(
-            deduper.entries.contains_key("uid"),
+            deduper.entries.contains("uid"),
             "same resourceVersion replay should refresh the dedupe retention"
         );
     }
@@ -373,7 +398,7 @@ mod tests {
     #[test]
     fn deduper_lazily_expires_accessed_uid() {
         let retention = Duration::from_secs(60);
-        let mut deduper = Deduper::new(retention);
+        let mut deduper = Deduper::new(retention, NonZeroUsize::MAX);
         let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let event = make_event("uid", "1", timestamp);
 
@@ -382,44 +407,91 @@ mod tests {
             resource_version: "1".to_string(),
             event: Some(event),
         });
-        if let Some(entry) = deduper.entries.get_mut("uid") {
-            entry.last_seen = Instant::now() - retention - Duration::from_secs(1);
+        if let Some(entry) = deduper.entries.peek_mut("uid") {
+            entry.last_seen = ago(retention + Duration::from_secs(1));
         }
-        deduper.last_pruned = Instant::now();
 
         assert!(matches!(
             deduper.evaluate("uid", "1", false),
             DedupResult::Added
         ));
-        assert!(
-            !deduper.entries.contains_key("uid"),
-            "an expired accessed UID should be removed without a full-map prune"
-        );
+        assert!(!deduper.entries.contains("uid"));
     }
 
     #[test]
-    fn deduper_throttles_full_map_pruning() {
-        let mut deduper = Deduper::new(Duration::from_secs(3600));
-        let last_pruned = deduper.last_pruned;
+    fn deduper_evicts_least_recently_seen_entries_when_full() {
+        let mut deduper = Deduper::new(Duration::from_secs(3600), NonZeroUsize::new(2).unwrap());
+        let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
 
-        deduper.prune_if_due(last_pruned + MAX_PRUNE_INTERVAL - Duration::from_millis(1));
-        assert_eq!(deduper.last_pruned, last_pruned);
+        for uid in ["a", "b"] {
+            deduper.record(
+                uid.to_string(),
+                "1".to_string(),
+                &make_event(uid, "1", timestamp),
+                timestamp,
+                false,
+            );
+        }
+        // Seeing `a` again makes `b` the least recently seen entry.
+        assert!(matches!(
+            deduper.evaluate("a", "1", false),
+            DedupResult::Duplicate
+        ));
 
-        let next_prune = last_pruned + MAX_PRUNE_INTERVAL;
-        deduper.prune_if_due(next_prune);
-        assert_eq!(deduper.last_pruned, next_prune);
+        deduper.record(
+            "c".to_string(),
+            "1".to_string(),
+            &make_event("c", "1", timestamp),
+            timestamp,
+            false,
+        );
+
+        assert_eq!(deduper.len(), 2);
+        assert!(deduper.contains("a"));
+        assert!(
+            !deduper.contains("b"),
+            "least recently seen entry should be evicted"
+        );
+        assert!(deduper.contains("c"));
+    }
+
+    #[test]
+    fn deduper_prunes_expired_entries_behind_updated_entries() {
+        let retention = Duration::from_secs(60);
+        let mut deduper = Deduper::new(retention, NonZeroUsize::MAX);
+        let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+
+        for uid in ["old", "live"] {
+            deduper.commit(PendingDedupeRecord {
+                uid: uid.to_string(),
+                resource_version: "1".to_string(),
+                event: Some(make_event(uid, "1", timestamp)),
+            });
+        }
+        // Evaluating an update must not move `old` ahead of `live` without refreshing it.
+        assert!(matches!(
+            deduper.evaluate("old", "2", false),
+            DedupResult::Updated { .. }
+        ));
+        if let Some(entry) = deduper.entries.peek_mut("old") {
+            entry.last_seen = ago(retention + Duration::from_secs(1));
+        }
+
+        deduper.prune();
+        assert!(!deduper.entries.contains("old"));
+        assert!(deduper.entries.contains("live"));
     }
 
     #[test]
     fn invalidating_previous_events_preserves_resource_version_dedupe() {
-        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
         let timestamp = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let first = make_event("uid", "1", timestamp);
 
         deduper.commit(PendingDedupeRecord {
             uid: "uid".to_string(),
             resource_version: "1".to_string(),
-            event: Some(first.clone()),
+            event: Some(first),
         });
         deduper.invalidate_previous_events();
 

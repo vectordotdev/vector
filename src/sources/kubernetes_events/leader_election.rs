@@ -54,16 +54,30 @@ impl ResourceVersionCheckpoints {
         }
     }
 
-    fn resume(persisted: Option<Self>, configuration_hash: &str) -> Self {
-        match persisted {
-            Some(checkpoints)
-                if checkpoints.version == CHECKPOINTS_VERSION
-                    && checkpoints.configuration_hash == configuration_hash =>
+    /// Resumes from the checkpoints loaded from the Lease, or starts fresh if they are missing,
+    /// unreadable, or were written for a different configuration.
+    fn resume(load: CheckpointLoad, configuration_hash: &str) -> (Self, CheckpointResume) {
+        let status = match &load {
+            CheckpointLoad::Missing => CheckpointResume::Missing,
+            CheckpointLoad::InvalidJson => CheckpointResume::Invalid,
+            CheckpointLoad::Loaded(checkpoints) if checkpoints.version != CHECKPOINTS_VERSION => {
+                CheckpointResume::VersionMismatch
+            }
+            CheckpointLoad::Loaded(checkpoints)
+                if checkpoints.configuration_hash != configuration_hash =>
             {
+                CheckpointResume::ConfigurationChanged
+            }
+            CheckpointLoad::Loaded(_) => CheckpointResume::Resumed,
+        };
+
+        let checkpoints = match load {
+            CheckpointLoad::Loaded(checkpoints) if status == CheckpointResume::Resumed => {
                 checkpoints
             }
             _ => Self::new(configuration_hash.to_string()),
-        }
+        };
+        (checkpoints, status)
     }
 
     pub(super) fn get(&self, stream: &str) -> Option<&str> {
@@ -78,6 +92,41 @@ impl ResourceVersionCheckpoints {
 
     pub(super) fn len(&self) -> usize {
         self.streams.len()
+    }
+}
+
+/// Result of reading the checkpoint annotation from a Lease.
+#[derive(Debug, PartialEq, Eq)]
+enum CheckpointLoad {
+    Missing,
+    InvalidJson,
+    Loaded(ResourceVersionCheckpoints),
+}
+
+/// How a new leader treated the checkpoints found on the Lease.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum CheckpointResume {
+    /// Checkpoints were found and are used to resume the watches.
+    Resumed,
+    /// The Lease had no checkpoints (for example, it was just created).
+    Missing,
+    /// The checkpoint annotation could not be parsed.
+    Invalid,
+    /// The checkpoints were written in an incompatible checkpoint format version.
+    VersionMismatch,
+    /// The checkpoints were written for a different source configuration.
+    ConfigurationChanged,
+}
+
+impl CheckpointResume {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Resumed => "resumed",
+            Self::Missing => "missing",
+            Self::Invalid => "invalid",
+            Self::VersionMismatch => "version_mismatch",
+            Self::ConfigurationChanged => "configuration_changed",
+        }
     }
 }
 
@@ -166,11 +215,13 @@ impl LeaseCoordinator {
         loop {
             match self.try_acquire_or_renew(None).await {
                 Ok(LeaseUpdate::Held { prior_checkpoints }) => {
+                    let (checkpoints, checkpoint_resume) = ResourceVersionCheckpoints::resume(
+                        prior_checkpoints,
+                        checkpoint_configuration_hash,
+                    );
                     return Some(AcquiredLeadership {
-                        checkpoints: ResourceVersionCheckpoints::resume(
-                            prior_checkpoints,
-                            checkpoint_configuration_hash,
-                        ),
+                        checkpoints,
+                        checkpoint_resume,
                     });
                 }
                 Ok(LeaseUpdate::HeldByOther) => {}
@@ -179,7 +230,7 @@ impl LeaseCoordinator {
 
             select! {
                 _ = &mut *shutdown => return None,
-                _ = sleep(self.settings.retry_period) => {}
+                () = sleep(self.settings.retry_period) => {}
             }
         }
     }
@@ -194,7 +245,7 @@ impl LeaseCoordinator {
             Err(KubeError::Api(status)) if status.is_not_found() => {
                 match self.create_lease(now, checkpoints).await {
                     Ok(_) => Ok(LeaseUpdate::Held {
-                        prior_checkpoints: None,
+                        prior_checkpoints: CheckpointLoad::Missing,
                     }),
                     Err(KubeError::Api(status))
                         if status.is_already_exists() || status.is_conflict() =>
@@ -293,15 +344,14 @@ impl LeaseCoordinator {
 
 #[derive(Debug, PartialEq, Eq)]
 enum LeaseUpdate {
-    Held {
-        prior_checkpoints: Option<ResourceVersionCheckpoints>,
-    },
+    Held { prior_checkpoints: CheckpointLoad },
     HeldByOther,
 }
 
 /// The state observed on the Lease at the moment leadership was acquired.
 pub(super) struct AcquiredLeadership {
     pub(super) checkpoints: ResourceVersionCheckpoints,
+    pub(super) checkpoint_resume: CheckpointResume,
 }
 
 pub(super) enum LeadershipEnd {
@@ -415,13 +465,17 @@ fn prepare_lease_update(
     Some(lease)
 }
 
-fn lease_checkpoints(lease: &Lease) -> Option<ResourceVersionCheckpoints> {
-    lease
+fn lease_checkpoints(lease: &Lease) -> CheckpointLoad {
+    let Some(raw) = lease
         .metadata
         .annotations
-        .as_ref()?
-        .get(CHECKPOINTS_ANNOTATION)
-        .and_then(|raw| serde_json::from_str(raw).ok())
+        .as_ref()
+        .and_then(|annotations| annotations.get(CHECKPOINTS_ANNOTATION))
+    else {
+        return CheckpointLoad::Missing;
+    };
+
+    serde_json::from_str(raw).map_or(CheckpointLoad::InvalidJson, CheckpointLoad::Loaded)
 }
 
 fn serialize_checkpoints(checkpoints: &ResourceVersionCheckpoints) -> String {
@@ -480,8 +534,7 @@ fn locally_observed_lease_is_expired(
         .lease_duration_seconds
         .and_then(|duration| u64::try_from(duration).ok())
         .filter(|duration| *duration > 0)
-        .map(Duration::from_secs)
-        .unwrap_or(fallback_duration);
+        .map_or(fallback_duration, Duration::from_secs);
 
     observed.as_ref().is_some_and(|observed| {
         now.saturating_duration_since(observed.observed_at) >= lease_duration
@@ -749,7 +802,10 @@ mod tests {
         assert!(!locally_observed_lease_is_expired(
             &mut observed,
             &spec,
-            first_observation + lease_duration - Duration::from_millis(1),
+            first_observation
+                + lease_duration
+                    .checked_sub(Duration::from_millis(1))
+                    .unwrap(),
             lease_duration,
         ));
         assert!(locally_observed_lease_is_expired(
@@ -833,14 +889,14 @@ mod tests {
         let mut lease = make_lease(Some("vector-0"), Some(now), Some(1));
         annotate_checkpoints(&mut lease, &expected);
 
-        assert_eq!(lease_checkpoints(&lease), Some(expected));
+        assert_eq!(lease_checkpoints(&lease), CheckpointLoad::Loaded(expected));
     }
 
     #[test]
     fn lease_checkpoints_ignore_missing_or_invalid_annotation() {
         let now = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
         let lease = make_lease(Some("vector-0"), Some(now), Some(1));
-        assert_eq!(lease_checkpoints(&lease), None);
+        assert_eq!(lease_checkpoints(&lease), CheckpointLoad::Missing);
 
         let mut lease = make_lease(Some("vector-0"), Some(now), Some(1));
         lease
@@ -848,26 +904,42 @@ mod tests {
             .annotations
             .get_or_insert_with(Default::default)
             .insert(CHECKPOINTS_ANNOTATION.to_string(), "not-json".into());
-        assert_eq!(lease_checkpoints(&lease), None);
+        assert_eq!(lease_checkpoints(&lease), CheckpointLoad::InvalidJson);
     }
 
     #[test]
     fn checkpoint_resume_requires_matching_configuration_and_version() {
         let persisted = checkpoints("config-a", &[("all", "123")]);
         assert_eq!(
-            ResourceVersionCheckpoints::resume(Some(persisted.clone()), "config-a"),
-            persisted
+            ResourceVersionCheckpoints::resume(
+                CheckpointLoad::Loaded(persisted.clone()),
+                "config-a"
+            ),
+            (persisted.clone(), CheckpointResume::Resumed)
         );
 
-        let reset = ResourceVersionCheckpoints::resume(Some(persisted.clone()), "config-b");
+        let (reset, status) = ResourceVersionCheckpoints::resume(
+            CheckpointLoad::Loaded(persisted.clone()),
+            "config-b",
+        );
         assert_eq!(reset.get("all"), None);
+        assert_eq!(status, CheckpointResume::ConfigurationChanged);
 
         let mut future = persisted;
         future.version = CHECKPOINTS_VERSION + 1;
-        assert_eq!(
-            ResourceVersionCheckpoints::resume(Some(future), "config-a").get("all"),
-            None
-        );
+        let (reset, status) =
+            ResourceVersionCheckpoints::resume(CheckpointLoad::Loaded(future), "config-a");
+        assert_eq!(reset.get("all"), None);
+        assert_eq!(status, CheckpointResume::VersionMismatch);
+
+        for (load, expected) in [
+            (CheckpointLoad::Missing, CheckpointResume::Missing),
+            (CheckpointLoad::InvalidJson, CheckpointResume::Invalid),
+        ] {
+            let (fresh, status) = ResourceVersionCheckpoints::resume(load, "config-a");
+            assert_eq!(fresh.len(), 0);
+            assert_eq!(status, expected);
+        }
     }
 
     #[test]
@@ -886,7 +958,7 @@ mod tests {
 
         assert_eq!(
             lease_checkpoints(&prepared),
-            Some(expected),
+            CheckpointLoad::Loaded(expected),
             "acquiring a lease must not discard the previous holder's checkpoints"
         );
     }
@@ -912,7 +984,10 @@ mod tests {
         )
         .expect("self-held lease should renew");
 
-        assert_eq!(lease_checkpoints(&prepared), Some(updated));
+        assert_eq!(
+            lease_checkpoints(&prepared),
+            CheckpointLoad::Loaded(updated)
+        );
     }
 
     #[test]

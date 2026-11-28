@@ -1,0 +1,8 @@
+sources:
+  my_source_id:
+    type: kubernetes_events
+    kube_config_file: /path/to/kubeconfig
+    max_event_age_seconds: 3600
+    namespaces:
+      - kube-system
+    watch_timeout_seconds: 290

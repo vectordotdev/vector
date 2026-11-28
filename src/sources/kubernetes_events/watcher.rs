@@ -95,6 +95,7 @@ impl std::error::Error for Error {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub(super) fn resumable_watcher(
     api: Api<KubeEvent>,
     config: watcher::Config,

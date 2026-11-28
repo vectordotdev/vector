@@ -183,7 +183,8 @@ fn kubernetes_events_leader_election_values(
             kubernetes_events:
               type: kubernetes_events
               namespaces: ["{namespace}"]
-              include_reasons: ["{KUBERNETES_EVENTS_LEADER_ELECTION_REASON}"]
+              include:
+                reasons: ["{KUBERNETES_EVENTS_LEADER_ELECTION_REASON}"]
               leader_election:
                 enabled: true
                 lease_name: "{lease_name}"

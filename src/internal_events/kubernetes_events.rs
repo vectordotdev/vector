@@ -81,6 +81,8 @@ pub(crate) struct KubernetesEventsLeaderAcquired {
     pub(crate) lease_name: String,
     /// Number of watch streams with a resource-version checkpoint on the Lease.
     pub(crate) checkpoint_streams: usize,
+    /// How the checkpoints found on the Lease were used (for example, `resumed` or `missing`).
+    pub(crate) checkpoint_status: &'static str,
 }
 
 impl InternalEvent for KubernetesEventsLeaderAcquired {
@@ -91,6 +93,7 @@ impl InternalEvent for KubernetesEventsLeaderAcquired {
             lease_namespace = %self.lease_namespace,
             lease_name = %self.lease_name,
             checkpoint_streams = self.checkpoint_streams,
+            checkpoint_status = self.checkpoint_status,
         );
     }
 }

@@ -1,63 +1,88 @@
 package metadata
 
 generated: components: sources: kubernetes_events: configuration: {
-	dedupe_retention_seconds: {
-		description: """
-			Retention window for deduplication state.
+	deduplication: {
+		description: "Deduplication settings."
+		required:    false
+		type: object: options: {
+			include_previous_event: {
+				description: """
+					When enabled, the previous version of the event is included in the emitted payload on updates.
 
-			Must be greater than zero. This should be at least as large as `max_event_age_seconds`;
-			otherwise a watch restart can re-emit events that are older than the retention window but
-			still within the maximum age.
+					This keeps a full copy of each tracked event in the deduplication cache, which increases
+					memory usage.
+					"""
+				required: false
+				type: bool: default: false
+			}
+			max_entries: {
+				description: """
+					Maximum number of events tracked in the deduplication cache.
+
+					When the cache is full, the least recently seen event is evicted. An evicted event can be
+					emitted again if the watch restarts and lists it, and an update to it is emitted without
+					`old_event`.
+					"""
+				required: false
+				type: uint: {
+					default: 100000
+					unit:    "events"
+				}
+			}
+			retention_seconds: {
+				description: """
+					Retention window for deduplication state.
+
+					Must be greater than zero. This should be at least as large as `max_event_age_seconds`;
+					otherwise a watch restart can re-emit events that are older than the retention window but
+					still within the maximum age.
+					"""
+				required: false
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
+			}
+		}
+	}
+	include: {
+		description: """
+			Client-side filters applied to received events.
+
+			An event is forwarded only if it matches every non-empty list.
 			"""
 		required: false
-		type: uint: {
-			default: 3600
-			unit:    "seconds"
-		}
-	}
-	field_selector: {
-		description: "Field selector applied to the events list/watch request."
-		required:    false
-		type: string: examples: ["regarding.kind=Pod"]
-	}
-	include_involved_object_kinds: {
-		description: "Restricts the source to the specified involved object kinds. Empty means all kinds."
-		required:    false
-		type: array: {
-			default: []
-			items: type: string: examples: ["Pod"]
-		}
-	}
-	include_previous_event: {
-		description: "When enabled, the previous version of the event is included in the emitted payload on updates."
-		required:    false
-		type: bool: default: false
-	}
-	include_reasons: {
-		description: "Restricts the source to the specified reasons. Empty means all reasons."
-		required:    false
-		type: array: {
-			default: []
-			items: type: string: examples: ["FailedScheduling"]
-		}
-	}
-	include_types: {
-		description: "Restricts the source to the specified event types (for example, `Warning`). Empty means all types."
-		required:    false
-		type: array: {
-			default: []
-			items: type: string: examples: ["Warning"]
+		type: object: options: {
+			involved_object_kinds: {
+				description: "Restricts the source to the specified involved object kinds. Empty means all kinds."
+				required:    false
+				type: array: {
+					default: []
+					items: type: string: examples: ["Pod"]
+				}
+			}
+			reasons: {
+				description: "Restricts the source to the specified reasons. Empty means all reasons."
+				required:    false
+				type: array: {
+					default: []
+					items: type: string: examples: ["FailedScheduling"]
+				}
+			}
+			types: {
+				description: "Restricts the source to the specified event types (for example, `Warning`). Empty means all types."
+				required:    false
+				type: array: {
+					default: []
+					items: type: string: examples: ["Warning"]
+				}
+			}
 		}
 	}
 	kube_config_file: {
 		description: "Path to a kubeconfig file. If omitted, in-cluster configuration or the local kubeconfig is used."
 		required:    false
 		type: string: examples: ["/path/to/kubeconfig"]
-	}
-	label_selector: {
-		description: "Label selector applied to the events list/watch request."
-		required:    false
-		type: string: examples: ["type=Warning"]
 	}
 	leader_election: {
 		description: """
@@ -163,6 +188,33 @@ generated: components: sources: kubernetes_events: configuration: {
 		type: array: {
 			default: []
 			items: type: string: examples: ["kube-system"]
+		}
+	}
+	selectors: {
+		description: "Kubernetes selectors applied to the events list and watch requests."
+		required:    false
+		type: object: options: {
+			field: {
+				description: """
+					[Field selector][field_selector] applied to the events list and watch requests.
+
+					[field_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/
+					"""
+				required: false
+				type: string: examples: ["regarding.kind=Pod"]
+			}
+			label: {
+				description: """
+					[Label selector][label_selector] applied to the events list and watch requests.
+
+					This matches the labels of the Event objects themselves, not the labels of the objects they
+					refer to. Most Kubernetes components emit Events without labels.
+
+					[label_selector]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+					"""
+				required: false
+				type: string: examples: ["app.kubernetes.io/managed-by=helm"]
+			}
 		}
 	}
 	watch_timeout_seconds: {

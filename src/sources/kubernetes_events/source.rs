@@ -2,6 +2,7 @@
 
 use std::{
     collections::HashSet,
+    num::NonZeroUsize,
     pin::Pin,
     time::{Duration, Instant},
 };
@@ -78,12 +79,12 @@ fn checkpoint_configuration_hash(config: &KubernetesEventsConfig) -> String {
     let configuration = CheckpointConfiguration {
         api_resource: "events.k8s.io/v1/events",
         namespaces: canonicalize_set(config.namespaces.clone()),
-        field_selector: config.field_selector.clone(),
-        label_selector: config.label_selector.clone(),
-        include_types: canonicalize_set(config.include_types.clone()),
-        include_reasons: canonicalize_set(config.include_reasons.clone()),
+        field_selector: config.selectors.field.clone(),
+        label_selector: config.selectors.label.clone(),
+        include_types: canonicalize_set(config.include.types.clone()),
+        include_reasons: canonicalize_set(config.include.reasons.clone()),
         include_involved_object_kinds: canonicalize_set(
-            config.include_involved_object_kinds.clone(),
+            config.include.involved_object_kinds.clone(),
         ),
         max_event_age_seconds: config.max_event_age_seconds,
     };
@@ -93,8 +94,12 @@ fn checkpoint_configuration_hash(config: &KubernetesEventsConfig) -> String {
     format!("{:x}", Sha256::digest(serialized))
 }
 
-fn checkpoint_stream(namespace: &Option<String>) -> String {
-    namespace.as_ref().map_or_else(
+fn to_filter(values: &[String]) -> Option<HashSet<String>> {
+    (!values.is_empty()).then(|| values.iter().cloned().collect())
+}
+
+fn checkpoint_stream(namespace: Option<&str>) -> String {
+    namespace.map_or_else(
         || "all-namespaces".to_string(),
         |namespace| format!("namespace/{namespace}"),
     )
@@ -108,6 +113,7 @@ pub(super) struct KubernetesEventsSource {
     kind_filter: Option<HashSet<String>>,
     max_event_age: Duration,
     dedupe_retention: Duration,
+    dedupe_max_entries: NonZeroUsize,
     watcher_config: watcher::Config,
     include_previous_event: bool,
     leader_election: Option<LeaderElectionSettings>,
@@ -143,7 +149,7 @@ impl SourceConfig for KubernetesEventsConfig {
 
         let client = Client::try_from(client_config)?;
 
-        let source = KubernetesEventsSource::new(client, self.clone())?;
+        let source = KubernetesEventsSource::new(client, self)?;
 
         Ok(crate::sources::opaque_source(source.run(
             cx.out,
@@ -166,9 +172,9 @@ impl SourceConfig for KubernetesEventsConfig {
 }
 
 impl KubernetesEventsSource {
-    fn new(client: Client, config: KubernetesEventsConfig) -> crate::Result<Self> {
-        if config.dedupe_retention_seconds == 0 {
-            return Err("dedupe_retention_seconds must be greater than 0".into());
+    fn new(client: Client, config: &KubernetesEventsConfig) -> crate::Result<Self> {
+        if config.deduplication.retention_seconds == 0 {
+            return Err("deduplication.retention_seconds must be greater than 0".into());
         }
         if !(1..=config::MAX_WATCH_TIMEOUT_SECS).contains(&config.watch_timeout_seconds) {
             return Err(format!(
@@ -178,30 +184,17 @@ impl KubernetesEventsSource {
             .into());
         }
 
-        let checkpoint_configuration_hash = checkpoint_configuration_hash(&config);
+        let checkpoint_configuration_hash = checkpoint_configuration_hash(config);
         let namespaces = canonicalize_set(config.namespaces.clone());
-        let type_filter = (!config.include_types.is_empty())
-            .then(|| config.include_types.iter().map(|s| s.to_owned()).collect());
-        let reason_filter = (!config.include_reasons.is_empty()).then(|| {
-            config
-                .include_reasons
-                .iter()
-                .map(|s| s.to_owned())
-                .collect()
-        });
-        let kind_filter = (!config.include_involved_object_kinds.is_empty()).then(|| {
-            config
-                .include_involved_object_kinds
-                .iter()
-                .map(|s| s.to_owned())
-                .collect()
-        });
+        let type_filter = to_filter(&config.include.types);
+        let reason_filter = to_filter(&config.include.reasons);
+        let kind_filter = to_filter(&config.include.involved_object_kinds);
 
         let mut watcher_config = watcher::Config::default().timeout(config.watch_timeout_seconds);
-        if let Some(selector) = &config.field_selector {
+        if let Some(selector) = &config.selectors.field {
             watcher_config = watcher_config.fields(selector);
         }
-        if let Some(selector) = &config.label_selector {
+        if let Some(selector) = &config.selectors.label {
             watcher_config = watcher_config.labels(selector);
         }
 
@@ -212,9 +205,10 @@ impl KubernetesEventsSource {
             reason_filter,
             kind_filter,
             max_event_age: Duration::from_secs(config.max_event_age_seconds),
-            dedupe_retention: Duration::from_secs(config.dedupe_retention_seconds),
+            dedupe_retention: Duration::from_secs(config.deduplication.retention_seconds),
+            dedupe_max_entries: config.deduplication.max_entries,
             watcher_config,
-            include_previous_event: config.include_previous_event,
+            include_previous_event: config.deduplication.include_previous_event,
             leader_election: LeaderElectionSettings::from_config(&config.leader_election)?,
             checkpoint_configuration_hash,
         })
@@ -246,7 +240,7 @@ impl KubernetesEventsSource {
         checkpoints: Option<&ResourceVersionCheckpoints>,
     ) -> WatchStream {
         let cfg = self.watcher_config.clone();
-        let stream = checkpoint_stream(&namespace);
+        let stream = checkpoint_stream(namespace.as_deref());
         let initial_resource_version = checkpoints
             .and_then(|checkpoints| checkpoints.get(&stream))
             .map(ToString::to_string);
@@ -263,7 +257,7 @@ impl KubernetesEventsSource {
         mut shutdown: ShutdownSignal,
         log_namespace: LogNamespace,
     ) -> Result<(), ()> {
-        let mut deduper = Deduper::new(self.dedupe_retention);
+        let mut deduper = Deduper::new(self.dedupe_retention, self.dedupe_max_entries);
 
         if let Some(settings) = self.leader_election.clone() {
             return self
@@ -302,7 +296,7 @@ impl KubernetesEventsSource {
                                     event,
                                     log_namespace,
                                     deduper,
-                                )?
+                                )
                             {
                                 let dedupe_record = processed.dedupe_record;
                                 if send_event(out, processed.event).await.is_err() {
@@ -346,6 +340,7 @@ impl KubernetesEventsSource {
                 lease_namespace: coordinator.settings.lease_namespace.clone(),
                 lease_name: coordinator.settings.lease_name.clone(),
                 checkpoint_streams: acquired.checkpoints.len(),
+                checkpoint_status: acquired.checkpoint_resume.as_str(),
             });
 
             match self
@@ -408,7 +403,7 @@ impl KubernetesEventsSource {
                                     event,
                                     log_namespace,
                                     deduper,
-                                )?
+                                )
                             {
                                 let dedupe_record = processed.dedupe_record;
                                 if let Some(end) = send_event_with_leadership(
@@ -446,7 +441,7 @@ impl KubernetesEventsSource {
         event: checkpoint_watcher::Event,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
-    ) -> Result<Option<ProcessedEvent>, ()> {
+    ) -> Option<ProcessedEvent> {
         match event {
             checkpoint_watcher::Event::Apply { event, kind } => {
                 self.process_apply_event(namespace, event, log_namespace, deduper, Some(kind))
@@ -458,143 +453,101 @@ impl KubernetesEventsSource {
                 if let Some(uid) = event.metadata.uid.as_deref() {
                     deduper.remove(uid);
                 }
-                Ok(None)
+                None
             }
-            checkpoint_watcher::Event::Init => Ok(None),
             checkpoint_watcher::Event::InitDone { .. } => {
                 deduper.prune();
-                Ok(None)
+                None
             }
-            checkpoint_watcher::Event::Bookmark { .. } => Ok(None),
+            checkpoint_watcher::Event::Init | checkpoint_watcher::Event::Bookmark { .. } => None,
         }
     }
 
     fn process_apply_event(
-        &mut self,
+        &self,
         namespace: Option<&str>,
         event: KubeEvent,
         log_namespace: LogNamespace,
         deduper: &mut Deduper,
         apply_kind: Option<ApplyKind>,
-    ) -> Result<Option<ProcessedEvent>, ()> {
-        let Some(identity) = event_identity(&event) else {
-            return Ok(None);
-        };
-        let uid = identity.uid;
-        let resource_version = identity.resource_version;
+    ) -> Option<ProcessedEvent> {
+        let EventIdentity {
+            uid,
+            resource_version,
+        } = event_identity(&event)?;
 
         if !self.type_allowed(&event) || !self.reason_allowed(&event) || !self.kind_allowed(&event)
         {
-            if self.include_previous_event {
-                deduper.commit(PendingDedupeRecord {
-                    uid,
-                    resource_version,
-                    event: Some(event),
-                });
-            }
-            emit(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "filtered",
-            });
-            return Ok(None);
+            self.drop_event(deduper, uid, resource_version, event, "filtered");
+            return None;
         }
 
-        let observed_timestamp = observed_event_timestamp(&event);
-        let timestamp = observed_timestamp.unwrap_or_else(Utc::now);
+        let timestamp = observed_event_timestamp(&event).unwrap_or_else(Utc::now);
         if self.is_older_than(timestamp) {
-            if self.include_previous_event {
-                deduper.commit(PendingDedupeRecord {
-                    uid,
-                    resource_version,
-                    event: Some(event),
-                });
-            }
-            emit(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "expired",
-            });
-            return Ok(None);
+            self.drop_event(deduper, uid, resource_version, event, "expired");
+            return None;
         }
 
-        let dedupe_record = PendingDedupeRecord {
-            uid: uid.clone(),
-            resource_version: resource_version.clone(),
-            event: self.include_previous_event.then(|| event.clone()),
-        };
+        let (verb, previous) =
+            match deduper.evaluate(&uid, &resource_version, self.include_previous_event) {
+                DedupResult::Duplicate => {
+                    emit(ComponentEventsDropped::<INTENTIONAL> {
+                        count: 1,
+                        reason: "duplicate",
+                    });
+                    return None;
+                }
+                DedupResult::Added if apply_kind == Some(ApplyKind::Modified) => ("UPDATED", None),
+                DedupResult::Added => ("ADDED", None),
+                DedupResult::Updated { previous } => ("UPDATED", previous),
+            };
 
-        let dedup_result = deduper.evaluate(&uid, &resource_version, self.include_previous_event);
-
-        let (verb, previous) = match dedup_result {
-            DedupResult::Duplicate => {
-                emit(ComponentEventsDropped::<INTENTIONAL> {
-                    count: 1,
-                    reason: "duplicate",
-                });
-                return Ok(None);
-            }
-            DedupResult::Added => (
-                if apply_kind == Some(ApplyKind::Modified) {
-                    "UPDATED"
-                } else {
-                    "ADDED"
-                },
-                None,
-            ),
-            DedupResult::Updated { previous } => ("UPDATED", previous),
-        };
-
-        let mut log = LogEvent::default();
-        if let Some(message_path) = log_schema().message_key_target_path()
-            && let Some(note) = &event.note
-        {
-            log.try_insert(message_path, note.clone());
-        }
-        if let Some(timestamp_path) = log_schema().timestamp_key_target_path() {
-            log.try_insert(timestamp_path, timestamp);
-        }
-
-        let event_namespace = namespace.or(event.metadata.namespace.as_deref());
-        insert_kubernetes_events_metadata(
-            log_namespace,
-            &mut log,
-            KubernetesEventMetadata {
+        let log = build_log(
+            &event,
+            &KubernetesEventMetadata {
                 verb,
                 uid: &uid,
-                namespace: event_namespace,
+                namespace: namespace.or(event.metadata.namespace.as_deref()),
                 reason: event.reason.as_deref(),
                 type_: event.type_.as_deref(),
                 received_at: Utc::now(),
             },
-        );
-        if let Some(controller) = &event.reporting_controller {
-            log.insert(event_path!("reporting_controller"), controller.clone());
-        }
-        if let Some(instance) = &event.reporting_instance {
-            log.insert(event_path!("reporting_instance"), instance.clone());
-        }
-
-        match serde_json::to_value(&event).map(|value| log.insert(event_path!("event"), value)) {
-            Ok(_) => {}
-            Err(error) => {
-                emit(KubernetesEventsSerializationError { error });
-                return Ok(None);
-            }
-        }
-
-        if let (true, Some(prev)) = (self.include_previous_event, previous)
-            && let Err(error) =
-                serde_json::to_value(&prev).map(|value| log.insert(event_path!("old_event"), value))
-        {
-            emit(KubernetesEventsSerializationError { error });
-        }
+            timestamp,
+            previous.filter(|_| self.include_previous_event).as_deref(),
+            log_namespace,
+        )?;
 
         let byte_size = log.estimated_json_encoded_size_of();
         emit(KubernetesEventsReceived { byte_size });
 
-        Ok(Some(ProcessedEvent {
+        Some(ProcessedEvent {
             event: Event::from(log),
-            dedupe_record,
-        }))
+            dedupe_record: PendingDedupeRecord {
+                uid,
+                resource_version,
+                event: self.include_previous_event.then_some(event),
+            },
+        })
+    }
+
+    /// Drops an event that is not forwarded. When previous-event output is enabled, the version
+    /// is still cached so that a later update reports the most recently observed version.
+    fn drop_event(
+        &self,
+        deduper: &mut Deduper,
+        uid: String,
+        resource_version: String,
+        event: KubeEvent,
+        reason: &'static str,
+    ) {
+        if self.include_previous_event {
+            deduper.commit(PendingDedupeRecord {
+                uid,
+                resource_version,
+                event: Some(event),
+            });
+        }
+        emit(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
     }
 
     fn type_allowed(&self, event: &KubeEvent) -> bool {
@@ -646,7 +599,7 @@ struct KubernetesEventMetadata<'a> {
 fn insert_kubernetes_events_metadata(
     log_namespace: LogNamespace,
     log: &mut LogEvent,
-    metadata: KubernetesEventMetadata<'_>,
+    metadata: &KubernetesEventMetadata<'_>,
 ) {
     log_namespace.insert_source_metadata(
         KubernetesEventsConfig::NAME,
@@ -694,6 +647,55 @@ fn insert_kubernetes_events_metadata(
         KubernetesEventsConfig::NAME,
         metadata.received_at,
     );
+}
+
+/// Builds the Vector log for a Kubernetes event. Returns `None` if the event cannot be
+/// serialized.
+fn build_log(
+    event: &KubeEvent,
+    metadata: &KubernetesEventMetadata<'_>,
+    timestamp: DateTime<Utc>,
+    previous: Option<&KubeEvent>,
+    log_namespace: LogNamespace,
+) -> Option<LogEvent> {
+    let mut log = LogEvent::default();
+    if let Some(message_path) = log_schema().message_key_target_path()
+        && let Some(note) = &event.note
+    {
+        log.try_insert(message_path, note.clone());
+    }
+    if let Some(timestamp_path) = log_schema().timestamp_key_target_path() {
+        log.try_insert(timestamp_path, timestamp);
+    }
+
+    insert_kubernetes_events_metadata(log_namespace, &mut log, metadata);
+    if let Some(controller) = &event.reporting_controller {
+        log.insert(event_path!("reporting_controller"), controller.clone());
+    }
+    if let Some(instance) = &event.reporting_instance {
+        log.insert(event_path!("reporting_instance"), instance.clone());
+    }
+
+    match serde_json::to_value(event) {
+        Ok(value) => {
+            log.insert(event_path!("event"), value);
+        }
+        Err(error) => {
+            emit(KubernetesEventsSerializationError { error });
+            return None;
+        }
+    }
+
+    if let Some(previous) = previous {
+        match serde_json::to_value(previous) {
+            Ok(value) => {
+                log.insert(event_path!("old_event"), value);
+            }
+            Err(error) => emit(KubernetesEventsSerializationError { error }),
+        }
+    }
+
+    Some(log)
 }
 
 struct ProcessedEvent {
@@ -759,26 +761,18 @@ fn event_timestamp(event: &KubeEvent) -> DateTime<Utc> {
 }
 
 fn event_identity(event: &KubeEvent) -> Option<EventIdentity> {
-    let uid = match event.metadata.uid.clone() {
-        Some(uid) => uid,
-        None => {
-            emit(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "missing_uid",
-            });
-            return None;
-        }
+    let Some(uid) = event.metadata.uid.clone() else {
+        emit(KubernetesEventsSerializationError {
+            error: "event is missing metadata.uid",
+        });
+        return None;
     };
 
-    let resource_version = match event.metadata.resource_version.clone() {
-        Some(resource_version) => resource_version,
-        None => {
-            emit(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "missing_resource_version",
-            });
-            return None;
-        }
+    let Some(resource_version) = event.metadata.resource_version.clone() else {
+        emit(KubernetesEventsSerializationError {
+            error: "event is missing metadata.resourceVersion",
+        });
+        return None;
     };
 
     Some(EventIdentity {
@@ -791,16 +785,19 @@ fn event_identity(event: &KubeEvent) -> Option<EventIdentity> {
 mod tests {
     use super::super::test_util::{kube_timestamp, make_event};
     use super::*;
+    use crate::sources::kubernetes_events::config::{
+        KubernetesEventsDeduplicationConfig, KubernetesEventsIncludeConfig,
+    };
     use chrono::{Duration as ChronoDuration, TimeZone};
     use k8s_openapi::api::events::v1::EventSeries;
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::{MicroTime, Time};
     use vrl::value;
 
     fn make_source() -> KubernetesEventsSource {
-        make_source_with_config(KubernetesEventsConfig::default())
+        make_source_with_config(&KubernetesEventsConfig::default())
     }
 
-    fn make_source_with_config(config: KubernetesEventsConfig) -> KubernetesEventsSource {
+    fn make_source_with_config(config: &KubernetesEventsConfig) -> KubernetesEventsSource {
         let client_config = ClientConfig::new("http://127.0.0.1:8080".parse().unwrap());
         let client = Client::try_from(client_config).unwrap();
         KubernetesEventsSource::new(client, config).unwrap()
@@ -814,7 +811,7 @@ mod tests {
         insert_kubernetes_events_metadata(
             LogNamespace::Vector,
             &mut log,
-            KubernetesEventMetadata {
+            &KubernetesEventMetadata {
                 verb: "ADDED",
                 uid: "event-uid",
                 namespace: Some("kube-system"),
@@ -871,7 +868,7 @@ mod tests {
         insert_kubernetes_events_metadata(
             LogNamespace::Legacy,
             &mut log,
-            KubernetesEventMetadata {
+            &KubernetesEventMetadata {
                 verb: "UPDATED",
                 uid: "event-uid",
                 namespace: Some("default"),
@@ -905,17 +902,15 @@ mod tests {
     #[tokio::test]
     async fn leader_bootstrap_init_apply_uses_normal_dedupe() {
         let mut source = make_source();
-        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
         let event = make_event("uid", "rv", Utc::now() - ChronoDuration::seconds(10));
 
-        let processed = source
-            .handle_event(
-                None,
-                checkpoint_watcher::Event::InitApply(event),
-                LogNamespace::Legacy,
-                &mut deduper,
-            )
-            .unwrap();
+        let processed = source.handle_event(
+            None,
+            checkpoint_watcher::Event::InitApply(event),
+            LogNamespace::Legacy,
+            &mut deduper,
+        );
 
         assert!(
             processed.is_some(),
@@ -925,14 +920,12 @@ mod tests {
         deduper.commit(dedupe_record);
 
         let replayed_event = make_event("uid", "rv", Utc::now() - ChronoDuration::seconds(10));
-        let processed = source
-            .handle_event(
-                None,
-                checkpoint_watcher::Event::InitApply(replayed_event),
-                LogNamespace::Legacy,
-                &mut deduper,
-            )
-            .unwrap();
+        let processed = source.handle_event(
+            None,
+            checkpoint_watcher::Event::InitApply(replayed_event),
+            LogNamespace::Legacy,
+            &mut deduper,
+        );
 
         assert!(
             processed.is_none(),
@@ -987,20 +980,18 @@ mod tests {
     #[tokio::test]
     async fn bootstrap_events_are_never_suppressed_by_event_timestamp() {
         let mut source = make_source();
-        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
         let delayed = make_event(
             "uid-delayed",
             "rv1",
             Utc::now() - ChronoDuration::minutes(30),
         );
-        let processed = source
-            .handle_event(
-                None,
-                checkpoint_watcher::Event::InitApply(delayed),
-                LogNamespace::Legacy,
-                &mut deduper,
-            )
-            .unwrap();
+        let processed = source.handle_event(
+            None,
+            checkpoint_watcher::Event::InitApply(delayed),
+            LogNamespace::Legacy,
+            &mut deduper,
+        );
 
         assert!(
             processed.is_some(),
@@ -1011,7 +1002,7 @@ mod tests {
     #[tokio::test]
     async fn modified_watch_event_is_updated_without_local_dedupe_state() {
         let mut source = make_source();
-        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
         let event = make_event("uid", "rv", Utc::now());
         let processed = source
             .handle_event(
@@ -1023,7 +1014,6 @@ mod tests {
                 LogNamespace::Legacy,
                 &mut deduper,
             )
-            .unwrap()
             .expect("modified event should be emitted");
 
         assert_eq!(
@@ -1035,11 +1025,14 @@ mod tests {
     #[tokio::test]
     async fn caches_event_payload_only_when_previous_event_is_enabled() {
         for include_previous_event in [false, true] {
-            let mut source = make_source_with_config(KubernetesEventsConfig {
-                include_previous_event,
+            let mut source = make_source_with_config(&KubernetesEventsConfig {
+                deduplication: KubernetesEventsDeduplicationConfig {
+                    include_previous_event,
+                    ..Default::default()
+                },
                 ..KubernetesEventsConfig::default()
             });
-            let mut deduper = Deduper::new(Duration::from_secs(60));
+            let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
             let processed = source
                 .handle_event(
                     None,
@@ -1047,7 +1040,6 @@ mod tests {
                     LogNamespace::Legacy,
                     &mut deduper,
                 )
-                .unwrap()
                 .expect("event should be emitted");
 
             assert_eq!(
@@ -1064,12 +1056,18 @@ mod tests {
 
     #[tokio::test]
     async fn filtered_versions_are_retained_for_previous_event_output() {
-        let mut source = make_source_with_config(KubernetesEventsConfig {
-            include_types: vec!["Normal".to_string()],
-            include_previous_event: true,
+        let mut source = make_source_with_config(&KubernetesEventsConfig {
+            include: KubernetesEventsIncludeConfig {
+                types: vec!["Normal".to_string()],
+                ..Default::default()
+            },
+            deduplication: KubernetesEventsDeduplicationConfig {
+                include_previous_event: true,
+                ..Default::default()
+            },
             ..KubernetesEventsConfig::default()
         });
-        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
         let mut first = make_event("uid", "1", Utc::now());
         first.type_ = Some("Normal".to_string());
         let first = source
@@ -1079,7 +1077,6 @@ mod tests {
                 LogNamespace::Legacy,
                 &mut deduper,
             )
-            .unwrap()
             .expect("matching event should be emitted");
         deduper.commit(first.dedupe_record);
 
@@ -1093,7 +1090,6 @@ mod tests {
                     LogNamespace::Legacy,
                     &mut deduper,
                 )
-                .unwrap()
                 .is_none(),
             "filtered event should not be emitted"
         );
@@ -1107,7 +1103,6 @@ mod tests {
                 LogNamespace::Legacy,
                 &mut deduper,
             )
-            .unwrap()
             .expect("event matching the filter again should be emitted");
 
         assert_eq!(
@@ -1124,20 +1119,18 @@ mod tests {
     #[tokio::test]
     async fn bootstrap_event_without_timestamp_is_emitted() {
         let mut source = make_source();
-        let mut deduper = Deduper::new(Duration::from_secs(60));
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
 
         let mut event = make_event("uid", "rv", Utc::now());
         event.event_time = None;
         assert!(observed_event_timestamp(&event).is_none());
 
-        let processed = source
-            .handle_event(
-                None,
-                checkpoint_watcher::Event::InitApply(event),
-                LogNamespace::Legacy,
-                &mut deduper,
-            )
-            .unwrap();
+        let processed = source.handle_event(
+            None,
+            checkpoint_watcher::Event::InitApply(event),
+            LogNamespace::Legacy,
+            &mut deduper,
+        );
 
         assert!(
             processed.is_some(),
@@ -1145,17 +1138,47 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn events_without_identity_are_dropped() {
+        let mut source = make_source();
+        let mut deduper = Deduper::new(Duration::from_secs(60), NonZeroUsize::MAX);
+
+        let mut missing_uid = make_event("uid", "rv", Utc::now());
+        missing_uid.metadata.uid = None;
+        let mut missing_resource_version = make_event("uid", "rv", Utc::now());
+        missing_resource_version.metadata.resource_version = None;
+
+        for event in [missing_uid, missing_resource_version] {
+            assert!(
+                source
+                    .handle_event(
+                        None,
+                        checkpoint_watcher::Event::InitApply(event),
+                        LogNamespace::Legacy,
+                        &mut deduper,
+                    )
+                    .is_none()
+            );
+        }
+    }
+
     #[test]
     fn checkpoint_configuration_hash_is_canonical_for_set_like_fields() {
         let first = KubernetesEventsConfig {
             namespaces: vec!["b".to_string(), "a".to_string()],
-            include_types: vec!["Warning".to_string(), "Normal".to_string()],
+            include: KubernetesEventsIncludeConfig {
+                types: vec!["Warning".to_string(), "Normal".to_string()],
+                ..Default::default()
+            },
             ..KubernetesEventsConfig::default()
         };
 
         let second = KubernetesEventsConfig {
             namespaces: vec!["a".to_string(), "b".to_string()],
-            include_types: vec!["Normal".to_string(), "Warning".to_string()],
+            include: KubernetesEventsIncludeConfig {
+                types: vec!["Normal".to_string(), "Warning".to_string()],
+                ..Default::default()
+            },
             ..KubernetesEventsConfig::default()
         };
 
@@ -1175,7 +1198,7 @@ mod tests {
         };
 
         let original = checkpoint_configuration_hash(&config);
-        config.field_selector = Some("regarding.kind=Pod".to_string());
+        config.selectors.field = Some("regarding.kind=Pod".to_string());
         let changed = checkpoint_configuration_hash(&config);
 
         assert_eq!(original.len(), 64);
@@ -1184,7 +1207,7 @@ mod tests {
 
     #[tokio::test]
     async fn runtime_namespaces_are_sorted_and_deduplicated() {
-        let source = make_source_with_config(KubernetesEventsConfig {
+        let source = make_source_with_config(&KubernetesEventsConfig {
             namespaces: vec!["b".to_string(), "a".to_string(), "a".to_string()],
             ..KubernetesEventsConfig::default()
         });
@@ -1198,15 +1221,18 @@ mod tests {
         let client = Client::try_from(client_config).unwrap();
         let result = KubernetesEventsSource::new(
             client,
-            KubernetesEventsConfig {
-                dedupe_retention_seconds: 0,
+            &KubernetesEventsConfig {
+                deduplication: KubernetesEventsDeduplicationConfig {
+                    retention_seconds: 0,
+                    ..Default::default()
+                },
                 ..KubernetesEventsConfig::default()
             },
         );
 
         assert!(matches!(
             result,
-            Err(error) if error.to_string() == "dedupe_retention_seconds must be greater than 0"
+            Err(error) if error.to_string() == "deduplication.retention_seconds must be greater than 0"
         ));
     }
 
@@ -1218,7 +1244,7 @@ mod tests {
         for watch_timeout_seconds in [0, config::MAX_WATCH_TIMEOUT_SECS + 1] {
             let result = KubernetesEventsSource::new(
                 client.clone(),
-                KubernetesEventsConfig {
+                &KubernetesEventsConfig {
                     watch_timeout_seconds,
                     ..KubernetesEventsConfig::default()
                 },
@@ -1237,7 +1263,7 @@ mod tests {
         assert!(
             KubernetesEventsSource::new(
                 client,
-                KubernetesEventsConfig {
+                &KubernetesEventsConfig {
                     watch_timeout_seconds: config::MAX_WATCH_TIMEOUT_SECS,
                     ..KubernetesEventsConfig::default()
                 },
