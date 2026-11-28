@@ -904,12 +904,15 @@ impl EventStreamBuilder {
 
         let result = match (result, error) {
             (Ok(()), None) => Ok(info),
-            (Err(()), _) => Err((info.id, ErrorPersistence::Permanent, None)),
-            (_, Some(ErrorPersistence::Permanent)) => {
-                Err((info.id, ErrorPersistence::Permanent, None))
-            }
-            (_, Some(ErrorPersistence::Transient)) => {
+            (Ok(()), Some(ErrorPersistence::Transient)) => {
+                // Resume before an unfinished partial message so the retry reads all of it.
+                if partial_event_merge_state.is_some() {
+                    info.last_log = info.last_complete_log;
+                }
                 Err((info.id.clone(), ErrorPersistence::Transient, Some(info)))
+            }
+            (Err(()), _) | (_, Some(ErrorPersistence::Permanent)) => {
+                Err((info.id, ErrorPersistence::Permanent, None))
             }
         };
 
@@ -1030,6 +1033,8 @@ struct ContainerLogInfo {
     created: DateTime<Utc>,
     /// Timestamp of last log message with it's generation
     last_log: Option<(DateTime<FixedOffset>, u64)>,
+    /// `last_log` as of the last event this info returned
+    last_complete_log: Option<(DateTime<FixedOffset>, u64)>,
     /// generation of `ContainerState` at `event_stream` creation
     generation: u64,
     metadata: ContainerMetadata,
@@ -1043,6 +1048,7 @@ impl ContainerLogInfo {
             id,
             created,
             last_log: None,
+            last_complete_log: None,
             generation: 0,
             metadata,
         }
@@ -1317,6 +1323,8 @@ impl ContainerLogInfo {
             // Return the log event as is, partial or not. No merging here.
             log
         };
+
+        self.last_complete_log = self.last_log;
 
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.
