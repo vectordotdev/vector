@@ -1,6 +1,7 @@
 use std::time::Duration;
 use vector_lib::internal_event::{emit, register};
 
+use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use serde_with::serde_as;
 use tokio::time;
@@ -9,13 +10,19 @@ use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     configurable::configurable_component,
-    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, GaugeName, InternalEventHandle as _, Protocol,
+    },
     lookup::lookup_v2::OptionalValuePath,
 };
 
 use crate::{
     SourceSender,
-    config::{SourceConfig, SourceContext, SourceOutput, log_schema},
+    config::{
+        SharedTopologyMetadata, SourceConfig, SourceContext, SourceOutput, TopologyMetadata,
+        log_schema,
+    },
+    event::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
@@ -161,6 +168,7 @@ impl SourceConfig for InternalMetricsConfig {
                 interval,
                 out: cx.out,
                 shutdown: cx.shutdown,
+                topology_metadata: cx.topology_metadata,
             }
             .run(),
         ))
@@ -184,6 +192,7 @@ struct InternalMetrics<'a> {
     interval: time::Duration,
     out: SourceSender,
     shutdown: ShutdownSignal,
+    topology_metadata: Option<SharedTopologyMetadata>,
 }
 
 impl InternalMetrics<'_> {
@@ -199,6 +208,20 @@ impl InternalMetrics<'_> {
             let mut metrics = self.controller.capture_metrics();
             if let Some(deltas) = &mut self.deltas {
                 deltas.convert(&mut metrics);
+            }
+
+            // The topology connection gauges are not stored in the metrics registry: they are
+            // derived from the running topology on every scrape, so they always reflect the
+            // currently loaded configuration and disappear as soon as a connection is removed.
+            if let Some(topology_metadata) = &self.topology_metadata {
+                let timestamp = metrics
+                    .first()
+                    .and_then(Metric::timestamp)
+                    .unwrap_or_else(Utc::now);
+                let topology = topology_metadata
+                    .read()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                metrics.extend(topology_connection_metrics(&topology, timestamp));
             }
 
             let count = metrics.len();
@@ -236,9 +259,54 @@ impl InternalMetrics<'_> {
     }
 }
 
+/// Builds one `component_connections` gauge per edge in the topology.
+///
+/// Each gauge has a value of `1` and is tagged with the IDs, types, and kinds of the components on
+/// either end of the edge, plus the named output of the upstream component, if any.
+fn topology_connection_metrics(
+    topology: &TopologyMetadata,
+    timestamp: DateTime<Utc>,
+) -> impl Iterator<Item = Metric> + '_ {
+    topology
+        .inputs
+        .iter()
+        .flat_map(move |(to_component, inputs)| {
+            inputs.iter().map(move |input| {
+                let mut tags = MetricTags::default();
+
+                tags.replace("from_component_id".to_owned(), input.component.to_string());
+                if let Some((type_name, kind)) = topology.component_types.get(&input.component) {
+                    tags.replace("from_component_type".to_owned(), (*type_name).to_owned());
+                    tags.replace("from_component_kind".to_owned(), (*kind).to_owned());
+                }
+                if let Some(port) = &input.port {
+                    tags.replace("from_output".to_owned(), port.clone());
+                }
+
+                tags.replace("to_component_id".to_owned(), to_component.to_string());
+                if let Some((type_name, kind)) = topology.component_types.get(to_component) {
+                    tags.replace("to_component_type".to_owned(), (*type_name).to_owned());
+                    tags.replace("to_component_kind".to_owned(), (*kind).to_owned());
+                }
+
+                Metric::new(
+                    GaugeName::ComponentConnections.as_str(),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                )
+                .with_namespace(Some("vector"))
+                .with_tags(Some(tags))
+                .with_timestamp(Some(timestamp))
+            })
+        })
+}
+
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::{
+        collections::BTreeMap,
+        sync::{Arc, RwLock},
+    };
 
     use strum::IntoEnumIterator;
     use vector_lib::{
@@ -250,6 +318,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::{ComponentKey, OutputId},
         event::{
             Event,
             metric::{Metric, MetricKind, MetricValue},
@@ -532,5 +601,124 @@ mod tests {
         let event = event_from_config(config).await;
 
         assert_eq!(event.as_metric().namespace(), Some(namespace));
+    }
+
+    fn test_topology() -> TopologyMetadata {
+        let mut topology = TopologyMetadata::default();
+        topology.inputs.insert(
+            ComponentKey::from("my_transform"),
+            vec![OutputId::from(ComponentKey::from("my_source"))],
+        );
+        topology.inputs.insert(
+            ComponentKey::from("my_sink"),
+            vec![OutputId {
+                component: ComponentKey::from("my_transform"),
+                port: Some("output1".to_owned()),
+            }],
+        );
+        topology
+            .component_types
+            .insert(ComponentKey::from("my_source"), ("file", "source"));
+        topology
+            .component_types
+            .insert(ComponentKey::from("my_transform"), ("route", "transform"));
+        topology
+            .component_types
+            .insert(ComponentKey::from("my_sink"), ("console", "sink"));
+        topology
+    }
+
+    fn connection_from<'a>(metrics: &'a [Metric], from_component_id: &str) -> &'a Metric {
+        metrics
+            .iter()
+            .find(|metric| {
+                metric.name() == "component_connections"
+                    && metric.tag_value("from_component_id").as_deref() == Some(from_component_id)
+            })
+            .unwrap_or_else(|| panic!("no connection from {from_component_id} in {metrics:?}"))
+    }
+
+    #[test]
+    fn topology_connection_metrics_tags_each_edge() {
+        let topology = test_topology();
+        let timestamp = Utc::now();
+        let metrics = topology_connection_metrics(&topology, timestamp).collect::<Vec<_>>();
+
+        assert_eq!(metrics.len(), 2);
+
+        let source_to_transform = connection_from(&metrics, "my_source");
+        assert_eq!(source_to_transform.namespace(), Some("vector"));
+        assert_eq!(source_to_transform.kind(), MetricKind::Absolute);
+        assert_eq!(
+            source_to_transform.value(),
+            &MetricValue::Gauge { value: 1.0 }
+        );
+        assert_eq!(source_to_transform.timestamp(), Some(timestamp));
+        let tags = source_to_transform.tags().expect("tags");
+        assert_eq!(tags.get("from_component_type"), Some("file"));
+        assert_eq!(tags.get("from_component_kind"), Some("source"));
+        assert_eq!(tags.get("from_output"), None);
+        assert_eq!(tags.get("to_component_id"), Some("my_transform"));
+        assert_eq!(tags.get("to_component_type"), Some("route"));
+        assert_eq!(tags.get("to_component_kind"), Some("transform"));
+
+        let transform_to_sink = connection_from(&metrics, "my_transform");
+        let tags = transform_to_sink.tags().expect("tags");
+        assert_eq!(tags.get("from_output"), Some("output1"));
+        assert_eq!(tags.get("to_component_id"), Some("my_sink"));
+        assert_eq!(tags.get("to_component_type"), Some("console"));
+        assert_eq!(tags.get("to_component_kind"), Some("sink"));
+    }
+
+    #[tokio::test]
+    async fn emits_topology_connections_with_common_tags() {
+        test_util::trace_init();
+
+        let config = InternalMetricsConfig {
+            namespace: "custom".to_owned(),
+            tags: TagsConfig {
+                host_key: Some(OptionalValuePath::new("my_host")),
+                pid_key: Some("my_pid".to_owned()),
+            },
+            ..Default::default()
+        };
+
+        let (tx, rx) = SourceSender::new_test();
+        let mut cx = SourceContext::new_test(tx, None);
+        cx.topology_metadata = Some(Arc::new(RwLock::new(test_topology())));
+        let source = config.build(cx).await.unwrap();
+
+        tokio::spawn(source);
+        time::sleep(time::Duration::from_millis(100)).await;
+
+        let metrics = collect_ready(rx)
+            .into_iter()
+            .map(Event::into_metric)
+            .collect::<Vec<_>>();
+
+        let connection = connection_from(&metrics, "my_transform");
+        assert_eq!(connection.namespace(), Some("custom"));
+        assert_eq!(
+            connection.tag_value("my_pid"),
+            Some(std::process::id().to_string())
+        );
+        assert_eq!(connection.tag_value("my_host"), crate::get_hostname().ok());
+        assert_eq!(
+            metrics
+                .iter()
+                .filter(|metric| metric.name() == "component_connections")
+                .count(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn no_topology_connections_without_topology() {
+        let metrics = scrape_once(InternalMetricsConfig::default(), || {}).await;
+        assert!(
+            metrics
+                .iter()
+                .all(|metric| metric.name() != "component_connections")
+        );
     }
 }

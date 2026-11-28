@@ -44,6 +44,7 @@ mod secret;
 mod sink;
 mod sink_validated;
 mod source;
+mod topology_metadata;
 mod transform;
 pub mod unit_test;
 mod unix;
@@ -67,6 +68,7 @@ pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use sink_validated::{DynValidatedSink, ValidatedSink};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
+pub use topology_metadata::{SharedTopologyMetadata, TopologyMetadata};
 pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
 };

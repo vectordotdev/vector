@@ -76,6 +76,54 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_connections: {
+			description: """
+				A connection between two components in the running topology. One series with a value
+				of `1` is emitted per connection on every scrape, derived from the currently loaded
+				configuration, so series appear and disappear as the topology is reloaded. Join this
+				metric with the per-component metrics, such as `component_sent_events_total`, to
+				visualize the topology together with its throughput.
+				"""
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _internal_metrics_tags & {
+				from_component_id: {
+					description: "The ID of the upstream component."
+					required:    true
+					examples: ["my_source"]
+				}
+				from_component_kind: {
+					description: "The kind of the upstream component."
+					required:    true
+					enum:        _component_kind.enum
+				}
+				from_component_type: {
+					description: "The type of the upstream component."
+					required:    true
+					examples: ["file", "route"]
+				}
+				from_output: {
+					description: "The named output of the upstream component the connection reads from. Not set for the default output."
+					required:    false
+					examples: ["errors", "route_a"]
+				}
+				to_component_id: {
+					description: "The ID of the downstream component."
+					required:    true
+					examples: ["my_sink"]
+				}
+				to_component_kind: {
+					description: "The kind of the downstream component."
+					required:    true
+					enum:        _component_kind.enum
+				}
+				to_component_type: {
+					description: "The type of the downstream component."
+					required:    true
+					examples: ["remap", "console"]
+				}
+			}
+		}
 		aggregate_events_recorded_total: {
 			description:       "The number of events recorded by the aggregate transform."
 			type:              "counter"

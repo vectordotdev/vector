@@ -3,7 +3,7 @@ use std::{
     future::ready,
     num::NonZeroUsize,
     sync::{
-        Arc, LazyLock, Mutex,
+        Arc, LazyLock, Mutex, RwLock,
         atomic::{AtomicUsize, Ordering},
     },
     time::Instant,
@@ -60,8 +60,9 @@ use crate::{
     SourceSender,
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
-        ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
-        TransformOuter, TransformOutput, enrichment_table_sinks, enrichment_table_sources,
+        ProxyConfig, SharedTopologyMetadata, SinkContext, SinkOuter, SourceContext, SourceOuter,
+        TopologyMetadata, TransformContext, TransformOuter, TransformOutput,
+        enrichment_table_sinks, enrichment_table_sources,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -145,6 +146,7 @@ struct Builder<'a> {
     extra_context: ExtraContext,
     utilization_emitter: Option<UtilizationEmitter>,
     utilization_registry: UtilizationRegistry,
+    topology_metadata: SharedTopologyMetadata,
 }
 
 impl<'a> Builder<'a> {
@@ -154,6 +156,7 @@ impl<'a> Builder<'a> {
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
         utilization_registry: Option<UtilizationRegistry>,
+        topology_metadata: Option<SharedTopologyMetadata>,
     ) -> Self {
         // If registry is not passed, we need to build a whole new utilization emitter + registry
         // Otherwise, we just store the registry and reuse it for this build
@@ -178,6 +181,11 @@ impl<'a> Builder<'a> {
             extra_context,
             utilization_emitter: emitter,
             utilization_registry: registry,
+            // A running topology passes in its existing handle so that unchanged `internal_metrics`
+            // sources keep observing it; it is refreshed by the running topology once the new pieces
+            // are connected. Otherwise, start from the configuration being built.
+            topology_metadata: topology_metadata
+                .unwrap_or_else(|| Arc::new(RwLock::new(TopologyMetadata::from_config(config)))),
         }
     }
 
@@ -210,6 +218,7 @@ impl<'a> Builder<'a> {
                 utilization: self
                     .utilization_emitter
                     .map(|e| (e, self.utilization_registry)),
+                topology_metadata: self.topology_metadata,
             })
         } else {
             Err(self.errors)
@@ -438,6 +447,8 @@ impl<'a> Builder<'a> {
             schema_definitions,
             schema: self.config.schema,
             extra_context: self.extra_context.clone(),
+            topology_metadata: (typetag == "internal_metrics")
+                .then(|| Arc::clone(&self.topology_metadata)),
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
@@ -1119,6 +1130,7 @@ pub struct TopologyPieces {
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
+    pub(crate) topology_metadata: SharedTopologyMetadata,
 }
 
 /// Builder for constructing `TopologyPieces` with a fluent API.
@@ -1138,6 +1150,7 @@ pub struct TopologyPiecesBuilder<'a> {
     buffers: HashMap<ComponentKey, BuiltBuffer>,
     extra_context: ExtraContext,
     utilization_registry: Option<UtilizationRegistry>,
+    topology_metadata: Option<SharedTopologyMetadata>,
 }
 
 impl<'a> TopologyPiecesBuilder<'a> {
@@ -1150,6 +1163,7 @@ impl<'a> TopologyPiecesBuilder<'a> {
             buffers: HashMap::new(),
             extra_context: ExtraContext::default(),
             utilization_registry: None,
+            topology_metadata: None,
         }
     }
 
@@ -1174,6 +1188,16 @@ impl<'a> TopologyPiecesBuilder<'a> {
         self
     }
 
+    /// Sets the shared topology metadata handed to `internal_metrics` sources.
+    ///
+    /// The running topology passes its existing handle on reload so that all `internal_metrics`
+    /// sources, changed or not, share a single view of the topology.
+    #[must_use]
+    pub fn with_topology_metadata(mut self, topology_metadata: SharedTopologyMetadata) -> Self {
+        self.topology_metadata = Some(topology_metadata);
+        self
+    }
+
     /// Builds the topology pieces, returning errors if any occur.
     ///
     /// Use this method when you need to handle errors explicitly,
@@ -1188,6 +1212,7 @@ impl<'a> TopologyPiecesBuilder<'a> {
             self.buffers,
             self.extra_context,
             self.utilization_registry,
+            self.topology_metadata,
         )
         .build()
         .await

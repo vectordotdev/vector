@@ -237,6 +237,8 @@ pub enum GaugeName {
     TagCardinalityTrackedKeys,
     SecurityConfinementDisabled,
     PrometheusKubernetesServiceDiscoveryTargetsDiscovered,
+    /// Emitted by the `internal_metrics` source from the running topology rather than recorded.
+    ComponentConnections,
     // Data-plane gauge names emitted by the `host_metrics` source.
     Load1,
     Load5,
@@ -323,6 +325,7 @@ impl GaugeName {
             Self::PrometheusKubernetesServiceDiscoveryTargetsDiscovered => {
                 "prometheus_kubernetes_service_discovery_targets_discovered"
             }
+            Self::ComponentConnections => "component_connections",
             Self::Load1 => "load1",
             Self::Load5 => "load5",
             Self::Load15 => "load15",

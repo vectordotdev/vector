@@ -38,7 +38,7 @@ use super::{
 use crate::{
     config::{
         ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
-        enrichment_table_sinks,
+        SharedTopologyMetadata, TopologyMetadata, enrichment_table_sinks,
     },
     event::EventArray,
     internal_events::{TopologyDiskBufferRemoved, TopologyDiskBufferReplacementUnreferenced},
@@ -84,6 +84,7 @@ pub struct RunningTopology {
     pending_reload: Option<HashSet<ComponentKey>>,
     sink_confinement_gauges: HashMap<ComponentKey, Gauge>,
     orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner,
+    topology_metadata: SharedTopologyMetadata,
 }
 
 impl RunningTopology {
@@ -112,6 +113,7 @@ impl RunningTopology {
             pending_reload: None,
             sink_confinement_gauges: HashMap::new(),
             orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner::new(),
+            topology_metadata: SharedTopologyMetadata::default(),
         }
     }
 
@@ -341,6 +343,7 @@ impl RunningTopology {
             .with_buffers(buffers.clone())
             .with_extra_context(extra_context.clone())
             .with_utilization_registry(self.utilization_registry.clone())
+            .with_topology_metadata(Arc::clone(&self.topology_metadata))
             .build_or_log_errors()
             .await
         {
@@ -352,6 +355,7 @@ impl RunningTopology {
                 .await
             {
                 self.connect_diff(&diff, &mut new_pieces);
+                self.refresh_topology_metadata(&new_config);
                 self.spawn_diff(&diff, new_pieces);
                 let previous_disk_buffer_paths = referenced_disk_buffer_directories(&self.config);
                 self.orphaned_disk_buffer_scanner
@@ -375,6 +379,7 @@ impl RunningTopology {
             .with_buffers(buffers)
             .with_extra_context(extra_context.clone())
             .with_utilization_registry(self.utilization_registry.clone())
+            .with_topology_metadata(Arc::clone(&self.topology_metadata))
             .build_or_log_errors()
             .await
             && self
@@ -382,6 +387,7 @@ impl RunningTopology {
                 .await
         {
             self.connect_diff(&diff, &mut new_pieces);
+            self.refresh_topology_metadata(&self.config);
             self.spawn_diff(&diff, new_pieces);
             self.orphaned_disk_buffer_scanner
                 .scan(&self.config, HashSet::new());
@@ -1410,6 +1416,18 @@ impl RunningTopology {
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }
 
+    /// Replaces the shared topology metadata with the topology described by `config`.
+    ///
+    /// Called once the pieces for `config` are connected, and before they are spawned, so that
+    /// newly spawned `internal_metrics` sources never observe a stale topology.
+    fn refresh_topology_metadata(&self, config: &Config) {
+        let metadata = TopologyMetadata::from_config(config);
+        *self
+            .topology_metadata
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = metadata;
+    }
+
     pub async fn start_init_validated(
         config: Config,
         extra_context: ExtraContext,
@@ -1478,7 +1496,9 @@ impl RunningTopology {
         {
             return None;
         }
+        running_topology.topology_metadata = Arc::clone(&pieces.topology_metadata);
         running_topology.connect_diff(&diff, &mut pieces);
+        running_topology.refresh_topology_metadata(&running_topology.config);
         running_topology.spawn_diff(&diff, pieces);
         // `running_topology.config` was set from the initial config in `new()`.
         running_topology.refresh_confinement_gauges();

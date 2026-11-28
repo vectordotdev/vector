@@ -57,6 +57,8 @@ mod panic;
 mod reload;
 #[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
 mod source_finished;
+#[cfg(feature = "sources-internal_metrics")]
+mod topology_metadata;
 mod transient_state;
 
 fn basic_config() -> Config {

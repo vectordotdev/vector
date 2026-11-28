@@ -1184,6 +1184,7 @@ mod test {
                 schema_definitions: HashMap::default(),
                 extra_context: ExtraContext::default(),
                 metrics_storage: MetricsStorage::default(),
+                topology_metadata: None,
             })
             .await
             .unwrap();
