@@ -133,7 +133,7 @@ impl ValidatedSink for StackdriverConfig {
             uri,
         } = validated.clone();
 
-        let auth = self.auth.build(Scope::MonitoringWrite).await?;
+        let auth = self.auth.build(Scope::MonitoringWrite, cx.proxy()).await?;
 
         let healthcheck = async { Ok(()) }.boxed();
         let started = chrono::Utc::now();
@@ -150,7 +150,7 @@ impl ValidatedSink for StackdriverConfig {
 
         let request_limits = self.request.into_settings();
 
-        auth.spawn_regenerate_token();
+        auth.spawn_regenerate_token(cx.proxy());
 
         let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
             endpoint: uri.clone(),

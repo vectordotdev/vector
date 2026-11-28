@@ -320,7 +320,7 @@ impl ValidatedSink for StackdriverConfig {
             batch_settings,
         } = validated;
 
-        let auth = self.auth.build(Scope::LoggingWrite).await?;
+        let auth = self.auth.build(Scope::LoggingWrite, cx.proxy()).await?;
 
         let request_builder = StackdriverLogsRequestBuilder {
             encoder: encoder.clone(),
@@ -349,7 +349,7 @@ impl ValidatedSink for StackdriverConfig {
 
         let healthcheck = healthcheck(client, auth.clone(), self.endpoint.clone()).boxed();
 
-        auth.spawn_regenerate_token();
+        auth.spawn_regenerate_token(cx.proxy());
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
