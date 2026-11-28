@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: humio_logs
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    token: ${HUMIO_TOKEN}

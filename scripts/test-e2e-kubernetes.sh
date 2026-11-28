@@ -86,43 +86,38 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   # Assign a default test run ID if none is provided by the user.
   TEST_RUN_ID="${TEST_RUN_ID:-"$(date +%s)-$(random-string)"}"
 
-  if [[ "${QUICK_BUILD:-"false"}" == "true" ]]; then
-    # Prepare test image parameters.
-    VERSION_TAG="test-$TEST_RUN_ID"
-
-    # Prepare the container image for the deployment command and docker build.
-    CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-debug"
-
-    # Build docker image.
-    docker build --build-arg RUST_VERSION="${RUST_VERSION}" --tag "$CONTAINER_IMAGE" -f tilt/Dockerfile .
-  else
-    # Package a .deb file to build a docker container, unless skipped.
-    if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
-      make package-deb-x86_64-unknown-linux-gnu
-    fi
-
-    # Prepare test image parameters.
-    VERSION_TAG="test-$TEST_RUN_ID"
-    BASE_TAG="debian"
-
-    # Build docker image with Vector - the same way it's done for releases. Don't
-    # do the push - we'll handle it later.
-    REPOS="$CONTAINER_IMAGE_REPO" \
-      CHANNEL="test" \
-      BASE="$BASE_TAG" \
-      TAG="$VERSION_TAG" \
-      PUSH="false" \
-      scripts/build-docker.sh
-
-    # Prepare the container image for the deployment command.
-    CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-$BASE_TAG"
+  # Package a .deb file to build a docker container, unless skipped.
+  if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
+    make package-deb-x86_64-unknown-linux-gnu
   fi
+
+  # Prepare test image parameters.
+  VERSION_TAG="test-$TEST_RUN_ID"
+  BASE_TAG="debian"
+
+  # Build docker image with Vector - the same way it's done for releases. Don't
+  # do the push - we'll handle it later.
+  REPOS="$CONTAINER_IMAGE_REPO" \
+    CHANNEL="test" \
+    BASE="$BASE_TAG" \
+    TAG="$VERSION_TAG" \
+    PUSH="false" \
+    scripts/build-docker.sh
+
+  # Prepare the container image for the deployment command.
+  CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-$BASE_TAG"
 fi
 
 if [[ -z "${SKIP_CONTAINER_IMAGE_PUBLISHING:-}" ]]; then
   # Make the container image accessible to the k8s cluster.
   if is_minikube_cache_enabled; then
-    minikube image load "$CONTAINER_IMAGE"
+    # Docker 25+ (including 29.1.5 on GitHub Actions) removed the VirtualSize field
+    # from the image API, breaking minikube image load with "unable to calculate manifest".
+    # Even minikube v1.34.0 doesn't fix Docker 29 compatibility.
+    # Workaround: Use Docker API v1.43 which still has VirtualSize.
+    # See: https://github.com/kubernetes/minikube/issues/18021
+    echo "Loading image into minikube: $CONTAINER_IMAGE"
+    DOCKER_API_VERSION=1.43 minikube image load "$CONTAINER_IMAGE"
     trap 'minikube image rm "$CONTAINER_IMAGE"' EXIT
   else
     docker push "$CONTAINER_IMAGE"

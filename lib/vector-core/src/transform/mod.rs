@@ -1,61 +1,37 @@
-use std::{collections::HashMap, error, pin::Pin, sync::Arc, time::Instant};
+use std::{collections::HashMap, pin::Pin, sync::Arc};
 
 use futures::{Stream, StreamExt};
-use vector_common::{
-    EventDataEq,
-    byte_size_of::ByteSizeOf,
-    internal_event::{
-        self, CountByteSize, DEFAULT_OUTPUT, EventsSent, InternalEventHandle as _, Registered,
-        register,
-    },
-    json_size::JsonSize,
-};
 
 use crate::{
-    config,
-    config::{ComponentKey, OutputId},
-    event::{
-        EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventMutRef, EventRef,
-        into_event_stream,
-    },
-    fanout::{self, Fanout},
-    schema,
+    config::OutputId,
+    event::{Event, EventArray, EventContainer, EventMutRef, into_event_stream},
     schema::Definition,
 };
 
+mod outputs;
 #[cfg(feature = "lua")]
 pub mod runtime_transform;
 
-/// Transforms come in two variants. Functions, or tasks.
+pub use outputs::{OutputBuffer, TransformOutputs, TransformOutputsBuf};
+
+/// Transforms execute synchronously over events or asynchronously over a stream.
 ///
-/// While function transforms can be run out of order, or concurrently, task
-/// transforms act as a coordination or barrier point.
+/// Synchronous definitions are shared; execution owns private mutable state.
+/// Task transforms act as a coordination or barrier point.
 pub enum Transform {
-    Function(Box<dyn FunctionTransform>),
-    Synchronous(Box<dyn SyncTransform>),
+    Synchronous(Arc<dyn ErasedSyncTransform>),
     Task(Box<dyn TaskTransform<EventArray>>),
 }
 
 impl Transform {
-    /// Create a new function transform.
-    ///
-    /// These functions are "stateless" and can be run in parallel, without
-    /// regard for coordination.
-    ///
-    /// **Note:** You should prefer to implement this over [`TaskTransform`]
-    /// where possible.
-    pub fn function(v: impl FunctionTransform + 'static) -> Self {
-        Transform::Function(Box::new(v))
+    /// Create a synchronous transform with no private execution state.
+    pub fn stateless(v: impl SyncTransform) -> Self {
+        Self::stateful(Stateless(v))
     }
 
-    /// Create a new synchronous transform.
-    ///
-    /// This is a broader trait than the simple [`FunctionTransform`] in that it allows transforms
-    /// to write to multiple outputs. Those outputs must be known in advanced and returned via
-    /// `TransformConfig::outputs`. Attempting to send to any output not registered in advance is
-    /// considered a bug and will cause a panic.
-    pub fn synchronous(v: impl SyncTransform + 'static) -> Self {
-        Transform::Synchronous(Box::new(v))
+    /// Create a synchronous transform with private execution state.
+    pub fn stateful(v: impl StatefulTransform) -> Self {
+        Transform::Synchronous(Arc::new(v))
     }
 
     /// Create a new task transform.
@@ -88,29 +64,27 @@ impl Transform {
     ///
     /// # Panics
     ///
-    /// If the transform is a [`FunctionTransform`] this will panic.
+    /// Panics if the transform is synchronous.
     pub fn into_task(self) -> Box<dyn TaskTransform<EventArray>> {
         match self {
             Transform::Task(t) => t,
-            _ => {
+            Transform::Synchronous(_) => {
                 panic!("Called `Transform::into_task` on something that was not a task variant.")
             }
         }
     }
 }
 
-/// Transforms that are simple, and don't require attention to coordination.
-/// You can run them as simple functions over events in any order.
+/// Stateless transforms that write to the primary output.
 ///
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a
 ///   `TaskTransform` or vice versa.
-pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event);
+pub trait FunctionTransform: Send + Sync + 'static {
+    /// Process an event and write any results to the primary output.
+    fn transform(&self, output: &mut OutputBuffer, event: Event);
 }
-
-dyn_clone::clone_trait_object!(FunctionTransform);
 
 /// Transforms that tend to be more complicated runtime style components.
 ///
@@ -142,27 +116,14 @@ pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
     }
 }
 
-/// Broader than the simple [`FunctionTransform`], this trait allows transforms to write to
-/// multiple outputs. Those outputs must be known in advanced and returned via
-/// `TransformConfig::outputs`. Attempting to send to any output not registered in advance is
-/// considered a bug and will cause a panic.
-pub trait SyncTransform: Send + dyn_clone::DynClone + Sync {
-    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf);
-
-    fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
-        for event in events.into_events() {
-            self.transform(event, output);
-        }
-    }
+/// Stateless synchronous transforms that can write to multiple outputs.
+pub trait SyncTransform: Send + Sync + 'static {
+    /// Process an event and write any results to outputs declared by the transform.
+    fn transform(&self, event: Event, output: &mut TransformOutputsBuf);
 }
 
-dyn_clone::clone_trait_object!(SyncTransform);
-
-impl<T> SyncTransform for T
-where
-    T: FunctionTransform,
-{
-    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
+impl<T: FunctionTransform> SyncTransform for T {
+    fn transform(&self, event: Event, output: &mut TransformOutputsBuf) {
         FunctionTransform::transform(
             self,
             output.primary_buffer.as_mut().expect("no default output"),
@@ -171,140 +132,88 @@ where
     }
 }
 
-// TODO: this is a bit ugly when we already have the above impl
-impl SyncTransform for Box<dyn FunctionTransform> {
-    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
-        FunctionTransform::transform(
-            self.as_mut(),
-            output.primary_buffer.as_mut().expect("no default output"),
-            event,
-        );
+/// Synchronous transforms that keep their mutable execution state separate from their definition.
+///
+/// Inline execution retains state across arrays. Enable concurrent execution only when
+/// starting each batch with fresh state preserves the transform's behavior.
+pub trait StatefulTransform: Send + Sync + 'static {
+    /// Mutable state owned by one execution.
+    type State: Send + 'static;
+
+    /// Initialize state once per inline executor or concurrent batch.
+    fn new_state(&self) -> Self::State;
+
+    /// Process an event and write any results to outputs declared by the transform.
+    fn transform(&self, state: &mut Self::State, event: Event, output: &mut TransformOutputsBuf);
+
+    /// Process an array of events with the current execution state.
+    fn transform_all(
+        &self,
+        state: &mut Self::State,
+        events: EventArray,
+        output: &mut TransformOutputsBuf,
+    ) {
+        for event in events.into_events() {
+            self.transform(state, event, output);
+        }
     }
 }
 
-struct TransformOutput {
-    fanout: Fanout,
-    events_sent: Registered<EventsSent>,
-    log_schema_definitions: HashMap<OutputId, Arc<schema::Definition>>,
-    output_id: Arc<OutputId>,
+struct Stateless<T>(T);
+
+impl<T: SyncTransform> StatefulTransform for Stateless<T> {
+    type State = ();
+
+    fn new_state(&self) {}
+
+    fn transform(&self, (): &mut (), event: Event, output: &mut TransformOutputsBuf) {
+        self.0.transform(event, output);
+    }
 }
 
-pub struct TransformOutputs {
-    outputs_spec: Vec<config::TransformOutput>,
-    primary_output: Option<TransformOutput>,
-    named_outputs: HashMap<String, TransformOutput>,
+/// Object-safe topology interface to a shared synchronous transform definition.
+///
+/// State remains typed inside the adapter; concurrent execution needs neither a
+/// boxed state nor a runtime downcast.
+pub trait ErasedSyncTransform: Send + Sync {
+    /// Process a whole compute batch with fresh state shared by all its arrays.
+    fn transform_batch(&self, arrays: Vec<EventArray>, output: &mut TransformOutputsBuf);
+
+    /// Bind the definition to persistent state for inline execution.
+    fn create_executor(self: Arc<Self>) -> Box<dyn SyncTransformExecutor>;
 }
 
-impl TransformOutputs {
-    pub fn new(
-        outputs_in: Vec<config::TransformOutput>,
-        component_key: &ComponentKey,
-    ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
-        let outputs_spec = outputs_in.clone();
-        let mut primary_output = None;
-        let mut named_outputs = HashMap::new();
-        let mut controls = HashMap::new();
-
-        for output in outputs_in {
-            let (fanout, control) = Fanout::new();
-
-            let log_schema_definitions = output
-                .log_schema_definitions
-                .into_iter()
-                .map(|(id, definition)| (id, Arc::new(definition)))
-                .collect();
-
-            match output.port {
-                None => {
-                    primary_output = Some(TransformOutput {
-                        fanout,
-                        events_sent: register(EventsSent::from(internal_event::Output(Some(
-                            DEFAULT_OUTPUT.into(),
-                        )))),
-                        log_schema_definitions,
-                        output_id: Arc::new(OutputId {
-                            component: component_key.clone(),
-                            port: None,
-                        }),
-                    });
-                    controls.insert(None, control);
-                }
-                Some(name) => {
-                    named_outputs.insert(
-                        name.clone(),
-                        TransformOutput {
-                            fanout,
-                            events_sent: register(EventsSent::from(internal_event::Output(Some(
-                                name.clone().into(),
-                            )))),
-                            log_schema_definitions,
-                            output_id: Arc::new(OutputId {
-                                component: component_key.clone(),
-                                port: Some(name.clone()),
-                            }),
-                        },
-                    );
-                    controls.insert(Some(name.clone()), control);
-                }
-            }
+impl<T: StatefulTransform> ErasedSyncTransform for T {
+    fn transform_batch(&self, arrays: Vec<EventArray>, output: &mut TransformOutputsBuf) {
+        let mut state = self.new_state();
+        for events in arrays {
+            self.transform_all(&mut state, events, output);
         }
-
-        let me = Self {
-            outputs_spec,
-            primary_output,
-            named_outputs,
-        };
-
-        (me, controls)
     }
 
-    pub fn new_buf_with_capacity(&self, capacity: usize) -> TransformOutputsBuf {
-        TransformOutputsBuf::new_with_capacity(self.outputs_spec.clone(), capacity)
+    fn create_executor(self: Arc<Self>) -> Box<dyn SyncTransformExecutor> {
+        let state = self.new_state();
+        Box::new(Executor {
+            definition: self,
+            state,
+        })
     }
+}
 
-    /// Sends the events in the buffer to their respective outputs.
-    ///
-    /// # Errors
-    ///
-    /// If an error occurs while sending events to their respective output, an error variant will be
-    /// returned detailing the cause.
-    pub async fn send(
-        &mut self,
-        buf: &mut TransformOutputsBuf,
-    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
-        if let Some(primary) = self.primary_output.as_mut() {
-            let buf = buf
-                .primary_buffer
-                .as_mut()
-                .unwrap_or_else(|| unreachable!("mismatched outputs"));
-            Self::send_single_buffer(buf, primary).await?;
-        }
-        for (key, buf) in &mut buf.named_buffers {
-            let output = self
-                .named_outputs
-                .get_mut(key)
-                .unwrap_or_else(|| unreachable!("unknown output"));
-            Self::send_single_buffer(buf, output).await?;
-        }
-        Ok(())
-    }
+/// A synchronous transform definition bound to private, persistent execution state.
+pub trait SyncTransformExecutor: Send {
+    fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf);
+}
 
-    async fn send_single_buffer(
-        buf: &mut OutputBuffer,
-        output: &mut TransformOutput,
-    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
-        for event in buf.events_mut() {
-            update_runtime_schema_definition(
-                event,
-                &output.output_id,
-                &output.log_schema_definitions,
-            );
-        }
-        let count = buf.len();
-        let byte_size = buf.estimated_json_encoded_size_of();
-        buf.send(&mut output.fanout).await?;
-        output.events_sent.emit(CountByteSize(count, byte_size));
-        Ok(())
+struct Executor<T: StatefulTransform> {
+    definition: Arc<T>,
+    state: T::State,
+}
+
+impl<T: StatefulTransform> SyncTransformExecutor for Executor<T> {
+    fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
+        self.definition
+            .transform_all(&mut self.state, events, output);
     }
 }
 
@@ -334,221 +243,6 @@ pub fn update_runtime_schema_definition(
     event.metadata_mut().set_upstream_id(Arc::clone(output_id));
 }
 
-#[derive(Debug, Clone)]
-pub struct TransformOutputsBuf {
-    primary_buffer: Option<OutputBuffer>,
-    named_buffers: HashMap<String, OutputBuffer>,
-}
-
-impl TransformOutputsBuf {
-    pub fn new_with_capacity(outputs_in: Vec<config::TransformOutput>, capacity: usize) -> Self {
-        let mut primary_buffer = None;
-        let mut named_buffers = HashMap::new();
-
-        for output in outputs_in {
-            match output.port {
-                None => {
-                    primary_buffer = Some(OutputBuffer::with_capacity(capacity));
-                }
-                Some(name) => {
-                    named_buffers.insert(name.clone(), OutputBuffer::default());
-                }
-            }
-        }
-
-        Self {
-            primary_buffer,
-            named_buffers,
-        }
-    }
-
-    /// Adds a new event to the named output buffer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no output with the given name.
-    pub fn push(&mut self, name: Option<&str>, event: Event) {
-        match name {
-            Some(name) => self.named_buffers.get_mut(name),
-            None => self.primary_buffer.as_mut(),
-        }
-        .expect("unknown output")
-        .push(event);
-    }
-
-    /// Drains the default output buffer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no default output.
-    pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
-        self.primary_buffer
-            .as_mut()
-            .expect("no default output")
-            .drain()
-    }
-
-    /// Drains the named output buffer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no output with the given name.
-    pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
-        self.named_buffers
-            .get_mut(name)
-            .expect("unknown output")
-            .drain()
-    }
-
-    /// Takes the default output buffer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no default output.
-    pub fn take_primary(&mut self) -> OutputBuffer {
-        std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
-    }
-
-    pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
-        std::mem::take(&mut self.named_buffers)
-    }
-}
-
-impl ByteSizeOf for TransformOutputsBuf {
-    fn allocated_bytes(&self) -> usize {
-        self.primary_buffer.size_of()
-            + self
-                .named_buffers
-                .values()
-                .map(ByteSizeOf::size_of)
-                .sum::<usize>()
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct OutputBuffer(Vec<EventArray>);
-
-impl OutputBuffer {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
-    }
-
-    pub fn push(&mut self, event: Event) {
-        // Coalesce multiple pushes of the same type into one array.
-        match (event, self.0.last_mut()) {
-            (Event::Log(log), Some(EventArray::Logs(logs))) => {
-                logs.push(log);
-            }
-            (Event::Metric(metric), Some(EventArray::Metrics(metrics))) => {
-                metrics.push(metric);
-            }
-            (Event::Trace(trace), Some(EventArray::Traces(traces))) => {
-                traces.push(trace);
-            }
-            (event, _) => {
-                self.0.push(event.into());
-            }
-        }
-    }
-
-    pub fn append(&mut self, events: &mut Vec<Event>) {
-        for event in events.drain(..) {
-            self.push(event);
-        }
-    }
-
-    pub fn extend(&mut self, events: impl Iterator<Item = Event>) {
-        for event in events {
-            self.push(event);
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.iter().map(EventArray::len).sum()
-    }
-
-    pub fn capacity(&self) -> usize {
-        self.0.capacity()
-    }
-
-    pub fn first(&self) -> Option<EventRef<'_>> {
-        self.0.first().and_then(|first| match first {
-            EventArray::Logs(l) => l.first().map(Into::into),
-            EventArray::Metrics(m) => m.first().map(Into::into),
-            EventArray::Traces(t) => t.first().map(Into::into),
-        })
-    }
-
-    pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
-        self.0.drain(..).flat_map(EventArray::into_events)
-    }
-
-    async fn send(
-        &mut self,
-        output: &mut Fanout,
-    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
-        let send_start = Some(Instant::now());
-        for array in std::mem::take(&mut self.0) {
-            output.send(array, send_start).await?;
-        }
-
-        Ok(())
-    }
-
-    fn iter_events(&self) -> impl Iterator<Item = EventRef<'_>> {
-        self.0.iter().flat_map(EventArray::iter_events)
-    }
-
-    fn events_mut(&mut self) -> impl Iterator<Item = EventMutRef<'_>> {
-        self.0.iter_mut().flat_map(EventArray::iter_events_mut)
-    }
-
-    pub fn into_events(self) -> impl Iterator<Item = Event> {
-        self.0.into_iter().flat_map(EventArray::into_events)
-    }
-}
-
-impl ByteSizeOf for OutputBuffer {
-    fn allocated_bytes(&self) -> usize {
-        self.0.iter().map(ByteSizeOf::size_of).sum()
-    }
-}
-
-impl EventDataEq<Vec<Event>> for OutputBuffer {
-    fn event_data_eq(&self, other: &Vec<Event>) -> bool {
-        struct Comparator<'a>(EventRef<'a>);
-
-        impl PartialEq<&Event> for Comparator<'_> {
-            fn eq(&self, that: &&Event) -> bool {
-                self.0.event_data_eq(that)
-            }
-        }
-
-        self.iter_events().map(Comparator).eq(other.iter())
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for OutputBuffer {
-    fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        self.0
-            .iter()
-            .map(EstimatedJsonEncodedSizeOf::estimated_json_encoded_size_of)
-            .sum()
-    }
-}
-
-impl From<Vec<Event>> for OutputBuffer {
-    fn from(events: Vec<Event>) -> Self {
-        let mut result = Self::default();
-        result.extend(events.into_iter());
-        result
-    }
-}
-
 struct WrapEventTask<T>(T);
 
 impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for WrapEventTask<T> {
@@ -566,6 +260,170 @@ impl<T: TaskTransform<Event> + Send + 'static> TaskTransform<EventArray> for Wra
 mod test {
     use super::*;
     use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
+
+    use std::{
+        cell::Cell,
+        sync::{
+            Mutex,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
+
+    // Deliberately not Clone; its state is Send but not Sync.
+    #[derive(Default)]
+    struct ObservedTransform {
+        created: AtomicUsize,
+        dropped: Arc<AtomicUsize>,
+        observations: Mutex<Vec<(usize, usize, usize)>>,
+    }
+
+    struct ObservedState {
+        id: usize,
+        count: Cell<usize>,
+        dropped: Arc<AtomicUsize>,
+    }
+
+    impl Drop for ObservedState {
+        fn drop(&mut self) {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    impl StatefulTransform for ObservedTransform {
+        type State = ObservedState;
+
+        fn new_state(&self) -> ObservedState {
+            ObservedState {
+                id: self.created.fetch_add(1, Ordering::Relaxed),
+                count: Cell::new(0),
+                dropped: Arc::clone(&self.dropped),
+            }
+        }
+
+        fn transform(
+            &self,
+            state: &mut ObservedState,
+            event: Event,
+            output: &mut TransformOutputsBuf,
+        ) {
+            state.count.set(state.count.get() + 1);
+            self.observations.lock().unwrap().push((
+                std::ptr::from_ref(self) as usize,
+                state.id,
+                state.count.get(),
+            ));
+            assert_ne!(event.as_log().get_message().unwrap(), &"panic".into());
+            output.push(None, event);
+        }
+    }
+
+    fn outputs() -> TransformOutputsBuf {
+        TransformOutputsBuf::new_with_capacity(
+            vec![crate::config::TransformOutput::new(
+                crate::config::DataType::Log,
+                HashMap::new(),
+            )],
+            1,
+        )
+    }
+
+    fn event() -> Event {
+        LogEvent::from("test").into()
+    }
+
+    #[test]
+    fn stateless_function_uses_primary_output_in_both_execution_modes() {
+        struct Pass;
+
+        impl FunctionTransform for Pass {
+            fn transform(&self, output: &mut OutputBuffer, event: Event) {
+                output.push(event);
+            }
+        }
+
+        let Transform::Synchronous(transform) = Transform::stateless(Pass) else {
+            panic!("expected a synchronous transform");
+        };
+
+        let mut batch_output = outputs();
+        transform.transform_batch(vec![event().into(), event().into()], &mut batch_output);
+        assert_eq!(batch_output.take_primary().len(), 2);
+
+        let mut inline_output = outputs();
+        let mut executor = transform.create_executor();
+        executor.transform_all(event().into(), &mut inline_output);
+        assert_eq!(inline_output.take_primary().len(), 1);
+    }
+
+    #[test]
+    fn batch_state_is_fresh_and_inline_state_persists() {
+        let definition = Arc::new(ObservedTransform::default());
+        let expected_address = Arc::as_ptr(&definition) as usize;
+        let shared: Arc<dyn ErasedSyncTransform> = definition.clone();
+        let mut output = outputs();
+        shared.transform_batch(vec![event().into(), event().into()], &mut output);
+        shared.transform_batch(vec![event().into()], &mut output);
+        assert_eq!(definition.dropped.load(Ordering::Relaxed), 2);
+
+        let mut executor = shared.create_executor();
+        executor.transform_all(event().into(), &mut output);
+        executor.transform_all(event().into(), &mut output);
+        assert_eq!(definition.created.load(Ordering::Relaxed), 3);
+        assert_eq!(definition.dropped.load(Ordering::Relaxed), 2);
+        drop(executor);
+        assert_eq!(definition.dropped.load(Ordering::Relaxed), 3);
+        assert_eq!(output.take_primary().len(), 5);
+        assert_eq!(
+            *definition.observations.lock().unwrap(),
+            [(0, 1), (0, 2), (1, 1), (2, 1), (2, 2)].map(|(id, count)| (
+                expected_address,
+                id,
+                count
+            )),
+        );
+    }
+
+    #[test]
+    fn concurrent_batches_share_definition_and_isolate_state() {
+        let definition = Arc::new(ObservedTransform::default());
+        let expected_address = Arc::as_ptr(&definition) as usize;
+        let shared: Arc<dyn ErasedSyncTransform> = definition.clone();
+        let barrier = Arc::new(std::sync::Barrier::new(4));
+        let threads: Vec<_> = (0..4)
+            .map(|_| {
+                let shared = Arc::clone(&shared);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    shared.transform_batch(vec![event().into()], &mut outputs());
+                })
+            })
+            .collect();
+        for thread in threads {
+            thread.join().unwrap();
+        }
+        assert_eq!(definition.created.load(Ordering::Relaxed), 4);
+        assert_eq!(definition.dropped.load(Ordering::Relaxed), 4);
+        let mut observations = definition.observations.lock().unwrap();
+        observations.sort_unstable();
+        assert_eq!(
+            *observations,
+            [0, 1, 2, 3].map(|id| (expected_address, id, 1))
+        );
+    }
+
+    #[test]
+    fn panicking_batch_drops_private_state() {
+        let definition = ObservedTransform::default();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            definition.transform_batch(
+                vec![Event::from(LogEvent::from("panic")).into()],
+                &mut outputs(),
+            );
+        }));
+        assert!(result.is_err());
+        assert_eq!(definition.dropped.load(Ordering::Relaxed), 1);
+    }
 
     #[test]
     fn buffers_output() {

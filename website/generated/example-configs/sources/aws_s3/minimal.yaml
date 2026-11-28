@@ -1,0 +1,3 @@
+sources:
+  my_source_id:
+    type: aws_s3

@@ -1,4 +1,7 @@
-use vector_lib::{TimeZone, compile_vrl, configurable::configurable_component, emit};
+use vector_lib::{
+    TimeZone, compile_vrl, configurable::configurable_component, internal_event::emit,
+};
+use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     compiler::{
         CompilationResult, CompileConfig, Program, TypeState, VrlRuntime,
@@ -10,7 +13,7 @@ use vrl::{
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
     config::LogNamespace,
-    event::{Event, TargetEvents, VrlTarget},
+    event::{Event, MetricTagMode, TargetEvents, VrlTarget},
     format_vrl_diagnostics,
     internal_events::VrlConditionExecutionError,
 };
@@ -22,7 +25,7 @@ pub struct VrlConfig {
     /// The VRL boolean expression.
     pub(crate) source: String,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(crate) runtime: VrlRuntime,
 }
@@ -33,6 +36,7 @@ impl ConditionalConfig for VrlConfig {
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
@@ -50,6 +54,7 @@ impl ConditionalConfig for VrlConfig {
 
         let mut config = CompileConfig::default();
         config.set_custom(enrichment_tables.clone());
+        config.set_custom(metrics_storage.clone());
         config.set_read_only();
 
         let CompilationResult {
@@ -84,12 +89,13 @@ pub struct Vrl {
 }
 
 impl Vrl {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::manual_let_else, reason = "Preserve existing control flow")]
     fn run(&self, event: Event) -> (Event, RuntimeResult) {
         let log_namespace = event
             .maybe_as_log()
-            .map(|log| log.namespace())
-            .unwrap_or(LogNamespace::Legacy);
-        let mut target = VrlTarget::new(event, self.program.info(), false);
+            .map_or(LogNamespace::Legacy, vector_lib::event::LogEvent::namespace);
+        let mut target = VrlTarget::new(event, self.program.info(), MetricTagMode::Single);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
@@ -106,17 +112,18 @@ impl Conditional for Vrl {
     fn check(&self, event: Event) -> (bool, Event) {
         let (event, result) = self.run(event);
 
-        let result = result
-            .map(|value| match value {
-                Value::Boolean(boolean) => boolean,
-                _ => panic!("VRL condition did not return a boolean type"),
-            })
-            .unwrap_or_else(|err| {
-                emit!(VrlConditionExecutionError {
-                    error: err.to_string().as_ref()
+        let result = result.map_or_else(
+            |err| {
+                emit(VrlConditionExecutionError {
+                    error: err.to_string().as_ref(),
                 });
                 false
-            });
+            },
+            |value| match value {
+                Value::Boolean(boolean) => boolean,
+                _ => panic!("VRL condition did not return a boolean type"),
+            },
+        );
         (result, event)
     }
 
@@ -142,6 +149,7 @@ impl Conditional for Vrl {
                 );
                 format!("source execution failed: {err}")
             }
+            Terminate::Interrupted => "source execution interrupted".to_owned(),
         });
 
         let value = match value_result {
@@ -176,6 +184,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::default_trait_access,
+        reason = "Preserve inferred default types"
+    )]
     fn check_vrl() {
         let checks = vec![
             (
@@ -230,6 +243,16 @@ mod test {
                 Ok(()),
             ),
             (
+                Event::Metric(Metric::new(
+                    "zork",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )),
+                r".counter.value == 1.0 && .gauge.value == null",
+                Ok(()),
+                Ok(()),
+            ),
+            (
                 log_event![],
                 r#""i_return_a_string""#,
                 Err("VRL conditions must return a boolean.".into()),
@@ -241,21 +264,21 @@ mod test {
             let source = source.to_owned();
             let config = VrlConfig {
                 source,
-                runtime: Default::default(),
+                runtime: VrlRuntime::default(),
             };
 
             assert_eq!(
                 config
-                    .build(&Default::default())
+                    .build(&Default::default(), &MetricsStorage::default())
                     .map(|_| ())
                     .map_err(|e| e.to_string()),
                 build
             );
 
-            if let Ok(cond) = config.build(&Default::default()) {
+            if let Ok(cond) = config.build(&Default::default(), &MetricsStorage::default()) {
                 assert_eq!(
-                    cond.check_with_context(event.clone()).0,
-                    check.map_err(|e| e.to_string())
+                    cond.check_with_context(event).0,
+                    check.map_err(std::string::ToString::to_string)
                 );
             }
         }

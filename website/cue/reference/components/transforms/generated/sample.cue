@@ -12,11 +12,33 @@ generated: components: transforms: sample: configuration: {
 
 			If left unspecified, or if the event doesn't have `group_by`, then the event is not
 			sampled separately.
+
+			This can also be used with `ratio_field` or `rate_field` to apply dynamic sampling
+			independently per rendered group value.
 			"""
 		required: false
 		type: string: {
 			examples: ["{{ service }}", "{{ hostname }}-{{ service }}"]
 			syntax: "template"
+		}
+		warnings: ["Prefer grouping by fields with a small, stable set of values, such as `service` or `host`. When the template interpolates event content (for example `{{ message }}` or `{{ request_id }}`), every distinct rendered value creates a new group: exceeding `max_state_bytes` then evicts the least recently used groups' sampling state."]
+	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for the Sample transform."
+		required:    false
+		type: object: options: include_group_tag: {
+			description: """
+				Whether or not to include the `group` tag on the `component_discarded_events_total`
+				internal metric.
+
+				When enabled, adds a `group` tag containing the rendered `group_by` value.
+				Missing or unrenderable values use `None`.
+
+				Note that this defaults to false because the `group` tag has potentially unbounded
+				cardinality. Only set this to true if you know that the number of unique groups is bounded.
+				"""
+			required: false
+			type: bool: default: false
 		}
 	}
 	key_field: {
@@ -32,9 +54,26 @@ generated: components: transforms: sample: configuration: {
 
 			This can be useful to, for example, ensure that all logs for a given transaction are
 			sampled together, but that overall `1/N` transactions are sampled.
+
+			This option cannot be combined with `ratio_field` or `rate_field`.
 			"""
 		required: false
 		type: string: examples: ["message"]
+	}
+	max_state_bytes: {
+		description: """
+			The maximum number of bytes of per-group sampling state that is retained.
+
+			Each group is counted by the size of its rendered `group_by` value plus a fixed per-group
+			overhead for its sampling state and cache bookkeeping. When this limit is reached, the least
+			recently used groups' state is evicted. A group whose state alone exceeds this limit is
+			sampled but not retained.
+			"""
+		required: false
+		type: uint: {
+			default: 134217728
+			unit:    "bytes"
+		}
 	}
 	rate: {
 		description: """
@@ -42,26 +81,55 @@ generated: components: transforms: sample: configuration: {
 
 			For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
 			dropped. This differs from `ratio` which allows more precise control over the number of events
-			retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
+			retained and values greater than 1/2.
+
+			Exactly one of `rate` or `ratio` must be set.
 			"""
 		required: false
-		type: uint: examples: [
-			1500,
-		]
+		required_one_of: ["rate", "ratio"]
+		required_one_of_group: "sampling_strategy"
+		type: uint: {}
+	}
+	rate_field: {
+		description: """
+			The event field whose integer value is used as the sampling rate on a per-event basis, expressed as `1/N`.
+
+			Accepts an integer, or a string that parses as a positive integer; floating point values
+			are rejected. The value must be a positive integer to be considered valid. If the field is
+			missing or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
+			This option cannot be used together with `ratio_field`.
+			"""
+		required: false
+		type: string: {}
 	}
 	ratio: {
 		description: """
-			The rate at which events are forwarded, expressed as a percentage
+			The rate at which events are forwarded, expressed as a percentage.
 
 			For example, `ratio = .13` means that 13% out of all events on the stream are forwarded and
 			the rest are dropped. This differs from `rate` allowing the configuration of a higher
-			precision value and also the ability to retain values of greater than 50% of all events. It is
-			an error to provide a value for both `rate` and `ratio`.
+			precision value and also the ability to retain values of greater than 50% of all events.
+
+			Exactly one of `rate` or `ratio` must be set.
 			"""
 		required: false
+		required_one_of: ["rate", "ratio"]
+		required_one_of_group: "sampling_strategy"
 		type: float: examples: [
-			0.13,
+			0.13
 		]
+	}
+	ratio_field: {
+		description: """
+			The event field whose numeric value is used as the sampling ratio on a per-event basis.
+
+			Accepts integer, floating point, or string values that parse as a number. The value must be
+			in `(0, 1]` to be considered valid (for example, `0.25` keeps 25%). If the field is missing
+			or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
+			This option cannot be used together with `rate_field`.
+			"""
+		required: false
+		type: string: {}
 	}
 	sample_rate_key: {
 		description: "The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event."

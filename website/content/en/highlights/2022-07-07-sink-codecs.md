@@ -20,13 +20,16 @@ For example, if you have a `socket` sink that you want to send
 [length-delimited][length_delimited] JSON-encoded, messages, you can now do so
 with configuration like:
 
-```toml
-[sinks.socket]
-type = "socket"
-address = "92.12.333.224:5000"
-mode = "tcp"
-framing.method = "length_delimited"
-encoding.codec = "json"
+```yaml
+sinks:
+  socket:
+    type: "socket"
+    address: "92.12.333.224:5000"
+    mode: "tcp"
+    framing:
+      method: "length_delimited"
+    encoding:
+      codec: "json"
 ```
 
 This will encode messages flowing into this sink as JSON and frame them using

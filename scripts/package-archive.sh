@@ -24,7 +24,7 @@ OVERWRITE=${OVERWRITE:-"true"}
 ARCHIVE_TYPE="${ARCHIVE_TYPE:-"tar.gz"}"
 NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
 TARGET="${TARGET:?"You must specify a target triple, ex: arm64-apple-darwin"}"
-ARCHIVE_VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
+ARCHIVE_VERSION="${VECTOR_VERSION:-"$(${VDEV:-cargo vdev} version)"}"
 
 #
 # Local Vars

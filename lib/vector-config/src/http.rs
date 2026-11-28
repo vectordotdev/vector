@@ -2,9 +2,11 @@ use std::cell::RefCell;
 
 use http::StatusCode;
 use serde_json::Value;
+use vector_config_common::{attributes::CustomAttribute, constants};
 
 use crate::{
     Configurable, GenerateError, Metadata, ToValue,
+    num::NumberClass,
     schema::{SchemaGenerator, SchemaObject, generate_number_schema},
 };
 
@@ -19,14 +21,13 @@ impl Configurable for StatusCode {
         Some("http::StatusCode")
     }
 
-    fn is_optional() -> bool {
-        true
-    }
-
     fn metadata() -> Metadata {
         let mut metadata = Metadata::default();
         metadata.set_description("HTTP response status code");
-        metadata.set_default_value(StatusCode::OK);
+        metadata.add_custom_attribute(CustomAttribute::kv(
+            constants::DOCS_META_NUMERIC_TYPE,
+            NumberClass::Unsigned,
+        ));
         metadata
     }
 

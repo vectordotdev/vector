@@ -1,0 +1,36 @@
+# Payload for the 3-processor async chain (throttle, dedupe, reduce).
+# Shapes:
+#   - .correlation_id: unique per id (1..10M) so dedupe always takes the cache-miss path.
+#   - .service x .host = 4x4 = 16 reduce buckets.
+#   - log_count=1, latency_ms, error_count=0 drive the reduce sum/max merges.
+generator: !with
+  bind:
+    id: !range { min: 1, max: 10000000 }
+  in: !object
+    id: !var id
+    message:
+      !choose ["user transaction processed", "deprecated endpoint called", "cache entry updated", "request completed"]
+    status: !const "ok"
+    timestamp: !timestamp
+    source: !choose ["load-test", "kafka-consumer", "scheduler-job", "web-frontend"]
+    env: !choose ["production", "production", "staging", "development"]
+    service: !choose ["api-service", "auth-service", "internal-metrics-agent", "billing-service"]
+    level: !const "info"
+    host: !choose ["host-01", "host-02", "canary-node-01", "host-03"]
+    region: !const "us-east-1"
+    correlation_id: !format
+      template: "corr-{}-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      args:
+        - !var id
+    trace_id: !format
+      template: "trace-{}-00000000000000000000000000000000"
+      args:
+        - !var id
+    span_id: !format
+      template: "span-{}-aaaaaaaaaaaaaaaa"
+      args:
+        - !var id
+    log_count: !const 1
+    latency_ms: !const 12.34
+    error_count: !const 0
+    tags: !const ["load-test", "synthetic", "batch"]

@@ -1,0 +1,160 @@
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
+use async_trait::async_trait;
+use futures_util::{FutureExt, StreamExt, future, stream::BoxStream};
+use tokio::sync::oneshot::Sender;
+use vector_lib::{
+    config::{AcknowledgementsConfig, Input},
+    configurable::configurable_component,
+    cpu_time::{ThreadTime, spawn_timed},
+    event::Event,
+    sink::{StreamSink, VectorSink},
+};
+
+use crate::{
+    config::{SinkConfig, SinkContext, ValidatedSink},
+    sinks::Healthcheck,
+    test_util::mock::transforms::busy_spin,
+};
+
+/// Configuration for the `test_completion` sink.
+#[configurable_component(sink("test_completion", "Test (completion)."))]
+#[derive(Clone, Debug, Default)]
+pub struct CompletionSinkConfig {
+    #[serde(skip)]
+    expected: usize,
+
+    #[serde(skip)]
+    completion_tx: Arc<Mutex<Option<Sender<bool>>>>,
+
+    /// CPU time burned per event, in a task spawned with `spawn_timed`.
+    #[serde(skip)]
+    cpu_burn_ms: Option<u64>,
+
+    /// CPU time burned by the healthcheck, in a task spawned with `spawn_timed`.
+    #[serde(skip)]
+    healthcheck_cpu_burn_ms: Option<u64>,
+}
+
+impl_generate_config_from_default!(CompletionSinkConfig);
+
+impl CompletionSinkConfig {
+    #[must_use]
+    pub fn new(expected: usize, completion_tx: Sender<bool>) -> Self {
+        Self {
+            expected,
+            completion_tx: Arc::new(Mutex::new(Some(completion_tx))),
+            cpu_burn_ms: None,
+            healthcheck_cpu_burn_ms: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_cpu_burn_ms(mut self, cpu_burn_ms: u64) -> Self {
+        self.cpu_burn_ms = Some(cpu_burn_ms);
+        self
+    }
+
+    #[must_use]
+    pub fn with_healthcheck_cpu_burn_ms(mut self, cpu_burn_ms: u64) -> Self {
+        self.healthcheck_cpu_burn_ms = Some(cpu_burn_ms);
+        self
+    }
+}
+
+#[async_trait]
+#[typetag::serde(name = "test_completion")]
+impl SinkConfig for CompletionSinkConfig {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+impl ValidatedSink for CompletionSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let completion_tx = self
+            .completion_tx
+            .lock()
+            .expect("completion sink mutex poisoned")
+            .take();
+
+        let sink = CompletionSink {
+            remaining: self.expected,
+            completion_tx,
+            cpu_burn: self.cpu_burn_ms.map(Duration::from_millis),
+        };
+        let healthcheck = match self.healthcheck_cpu_burn_ms.map(Duration::from_millis) {
+            Some(cpu_burn) => async move {
+                spawn_timed(async move { burn_thread_cpu(cpu_burn) }).await?;
+                Ok(())
+            }
+            .boxed(),
+            None => future::ready(Ok(())).boxed(),
+        };
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
+/// Spins until the current thread has used `duration` of CPU time. Unlike [`busy_spin`], the
+/// burn holds when the thread is preempted.
+fn burn_thread_cpu(duration: Duration) {
+    let start = ThreadTime::now();
+    while start.elapsed() < duration {
+        busy_spin(Duration::from_millis(1));
+    }
+}
+
+struct CompletionSink {
+    remaining: usize,
+    completion_tx: Option<Sender<bool>>,
+    cpu_burn: Option<Duration>,
+}
+
+#[async_trait]
+impl StreamSink<Event> for CompletionSink {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        while let Some(event) = input.next().await {
+            drop(event);
+
+            if let Some(cpu_burn) = self.cpu_burn {
+                spawn_timed(async move { busy_spin(cpu_burn) })
+                    .await
+                    .expect("CPU burn task panicked");
+            }
+
+            if self.remaining > 0 {
+                self.remaining -= 1;
+                if self.remaining == 0
+                    && let Some(tx) = self.completion_tx.take()
+                {
+                    tx.send(true).ok(); // receiver may be gone if the test already completed
+                }
+            }
+        }
+
+        if let Some(tx) = self.completion_tx.take() {
+            tx.send(self.remaining == 0).ok(); // receiver may be gone if the test already completed
+        }
+
+        Ok(())
+    }
+}

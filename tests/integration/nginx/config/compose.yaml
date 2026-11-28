@@ -1,25 +1,25 @@
-version: '3'
+version: "3"
 
 services:
   squid:
     image: docker.io/ubuntu/squid:latest
     depends_on:
-    - nginx-proxy
+      - nginx-proxy
     networks:
-    - default
-    - proxy
+      - default
+      - proxy
   nginx:
     image: docker.io/nginx:${CONFIG_VERSION}
     volumes:
-    - ../data/:/etc/nginx:ro
+      - ../data/:/etc/nginx:ro
     networks:
-    - default
+      - default
   nginx-proxy:
     image: docker.io/nginx:${CONFIG_VERSION}
     volumes:
-    - ../data/:/etc/nginx:ro
+      - ../data/:/etc/nginx:ro
     networks:
-    - proxy
+      - proxy
 
 networks:
   default:

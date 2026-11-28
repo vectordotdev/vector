@@ -1,10 +1,7 @@
-use std::{
-    fs::{OpenOptions, create_dir},
-    io::Write,
-    path::PathBuf,
-};
+use std::{fs::OpenOptions, io::Write, path::PathBuf};
 
-use vector::test_util::{temp_dir, temp_file};
+use tempfile::TempDir;
+use vector::test_util::temp_file;
 
 #[cfg(feature = "cli-tests")]
 mod cli;
@@ -12,14 +9,31 @@ mod cli;
 #[cfg(feature = "shutdown-tests")]
 mod shutdown;
 
+#[cfg(windows)]
+mod windows;
+
 /// Creates a file with given content
+#[must_use]
 pub fn create_file(config: &str) -> PathBuf {
     let path = temp_file();
     overwrite_file(path.clone(), config);
     path
 }
 
-/// Overwrites file with given content
+/// Creates a YAML config file (`.yaml` extension so Vector parses it as YAML)
+#[must_use]
+pub fn create_yaml_file(config: &str) -> PathBuf {
+    let mut path = temp_file();
+    path.set_extension("yaml");
+    overwrite_file(path.clone(), config);
+    path
+}
+
+/// Overwrites file with given content.
+///
+/// # Panics
+///
+/// Panics if the file cannot be opened, written, or synchronized.
 pub fn overwrite_file(path: PathBuf, config: &str) {
     let mut file = OpenOptions::new()
         .create(true)
@@ -29,12 +43,15 @@ pub fn overwrite_file(path: PathBuf, config: &str) {
         .unwrap();
 
     file.write_all(config.as_bytes()).unwrap();
-    file.flush().unwrap();
     file.sync_all().unwrap();
 }
 
-pub fn create_directory() -> PathBuf {
-    let path = temp_dir();
-    create_dir(path.clone()).unwrap();
-    path
+/// Creates a temporary directory.
+///
+/// # Panics
+///
+/// Panics if the directory cannot be created.
+#[must_use]
+pub fn create_directory() -> TempDir {
+    tempfile::tempdir().expect("Failed to create temporary directory")
 }

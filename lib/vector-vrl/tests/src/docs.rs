@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs,
-    process::Command,
-};
+use std::{collections::HashMap, fs, process::Command};
 
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -112,13 +108,13 @@ fn examples_to_tests(
     Box::new(examples.into_iter().flat_map(move |(k, v)| {
         v.examples
             .into_iter()
-            .map(|example| test_from_cue_example(category, k.clone(), example))
+            .map(|example| test_from_cue_example(category, &k, example))
             .collect::<Vec<_>>()
     }))
 }
 
-fn test_from_cue_example(category: &'static str, name: String, example: Example) -> Test {
-    use vrl::value::Value;
+fn test_from_cue_example(category: &'static str, name: &str, example: Example) -> Test {
+    use vrl::value::{ObjectMap, Value};
 
     let Example {
         title,
@@ -130,21 +126,19 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
         skip_test,
     } = example;
 
-    let mut skip = skip_test.unwrap_or_else(|| SKIP_FUNCTION_EXAMPLES.contains(&name.as_str()));
+    let mut skip = skip_test.unwrap_or_else(|| SKIP_FUNCTION_EXAMPLES.contains(&name));
 
     let object = match input {
         Some(event) => {
             serde_json::from_value::<Value>(serde_json::Value::Object(event.log)).unwrap()
         }
-        None => Value::Object(BTreeMap::default()),
+        None => Value::Object(ObjectMap::new()),
     };
 
-    if returns.is_some() && output.is_some() {
-        panic!(
-            "example must either specify return or output, not both: {}/{}",
-            category, &name
-        );
-    }
+    assert!(
+        !(returns.is_some() && output.is_some()),
+        "example must either specify return or output, not both: {category}/{name}"
+    );
 
     if let Some(output) = &output {
         let contains_metric_event = match &output {
@@ -192,6 +186,7 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
         skip,
         read_only_paths: vec![],
         check_diagnostics: false,
+        check_type_only: false,
         source_file: format!("website/cue/reference/remap/functions/{name}.cue"),
         source_line: 1,
     }

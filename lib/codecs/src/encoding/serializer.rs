@@ -2,12 +2,16 @@
 
 use bytes::BytesMut;
 use vector_config::configurable_component;
-use vector_core::{config::DataType, event::Event, schema};
+use vector_core::{config::DataType, event::Event, schema, serde::AsciiChar};
 
 #[cfg(feature = "arrow")]
 use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "parquet")]
+use super::format::{ParquetSerializer, ParquetSerializerConfig};
+#[cfg(feature = "syslog")]
+use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
     chunking::Chunker,
     format::{
@@ -93,11 +97,13 @@ pub enum SerializerConfig {
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     Native,
 
-    /// Encodes an event in the [native JSON format][vector_native_json].
+    /// Encodes an event using the [ProtoJSON mapping][protojson] of Vector's
+    /// [native event schema][vector_native_protobuf]. Deprecated schema fields are omitted.
     ///
     /// This codec is **[experimental][experimental]**.
     ///
-    /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+    /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+    /// [protojson]: https://protobuf.dev/programming-guides/json/
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     NativeJson,
 
@@ -134,6 +140,11 @@ pub enum SerializerConfig {
     /// transform) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
     Text(TextSerializerConfig),
+
+    /// Syslog encoding
+    /// RFC 3164 and 5424 are supported
+    #[cfg(feature = "syslog")]
+    Syslog(SyslogSerializerConfig),
 }
 
 impl Default for SerializerConfig {
@@ -143,6 +154,10 @@ impl Default for SerializerConfig {
 }
 
 /// Batch serializer configuration.
+///
+/// Only available when the `arrow` feature is enabled (the `parquet` feature
+/// implies `arrow`); all batch serializers produce columnar Arrow/Parquet output.
+#[cfg(feature = "arrow")]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
@@ -156,35 +171,62 @@ pub enum BatchSerializerConfig {
     /// a continuous stream of record batches.
     ///
     /// [apache_arrow]: https://arrow.apache.org/
-    #[cfg(feature = "arrow")]
     #[serde(rename = "arrow_stream")]
     ArrowStream(ArrowStreamSerializerConfig),
+    /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
+    ///
+    /// [apache_parquet]: https://parquet.apache.org/
+    #[cfg(feature = "parquet")]
+    #[serde(rename = "parquet")]
+    Parquet(ParquetSerializerConfig),
 }
 
 #[cfg(feature = "arrow")]
 impl BatchSerializerConfig {
-    /// Build the `ArrowStreamSerializer` from this configuration.
-    pub fn build(
+    /// Build the batch serializer from this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configured batch serializer cannot be built:
+    /// - `arrow_stream`: `schema` is not set, or `allow_nullable_fields` is enabled and the schema
+    ///   contains a `Map` field whose entries are not a struct of exactly two fields.
+    /// - `parquet`: `schema_file` is not set (unless `schema_mode` is `auto_infer`), cannot be
+    ///   read, is larger than 10 MB, or is not a valid Parquet schema; the schema contains binary
+    ///   columns, which the JSON-based encoder does not support; or the compression level is out
+    ///   of range for the selected codec.
+    pub fn build_batch_serializer(
         &self,
-    ) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<super::BatchSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => {
-                ArrowStreamSerializer::new(arrow_config.clone())
+                let serializer = ArrowStreamSerializer::new(arrow_config.clone())?;
+                Ok(super::BatchSerializer::Arrow(serializer))
+            }
+            #[cfg(feature = "parquet")]
+            BatchSerializerConfig::Parquet(parquet_config) => {
+                let serializer = ParquetSerializer::new(parquet_config.clone())?;
+                Ok(super::BatchSerializer::Parquet(Box::new(serializer)))
             }
         }
     }
 
     /// The data type of events that are accepted by this batch serializer.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
+            #[cfg(feature = "parquet")]
+            BatchSerializerConfig::Parquet(parquet_config) => parquet_config.input_type(),
         }
     }
 
     /// The schema required by the batch serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
+            #[cfg(feature = "parquet")]
+            BatchSerializerConfig::Parquet(parquet_config) => parquet_config.schema_requirement(),
         }
     }
 }
@@ -270,6 +312,19 @@ impl From<TextSerializerConfig> for SerializerConfig {
 
 impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected codec cannot be built:
+    /// - `avro`: the schema cannot be parsed or its named schemas cannot be resolved.
+    /// - `cef`: `device_vendor`, `device_product`, `device_version`, or `device_event_class_id`
+    ///   exceeds its maximum length after escaping, or an extension key contains characters other
+    ///   than ASCII letters.
+    /// - `csv`: no fields are configured.
+    /// - `otlp`: the bundled OTLP descriptor set cannot be decoded or does not contain the logs,
+    ///   metrics, or traces export request message types.
+    /// - `protobuf`: `desc_file` cannot be read or decoded as a descriptor set, or does not contain
+    ///   `message_type`.
     pub fn build(&self) -> Result<Serializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
@@ -294,10 +349,13 @@ impl SerializerConfig {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
             SerializerConfig::Text(config) => Ok(Serializer::Text(config.build())),
+            #[cfg(feature = "syslog")]
+            SerializerConfig::Syslog(config) => Ok(Serializer::Syslog(config.build())),
         }
     }
 
     /// Return an appropriate default framer for the given serializer.
+    #[must_use]
     pub fn default_stream_framing(&self) -> FramingConfig {
         match self {
             // TODO: Technically, Avro messages are supposed to be framed[1] as a vector of
@@ -327,13 +385,16 @@ impl SerializerConfig {
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
             | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
-            SerializerConfig::Gelf(_) => {
-                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
-            }
+            #[cfg(feature = "syslog")]
+            SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
+            SerializerConfig::Gelf(_) => FramingConfig::CharacterDelimited(
+                CharacterDelimitedEncoderConfig::new(AsciiChar::new('\0')),
+            ),
         }
     }
 
     /// The data type of events that are accepted by this `Serializer`.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         match self {
             SerializerConfig::Avro { avro } => {
@@ -352,10 +413,13 @@ impl SerializerConfig {
             SerializerConfig::Protobuf(config) => config.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
             SerializerConfig::Text(config) => config.input_type(),
+            #[cfg(feature = "syslog")]
+            SerializerConfig::Syslog(config) => config.input_type(),
         }
     }
 
     /// The schema required by the serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
             SerializerConfig::Avro { avro } => {
@@ -374,6 +438,8 @@ impl SerializerConfig {
             SerializerConfig::Protobuf(config) => config.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
             SerializerConfig::Text(config) => config.schema_requirement(),
+            #[cfg(feature = "syslog")]
+            SerializerConfig::Syslog(config) => config.schema_requirement(),
         }
     }
 }
@@ -408,10 +474,14 @@ pub enum Serializer {
     RawMessage(RawMessageSerializer),
     /// Uses a `TextSerializer` for serialization.
     Text(TextSerializer),
+    /// Uses a `SyslogSerializer` for serialization.
+    #[cfg(feature = "syslog")]
+    Syslog(SyslogSerializer),
 }
 
 impl Serializer {
     /// Check if the serializer supports encoding an event to JSON via `Serializer::to_json_value`.
+    #[must_use]
     pub fn supports_json(&self) -> bool {
         match self {
             Serializer::Json(_) | Serializer::NativeJson(_) | Serializer::Gelf(_) => true,
@@ -424,6 +494,8 @@ impl Serializer {
             | Serializer::Native(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => false,
+            #[cfg(feature = "syslog")]
+            Serializer::Syslog(_) => false,
             #[cfg(feature = "opentelemetry")]
             Serializer::Otlp(_) => false,
         }
@@ -431,10 +503,17 @@ impl Serializer {
 
     /// Encode event and represent it as JSON value.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the event cannot be serialized to JSON. For GELF, this includes events
+    /// that are not valid GELF and cannot be coerced into it, such as events missing the `host`
+    /// field or containing fields with invalid names or value types.
+    ///
     /// # Panics
     ///
     /// Panics if the serializer does not support encoding to JSON. Call `Serializer::supports_json`
-    /// if you need to determine the capability to encode to JSON at runtime.
+    /// if you need to determine the capability to encode to JSON at runtime. Also panics if the
+    /// serializer is GELF and the event is not a log event.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         match self {
             Serializer::Gelf(serializer) => serializer.to_json_value(event),
@@ -451,6 +530,10 @@ impl Serializer {
             | Serializer::RawMessage(_) => {
                 panic!("Serializer does not support JSON")
             }
+            #[cfg(feature = "syslog")]
+            Serializer::Syslog(_) => {
+                panic!("Serializer does not support JSON")
+            }
             #[cfg(feature = "opentelemetry")]
             Serializer::Otlp(_) => {
                 panic!("Serializer does not support JSON")
@@ -459,6 +542,7 @@ impl Serializer {
     }
 
     /// Returns the chunking implementation for the serializer, if any is supported.
+    #[must_use]
     pub fn chunker(&self) -> Option<Chunker> {
         match self {
             Serializer::Gelf(gelf) => Some(Chunker::Gelf(gelf.chunker())),
@@ -470,6 +554,7 @@ impl Serializer {
     ///
     /// Binary serializers produce raw bytes that should not be interpreted as text,
     /// while text serializers produce UTF-8 encoded strings.
+    #[must_use]
     pub const fn is_binary(&self) -> bool {
         match self {
             Serializer::RawMessage(_)
@@ -478,6 +563,8 @@ impl Serializer {
             | Serializer::Protobuf(_) => true,
             #[cfg(feature = "opentelemetry")]
             Serializer::Otlp(_) => true,
+            #[cfg(feature = "syslog")]
+            Serializer::Syslog(_) => false,
             Serializer::Cef(_)
             | Serializer::Csv(_)
             | Serializer::Influxdb(_)
@@ -568,6 +655,12 @@ impl From<TextSerializer> for Serializer {
         Self::Text(serializer)
     }
 }
+#[cfg(feature = "syslog")]
+impl From<SyslogSerializer> for Serializer {
+    fn from(serializer: SyslogSerializer) -> Self {
+        Self::Syslog(serializer)
+    }
+}
 
 impl tokio_util::codec::Encoder<Event> for Serializer {
     type Error = vector_common::Error;
@@ -588,6 +681,8 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Protobuf(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
             Serializer::Text(serializer) => serializer.encode(event, buffer),
+            #[cfg(feature = "syslog")]
+            Serializer::Syslog(serializer) => serializer.encode(event, buffer),
         }
     }
 }

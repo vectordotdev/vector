@@ -148,7 +148,7 @@ they would end up with a compilation error again, because the compiler gave them
 incorrect advice:
 
 ```coffee
-foo = to_string(15)
+foo = to_strng(15)
 foo = string!(foo)
 upcase(foo)
 ```

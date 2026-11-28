@@ -1,8 +1,6 @@
 use indexmap::IndexMap;
 use vector_lib::{
-    config::{LogNamespace, clone_input_definitions},
-    configurable::configurable_component,
-    transform::SyncTransform,
+    config::clone_input_definitions, configurable::configurable_component, transform::SyncTransform,
 };
 
 use crate::{
@@ -25,10 +23,15 @@ pub struct Route {
 }
 
 impl Route {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a route condition cannot be built.
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
         let mut conditions = Vec::with_capacity(config.route.len());
-        for (output_name, condition) in config.route.iter() {
-            let condition = condition.build(&context.enrichment_tables)?;
+        for (output_name, condition) in &config.route {
+            let condition =
+                condition.build(&context.enrichment_tables, &context.metrics_storage)?;
             conditions.push((output_name.clone(), condition));
         }
         Ok(Self {
@@ -39,7 +42,7 @@ impl Route {
 }
 
 impl SyncTransform for Route {
-    fn transform(&mut self, event: Event, output: &mut vector_lib::transform::TransformOutputsBuf) {
+    fn transform(&self, event: Event, output: &mut vector_lib::transform::TransformOutputsBuf) {
         let mut check_failed: usize = 0;
         for (output_name, condition) in &self.conditions {
             let (result, event) = condition.check(event.clone());
@@ -111,8 +114,8 @@ fn route_examples() -> IndexMap<String, AnyCondition> {
 }
 
 impl GenerateConfig for RouteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             reroute_unmatched: true,
             route: route_examples(),
         })
@@ -125,14 +128,14 @@ impl GenerateConfig for RouteConfig {
 impl TransformConfig for RouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let route = Route::new(self, context)?;
-        Ok(Transform::synchronous(route))
+        Ok(Transform::stateless(route))
     }
 
     fn input(&self) -> Input {
         Input::all()
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         if self.route.contains_key(UNMATCHED_ROUTE) {
             Err(vec![format!(
                 "cannot have a named output with reserved name: `{UNMATCHED_ROUTE}`"
@@ -142,11 +145,29 @@ impl TransformConfig for RouteConfig {
         }
     }
 
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let errors: Vec<String> = self
+            .route
+            .iter()
+            .filter_map(|(name, condition)| {
+                condition
+                    .validate(&context.enrichment_tables, &context.metrics_storage)
+                    .err()
+                    .map(|e| format!("route \"{name}\": {e}"))
+            })
+            .collect();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let mut result: Vec<TransformOutput> = self
             .route
@@ -181,7 +202,7 @@ mod test {
     use std::collections::HashMap;
 
     use indoc::indoc;
-    use vector_lib::transform::TransformOutputsBuf;
+    use vector_lib::{config::LogNamespace, transform::TransformOutputsBuf};
 
     use super::*;
     use crate::{
@@ -198,12 +219,12 @@ mod test {
     fn can_serialize_remap() {
         // We need to serialize the config to check if a config has
         // changed when reloading.
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+        "})
         .unwrap();
 
         assert_eq!(
@@ -220,21 +241,21 @@ mod test {
             LogNamespace::Legacy,
         )
         .unwrap();
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-
-            route.second.type = "vrl"
-            route.second.source = '.second == "second"'
-
-            route.third.type = "vrl"
-            route.third.source = '.third == "third"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+              second:
+                type: vrl
+                source: '.second == \"second\"'
+              third:
+                type: vrl
+                source: '.third == \"third\"'
+        "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -250,7 +271,7 @@ mod test {
         for output_name in output_names {
             let mut events: Vec<_> = outputs.drain_named(output_name).collect();
             if output_name == UNMATCHED_ROUTE {
-                assert!(events.is_empty());
+                assert_eq!(events, [] as [vector_lib::event::Event; 0]);
             } else {
                 assert_eq!(events.len(), 1);
                 assert_eq!(events.pop().unwrap(), event);
@@ -266,21 +287,21 @@ mod test {
             LogNamespace::Legacy,
         )
         .unwrap();
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-
-            route.second.type = "vrl"
-            route.second.source = '.second == "second"'
-
-            route.third.type = "vrl"
-            route.third.source = '.third == "third"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+              second:
+                type: vrl
+                source: '.second == \"second\"'
+              third:
+                type: vrl
+                source: '.third == \"third\"'
+        "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -309,21 +330,21 @@ mod test {
         let event =
             Event::from_json_value(serde_json::json!({"message": "NOPE"}), LogNamespace::Legacy)
                 .unwrap();
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-
-            route.second.type = "vrl"
-            route.second.source = '.second == "second"'
-
-            route.third.type = "vrl"
-            route.third.source = '.third == "third"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+              second:
+                type: vrl
+                source: '.second == \"second\"'
+              third:
+                type: vrl
+                source: '.third == \"third\"'
+        "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -352,23 +373,22 @@ mod test {
         let event =
             Event::from_json_value(serde_json::json!({"message": "NOPE"}), LogNamespace::Legacy)
                 .unwrap();
-        let config = toml::from_str::<RouteConfig>(
-            r#"
-            reroute_unmatched = false
-
-            route.first.type = "vrl"
-            route.first.source = '.message == "hello world"'
-
-            route.second.type = "vrl"
-            route.second.source = '.second == "second"'
-
-            route.third.type = "vrl"
-            route.third.source = '.third == "third"'
-        "#,
-        )
+        let config = serde_yaml::from_str::<RouteConfig>(indoc! {"
+            reroute_unmatched: false
+            route:
+              first:
+                type: vrl
+                source: '.message == \"hello world\"'
+              second:
+                type: vrl
+                source: '.second == \"second\"'
+              third:
+                type: vrl
+                source: '.third == \"third\"'
+        "})
         .unwrap();
 
-        let mut transform = Route::new(&config, &Default::default()).unwrap();
+        let transform = Route::new(&config, &TransformContext::default()).unwrap();
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             output_names
                 .iter()
@@ -380,7 +400,7 @@ mod test {
             1,
         );
 
-        transform.transform(event.clone(), &mut outputs);
+        transform.transform(event, &mut outputs);
         for output_name in output_names {
             let events: Vec<_> = outputs.drain_named(output_name).collect();
             assert_eq!(events.len(), 0);
@@ -391,30 +411,32 @@ mod test {
     async fn route_metrics_with_output_tag() {
         init_test();
 
-        let config: ConfigBuilder = toml::from_str(indoc! {r#"
-            [transforms.foo]
-            inputs = []
-            type = "route"
-            [transforms.foo.route.first]
-                type = "is_log"
-
-            [[tests]]
-            name = "metric output"
-
-            [tests.input]
-                insert_at = "foo"
-                value = "none"
-
-            [[tests.outputs]]
-                extract_from = "foo.first"
-                [[tests.outputs.conditions]]
-                type = "vrl"
-                source = "true"
-        "#})
+        let config: ConfigBuilder = serde_yaml::from_str(indoc! {"
+            transforms:
+              foo:
+                inputs: []
+                type: route
+                route:
+                  first:
+                    type: is_log
+            tests:
+              - name: metric output
+                input:
+                  insert_at: foo
+                  value: none
+                outputs:
+                  - extract_from: foo.first
+                    conditions:
+                      - type: vrl
+                        source: \"true\"
+        "})
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
-        assert!(tests.remove(0).run().await.errors.is_empty());
+        assert_eq!(
+            tests.remove(0).run().await.errors,
+            [] as [std::string::String; 0]
+        );
         // Check that metrics were emitted with output tag
         COMPONENT_MULTIPLE_OUTPUTS_TESTS.assert(&["output"]);
     }

@@ -18,21 +18,21 @@ use vector_lib::config;
 
 use crate::{kafka::KafkaStatisticsContext, sinks::prelude::*};
 
-pub struct KafkaRequest {
+pub(crate) struct KafkaRequest {
+    pub(super) finalizers: EventFinalizers,
     pub body: Bytes,
     pub metadata: KafkaRequestMetadata,
     pub request_metadata: RequestMetadata,
 }
 
-pub struct KafkaRequestMetadata {
-    pub finalizers: EventFinalizers,
+pub(crate) struct KafkaRequestMetadata {
     pub key: Option<Bytes>,
     pub timestamp_millis: Option<i64>,
     pub headers: Option<OwnedHeaders>,
     pub topic: String,
 }
 
-pub struct KafkaResponse {
+pub(crate) struct KafkaResponse {
     event_byte_size: GroupedCountByteSize,
     raw_byte_size: usize,
     event_status: EventStatus,
@@ -54,7 +54,7 @@ impl DriverResponse for KafkaResponse {
 
 impl Finalizable for KafkaRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.metadata.finalizers)
+        std::mem::take(&mut self.finalizers)
     }
 }
 
@@ -68,7 +68,7 @@ impl MetaDescriptive for KafkaRequest {
     }
 }
 
-/// BlockedRecordState manages state for a record blocked from being enqueued on the producer.
+/// `BlockedRecordState` manages state for a record blocked from being enqueued on the producer.
 struct BlockedRecordState {
     records_blocked: Arc<AtomicUsize>,
 }
@@ -87,7 +87,7 @@ impl Drop for BlockedRecordState {
 }
 
 #[derive(Clone)]
-pub struct KafkaService {
+pub(crate) struct KafkaService {
     kafka_producer: FutureProducer<KafkaStatisticsContext>,
 
     /// The number of records blocked from being enqueued on the producer.
@@ -123,7 +123,7 @@ impl Service<KafkaRequest> for KafkaService {
 
         Box::pin(async move {
             let raw_byte_size =
-                request.body.len() + request.metadata.key.as_ref().map_or(0, |x| x.len());
+                request.body.len() + request.metadata.key.as_ref().map_or(0, bytes::Bytes::len);
             let event_byte_size = request
                 .request_metadata
                 .into_events_estimated_json_encoded_byte_size();
@@ -198,7 +198,7 @@ impl Service<KafkaRequest> for KafkaService {
                             event_status: EventStatus::Errored,
                         });
                     }
-                };
+                }
             }
         })
     }

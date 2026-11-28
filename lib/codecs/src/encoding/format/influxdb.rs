@@ -22,6 +22,9 @@ pub enum Field {
     /// Floating point field.
     Float(f64),
     /// Unsigned integer field.
+    ///
+    /// Influx can support 64 bit integers if compiled with a flag, see:
+    /// <https://github.com/influxdata/influxdb/issues/7801#issuecomment-466801839>
     UnsignedInt(u64),
     /// Signed integer field.
     Int(i64),
@@ -69,22 +72,26 @@ pub struct InfluxLineProtocolSerializerConfig {
 
 impl InfluxLineProtocolSerializerConfig {
     /// Build the serializer from this configuration.
+    #[must_use]
     pub fn build(&self) -> InfluxLineProtocolSerializer {
         InfluxLineProtocolSerializer::new(self.clone())
     }
 
     /// The data type of events accepted by this serializer.
+    #[must_use]
     pub fn input_type(&self) -> DataType {
         DataType::Metric
     }
 
     /// The schema requirement for events encoded by this serializer.
+    #[must_use]
     pub fn schema_requirement(&self) -> schema::Requirement {
         schema::Requirement::empty()
     }
 }
 
 /// Default quantiles that align with the existing InfluxDB sink behaviour.
+#[must_use]
 pub fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
@@ -95,29 +102,30 @@ pub struct InfluxLineProtocolSerializer {
     protocol_version: ProtocolVersion,
     default_namespace: Option<String>,
     tags: Option<Arc<HashMap<String, String>>>,
-    quantiles: Arc<Vec<f64>>,
+    quantiles: Arc<[f64]>,
 }
 
 impl InfluxLineProtocolSerializer {
     /// Creates a new serializer from the provided configuration.
+    #[must_use]
     pub fn new(config: InfluxLineProtocolSerializerConfig) -> Self {
         Self {
             protocol_version: config.protocol_version,
             default_namespace: config.default_namespace,
             tags: config.tags.map(Arc::new),
-            quantiles: Arc::new(config.quantiles),
+            quantiles: config.quantiles.into(),
         }
     }
 
     fn encode_metric(
         &self,
-        metric: Metric,
+        metric: &Metric,
         output: &mut BytesMut,
     ) -> Result<(), InfluxLineProtocolSerializerError> {
         let namespace = metric.namespace().or(self.default_namespace.as_deref());
         let measurement = encode_namespace(namespace, '.', metric.name());
         let timestamp = encode_timestamp(metric.timestamp());
-        let tags = merge_tags(&metric, self.tags.as_deref());
+        let tags = merge_tags(metric, self.tags.as_deref());
         let (metric_type, fields) = get_type_and_fields(metric.value(), &self.quantiles);
 
         let mut merged_tags = tags.unwrap_or_default();
@@ -140,7 +148,7 @@ impl tokio_util::codec::Encoder<Event> for InfluxLineProtocolSerializer {
 
     fn encode(&mut self, item: Event, dst: &mut BytesMut) -> Result<(), Self::Error> {
         match item {
-            Event::Metric(metric) => self.encode_metric(metric, dst).map_err(Into::into),
+            Event::Metric(metric) => self.encode_metric(&metric, dst).map_err(Into::into),
             Event::Log(_) => {
                 Err(InfluxLineProtocolSerializerError::InvalidEventType { actual: "log" }.into())
             }
@@ -196,7 +204,12 @@ fn get_type_and_fields(
     match value {
         MetricValue::Counter { value } => ("counter", Some(to_fields(*value))),
         MetricValue::Gauge { value } => ("gauge", Some(to_fields(*value))),
-        MetricValue::Set { values } => ("set", Some(to_fields(values.len() as f64))),
+        MetricValue::Set { values } => {
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[allow(clippy::cast_precision_loss, reason = "Preserve set-size rounding.")]
+            let count = values.len() as f64;
+            ("set", Some(to_fields(count)))
+        }
         MetricValue::AggregatedHistogram {
             buckets,
             count,
@@ -212,7 +225,9 @@ fn get_type_and_fields(
                 })
                 .collect();
             fields.insert("count".into(), Field::UnsignedInt(*count));
-            fields.insert("sum".into(), Field::Float(*sum));
+            if let Some(sum) = sum {
+                fields.insert("sum".into(), Field::Float(*sum));
+            }
 
             ("histogram", Some(fields))
         }
@@ -281,6 +296,9 @@ fn get_type_and_fields(
 
 fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<KeyString, Field>> {
     let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(clippy::cast_precision_loss, reason = "Preserve count rounding.")]
+    let count = statistic.count as f64;
 
     Some(
         [
@@ -289,7 +307,7 @@ fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<
             ("median".into(), Field::Float(statistic.median)),
             ("avg".into(), Field::Float(statistic.avg)),
             ("sum".into(), Field::Float(statistic.sum)),
-            ("count".into(), Field::Float(statistic.count as f64)),
+            ("count".into(), Field::Float(count)),
         ]
         .into_iter()
         .chain(
@@ -309,46 +327,61 @@ fn to_fields(value: f64) -> HashMap<KeyString, Field> {
 }
 
 fn encode_namespace(namespace: Option<&str>, delimiter: char, name: &str) -> String {
-    namespace
-        .map(|namespace| format!("{namespace}{delimiter}{name}"))
-        .unwrap_or_else(|| name.to_owned())
+    match namespace {
+        Some(namespace) => format!("{namespace}{delimiter}{name}"),
+        None => name.to_owned(),
+    }
 }
 
 /// Encode a full InfluxDB line protocol entry into the provided buffer.
+///
+/// See <https://docs.influxdata.com/influxdb/latest/reference/syntax/line-protocol/>.
+///
+/// # Errors
+///
+/// Returns an error if `fields` is empty, since a line protocol entry requires at least one field.
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Callers build fields with the default hasher."
+)]
 pub fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,
     tags: Option<MetricTags>,
     fields: Option<HashMap<KeyString, Field>>,
     timestamp: i64,
-    buffer: &mut BytesMut,
+    line_protocol: &mut BytesMut,
 ) -> Result<(), &'static str> {
-    let fields = fields.unwrap_or_default();
-    if fields.is_empty() {
+    // Fields
+    let unwrapped_fields = fields.unwrap_or_default();
+    // LineProtocol should have a field
+    if unwrapped_fields.is_empty() {
         return Err("fields must not be empty");
     }
 
-    encode_string(measurement, buffer);
+    encode_string(measurement, line_protocol);
 
-    if let Some(tags) = tags {
-        let mut tags_buffer = BytesMut::new();
-        encode_tags(tags, &mut tags_buffer);
-        if !tags_buffer.is_empty() {
-            buffer.put_u8(b',');
-            buffer.extend_from_slice(&tags_buffer);
-        }
+    // Tags are optional
+    let unwrapped_tags = tags.unwrap_or_default();
+    if !unwrapped_tags.is_empty() {
+        line_protocol.put_u8(b',');
+        encode_tags(&unwrapped_tags, line_protocol);
     }
+    line_protocol.put_u8(b' ');
 
-    buffer.put_u8(b' ');
-    encode_fields(protocol_version, fields, buffer);
-    buffer.put_u8(b' ');
-    buffer.put_slice(&timestamp.to_string().into_bytes());
-    buffer.put_u8(b'\n');
+    // Fields
+    encode_fields(protocol_version, unwrapped_fields, line_protocol);
+    line_protocol.put_u8(b' ');
+
+    // Timestamp
+    line_protocol.put_slice(&timestamp.to_string().into_bytes());
+    line_protocol.put_u8(b'\n');
     Ok(())
 }
 
-fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
+fn encode_tags(tags: &MetricTags, output: &mut BytesMut) {
     let original_len = output.len();
+    // `tags` is already sorted
     for (key, value) in tags.iter_single() {
         if key.is_empty() || value.is_empty() {
             continue;
@@ -359,6 +392,7 @@ fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
         output.put_u8(b',');
     }
 
+    // remove last ','
     if output.len() > original_len {
         output.truncate(output.len() - 1);
     }
@@ -370,32 +404,30 @@ fn encode_fields(
     output: &mut BytesMut,
 ) {
     let original_len = output.len();
-
-    for (key, value) in fields.into_iter() {
+    for (key, value) in fields {
         encode_string(&key, output);
         output.put_u8(b'=');
-
         match value {
             Field::String(s) => {
                 output.put_u8(b'"');
-                for ch in s.chars() {
-                    if "\\\"".contains(ch) {
+                for c in s.chars() {
+                    if "\\\"".contains(c) {
                         output.put_u8(b'\\');
                     }
-                    let mut buffer: [u8; 4] = [0; 4];
-                    output.put_slice(ch.encode_utf8(&mut buffer).as_bytes());
+                    let mut c_buffer: [u8; 4] = [0; 4];
+                    output.put_slice(c.encode_utf8(&mut c_buffer).as_bytes());
                 }
                 output.put_u8(b'"');
             }
             Field::Float(f) => output.put_slice(&f.to_string().into_bytes()),
             Field::UnsignedInt(i) => {
                 output.put_slice(&i.to_string().into_bytes());
-                let suffix = match protocol_version {
+                let c = match protocol_version {
                     ProtocolVersion::V1 => 'i',
                     ProtocolVersion::V2 => 'u',
                 };
-                let mut buffer: [u8; 4] = [0; 4];
-                output.put_slice(suffix.encode_utf8(&mut buffer).as_bytes());
+                let mut c_buffer: [u8; 4] = [0; 4];
+                output.put_slice(c.encode_utf8(&mut c_buffer).as_bytes());
             }
             Field::Int(i) => {
                 output.put_slice(&i.to_string().into_bytes());
@@ -405,26 +437,33 @@ fn encode_fields(
                 output.put_slice(&b.to_string().into_bytes());
             }
         }
-
         output.put_u8(b',');
     }
 
+    // remove last ','
     if output.len() > original_len {
         output.truncate(output.len() - 1);
     }
 }
 
-fn encode_string(value: &str, output: &mut BytesMut) {
-    for ch in value.chars() {
-        if "\\, =".contains(ch) {
+fn encode_string(key: &str, output: &mut BytesMut) {
+    for c in key.chars() {
+        if "\\, =".contains(c) {
             output.put_u8(b'\\');
         }
-        let mut buffer: [u8; 4] = [0; 4];
-        output.put_slice(ch.encode_utf8(&mut buffer).as_bytes());
+        let mut c_buffer: [u8; 4] = [0; 4];
+        output.put_slice(c.encode_utf8(&mut c_buffer).as_bytes());
     }
 }
 
 /// Converts an optional timestamp into the nanoseconds expected by the protocol.
+///
+/// Uses the current time when no timestamp is given.
+///
+/// # Panics
+///
+/// Panics if the timestamp is outside the range representable as nanoseconds since the epoch.
+#[must_use]
 pub fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     match timestamp {
         Some(timestamp) => timestamp
@@ -463,8 +502,8 @@ impl DistributionStatistic {
                     max: val,
                     median: val,
                     avg: val,
-                    sum: val * count as f64,
-                    count: count as u64,
+                    sum: val * f64::from(count),
+                    count: u64::from(count),
                     quantiles: quantiles.iter().map(|&p| (p, val)).collect(),
                 })
             }
@@ -476,7 +515,7 @@ impl DistributionStatistic {
                 let max = bins.last().expect("bins is non-empty").value;
                 let sum = bins
                     .iter()
-                    .map(|sample| sample.value * sample.rate as f64)
+                    .map(|sample| sample.value * f64::from(sample.rate))
                     .sum::<f64>();
 
                 for index in 1..bins.len() {
@@ -484,7 +523,7 @@ impl DistributionStatistic {
                 }
 
                 let count = bins.last().expect("bins is non-empty").rate;
-                let avg = sum / count as f64;
+                let avg = sum / f64::from(count);
 
                 let median = find_quantile(&bins, 0.5);
                 let quantiles = quantiles
@@ -498,7 +537,7 @@ impl DistributionStatistic {
                     median,
                     avg,
                     sum,
-                    count: count as u64,
+                    count: u64::from(count),
                     quantiles,
                 })
             }
@@ -508,13 +547,19 @@ impl DistributionStatistic {
 
 fn find_quantile(bins: &[Sample], p: f64) -> f64 {
     let count = bins.last().expect("bins is empty").rate;
-    find_sample(bins, (p * count as f64).round() as u32)
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Preserve rounded index conversion."
+    )]
+    let index = (p * f64::from(count)).round() as u32;
+    find_sample(bins, index)
 }
 
 fn find_sample(bins: &[Sample], i: u32) -> f64 {
     let index = match bins.binary_search_by_key(&i, |sample| sample.rate) {
-        Ok(index) => index,
-        Err(index) => index,
+        Ok(index) | Err(index) => index,
     };
     bins[index].value
 }

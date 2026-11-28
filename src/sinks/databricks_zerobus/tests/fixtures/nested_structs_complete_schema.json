@@ -1,0 +1,127 @@
+{
+  "name": "nested_structs_table",
+  "catalog_name": "test_catalog",
+  "schema_name": "test_schema",
+  "columns": [
+    {
+      "name": "field_001",
+      "type_text": "bigint",
+      "type_name": "LONG",
+      "position": 0,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_001\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_002",
+      "type_text": "string",
+      "type_name": "STRING",
+      "position": 1,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_002\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_003",
+      "type_text": "string",
+      "type_name": "STRING",
+      "position": 2,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_003\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_004",
+      "type_text": "string",
+      "type_name": "STRING",
+      "position": 3,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_004\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_005",
+      "type_text": "string",
+      "type_name": "STRING",
+      "position": 4,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_005\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_006",
+      "type_text": "bigint",
+      "type_name": "LONG",
+      "position": 5,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_006\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_007",
+      "type_text": "bigint",
+      "type_name": "LONG",
+      "position": 6,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_007\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_008",
+      "type_text": "struct<field_009:struct<field_010:bigint,field_011:bigint>,field_012:struct<field_013:string>,field_014:struct<field_015:string>,field_016:struct<field_017:bigint>>",
+      "type_name": "STRUCT",
+      "position": 7,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_008\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"field_009\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"field_010\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}},{\"name\":\"field_011\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}},{\"name\":\"field_012\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"field_013\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}},{\"name\":\"field_014\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"field_015\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}},{\"name\":\"field_016\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"field_017\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_018",
+      "type_text": "struct<field_019:string,field_020:string>",
+      "type_name": "STRUCT",
+      "position": 8,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_018\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"field_019\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"field_020\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_021",
+      "type_text": "struct<field_022:string,field_023:string,field_020:string,field_024:string,field_025:string,field_026:int>",
+      "type_name": "STRUCT",
+      "position": 9,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_021\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"field_022\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"field_023\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"field_020\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"field_024\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"field_025\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"field_026\",\"type\":\"integer\",\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_027",
+      "type_text": "array<bigint>",
+      "type_name": "ARRAY",
+      "position": 10,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_027\",\"type\":{\"type\":\"array\",\"elementType\":\"long\",\"containsNull\":true},\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_028",
+      "type_text": "boolean",
+      "type_name": "BOOLEAN",
+      "position": 11,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_028\",\"type\":\"boolean\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_029",
+      "type_text": "string",
+      "type_name": "STRING",
+      "position": 12,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_029\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_030",
+      "type_text": "string",
+      "type_name": "STRING",
+      "position": 13,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_030\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_031",
+      "type_text": "boolean",
+      "type_name": "BOOLEAN",
+      "position": 14,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_031\",\"type\":\"boolean\",\"nullable\":true,\"metadata\":{}}"
+    }
+  ]
+}

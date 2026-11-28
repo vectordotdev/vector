@@ -153,8 +153,12 @@ impl<'de> Deserialize<'de> for BufferType {
     }
 }
 
+/// # Panics
+///
+/// Never panics; the value 500 is non-zero.
+#[must_use]
 pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(500) }
+    NonZeroUsize::new(500).expect("500 is non-zero")
 }
 
 /// Disk usage configuration for disk-backed buffers.
@@ -167,6 +171,7 @@ pub struct DiskUsage {
 
 impl DiskUsage {
     /// Creates a new `DiskUsage` with the given usage configuration.
+    #[must_use]
     pub fn new(id: ComponentKey, data_dir: PathBuf, max_size: NonZeroU64) -> Self {
         Self {
             id,
@@ -176,16 +181,19 @@ impl DiskUsage {
     }
 
     /// Gets the component key for the component this buffer is attached to.
+    #[must_use]
     pub fn id(&self) -> &ComponentKey {
         &self.id
     }
 
     /// Gets the maximum size, in bytes, that this buffer can consume on disk.
+    #[must_use]
     pub fn max_size(&self) -> u64 {
         self.max_size.get()
     }
 
     /// Gets the data directory path that this buffer will store its files on disk.
+    #[must_use]
     pub fn data_dir(&self) -> &Path {
         self.data_dir.as_path()
     }
@@ -197,15 +205,17 @@ impl DiskUsage {
 #[serde(rename_all = "snake_case")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryBufferSize {
-    /// The maximum number of events allowed in the buffer.
-    MaxEvents(#[serde(default = "memory_buffer_default_max_events")] NonZeroUsize),
-
+    // Try max_size before the default max_events form so an explicit byte limit is coerced.
     // Doc string is duplicated here as a workaround due to a name collision with the `max_size`
     // field with the DiskV2 variant of `BufferType`.
     /// The maximum allowed amount of allocated memory the buffer can hold.
     ///
     /// If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
     MaxSize(#[configurable(metadata(docs::type_unit = "bytes"))] NonZeroUsize),
+
+    /// The maximum number of events allowed in the buffer.
+    #[configurable(metadata(serde::optional_tag = "max_events"))]
+    MaxEvents(#[serde(default = "memory_buffer_default_max_events")] NonZeroUsize),
 }
 
 /// A specific type of buffer stage.
@@ -219,12 +229,13 @@ pub enum BufferType {
     /// This is more performant, but less durable. Data will be lost if Vector is restarted
     /// forcefully or crashes.
     #[configurable(title = "Events are buffered in memory.")]
+    // BufferTypeVisitor defaults a missing type to memory.
+    #[configurable(metadata(serde::optional_tag = "type"))]
     Memory {
         /// The terms around how to express buffering limits, can be in size or `bytes_size`.
         #[serde(flatten)]
         size: MemoryBufferSize,
 
-        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
@@ -247,7 +258,6 @@ pub enum BufferType {
         )]
         max_size: NonZeroU64,
 
-        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
@@ -260,6 +270,7 @@ impl BufferType {
     /// such as maximum size and data directory path.
     ///
     /// Otherwise, `None` is returned.
+    #[must_use]
     pub fn disk_usage(
         &self,
         global_data_dir: Option<PathBuf>,
@@ -371,7 +382,16 @@ impl Default for BufferConfig {
 }
 
 impl BufferConfig {
+    /// Returns true if any stage in this buffer configuration uses disk-based storage.
+    #[must_use]
+    pub fn has_disk_stage(&self) -> bool {
+        self.stages()
+            .iter()
+            .any(|stage| matches!(stage, BufferType::DiskV2 { .. }))
+    }
+
     /// Gets all of the configured stages for this buffer.
+    #[must_use]
     pub fn stages(&self) -> &[BufferType] {
         match self {
             Self::Single(stage) => slice::from_ref(stage),
@@ -391,7 +411,6 @@ impl BufferConfig {
     ///
     /// If a disk buffer stage is configured and the data directory provided is `None`, an error
     /// variant will be thrown.
-    #[allow(clippy::needless_pass_by_value)]
     pub async fn build<T>(
         &self,
         data_dir: Option<PathBuf>,

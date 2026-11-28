@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
 use futures::FutureExt;
-use http::{StatusCode, Uri};
-use hyper::Body;
+use http::StatusCode;
 use snafu::Snafu;
+use vector_http::empty_body;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
@@ -12,12 +12,21 @@ use crate::{
     sinks::{
         Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,
-        util::retries::{RetryAction, RetryLogic},
+        util::{
+            HttpEndpoint,
+            retries::{RetryAction, RetryLogic},
+        },
     },
 };
 
-pub fn default_endpoint() -> String {
-    "https://storage.googleapis.com".to_string()
+/// Returns the default Google Cloud Storage endpoint.
+///
+/// # Panics
+/// Panics if the static endpoint is not a valid HTTP URL.
+#[must_use]
+pub fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://storage.googleapis.com")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 /// GCS Predefined ACLs.
@@ -26,8 +35,7 @@ pub fn default_endpoint() -> String {
 ///
 /// [predefined_acls]: https://cloud.google.com/storage/docs/access-control/lists#predefined-acl
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum GcsPredefinedAcl {
     /// Bucket/object can be read by authenticated users.
@@ -65,10 +73,10 @@ pub enum GcsPredefinedAcl {
     /// part of the project team is granted the `READER` permission.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     ProjectPrivate,
 
-    /// Bucket/object can be read publically.
+    /// Bucket/object can be read publicly.
     ///
     /// The bucket/object owner is granted the `OWNER` permission, and all other users, whether
     /// authenticated or anonymous, are granted the `READER` permission.
@@ -81,14 +89,13 @@ pub enum GcsPredefinedAcl {
 ///
 /// [storage_classes]: https://cloud.google.com/storage/docs/storage-classes
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GcsStorageClass {
     /// Standard storage.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     Standard,
 
     /// Nearline storage.
@@ -107,36 +114,39 @@ pub enum GcsError {
     BucketNotFound { bucket: String },
 }
 
+/// Builds a bucket healthcheck.
+///
+/// The returned future reports request failures and non-successful health statuses.
 pub fn build_healthcheck(
     bucket: String,
     client: HttpClient,
-    base_url: String,
+    base_url: HttpEndpoint,
     auth: GcpAuthenticator,
-) -> crate::Result<Healthcheck> {
+) -> Healthcheck {
     let healthcheck = async move {
-        let uri = base_url.parse::<Uri>()?;
-        let mut request = http::Request::head(uri).body(Body::empty())?;
+        let mut request = http::Request::head(base_url.into_uri()).body(empty_body())?;
 
         auth.apply(&mut request);
 
         let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
         let response = client.send(request).await?;
-        healthcheck_response(response, not_found_error)
+        healthcheck_status(response.status(), not_found_error)
     };
 
-    Ok(healthcheck.boxed())
+    healthcheck.boxed()
 }
 
-pub fn healthcheck_response(
-    response: http::Response<hyper::Body>,
-    not_found_error: crate::Error,
-) -> crate::Result<()> {
-    match response.status() {
+/// Classifies a GCP healthcheck response by status alone.
+///
+/// # Errors
+/// Returns an error for forbidden, missing, or unexpected response statuses.
+pub fn healthcheck_status(status: StatusCode, not_found_error: crate::Error) -> crate::Result<()> {
+    match status {
         StatusCode::OK => Ok(()),
         StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        status => Err(HealthcheckError::unexpected_status(status).into()),
     }
 }
 
@@ -160,7 +170,7 @@ impl<Request> Clone for GcsRetryLogic<Request> {
     }
 }
 
-// This is a clone of HttpRetryLogic for the Body type, should get merged
+// Mirrors `RetryStrategy::Default` for `GcsResponse`, but also retries 401 Unauthorized
 impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Request> {
     type Error = hyper::Error;
     type Request = Request;

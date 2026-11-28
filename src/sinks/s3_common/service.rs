@@ -19,6 +19,7 @@ use super::{config::S3Options, partitioner::S3PartitionKey};
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
+    pub(crate) finalizers: EventFinalizers,
     pub body: Bytes,
     pub bucket: String,
     pub metadata: S3Metadata,
@@ -29,7 +30,7 @@ pub struct S3Request {
 
 impl Finalizable for S3Request {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.metadata.finalizers)
+        std::mem::take(&mut self.finalizers)
     }
 }
 
@@ -47,7 +48,6 @@ impl MetaDescriptive for S3Request {
 pub struct S3Metadata {
     pub partition_key: S3PartitionKey,
     pub s3_key: String,
-    pub finalizers: EventFinalizers,
 }
 
 #[derive(Debug)]
@@ -77,10 +77,12 @@ pub struct S3Service {
 }
 
 impl S3Service {
+    #[must_use]
     pub const fn new(client: S3Client) -> S3Service {
         S3Service { client }
     }
 
+    #[must_use]
     pub fn client(&self) -> S3Client {
         self.client.clone()
     }
@@ -103,7 +105,7 @@ impl Service<S3Request> for S3Service {
         let content_encoding = request.content_encoding;
         let content_encoding = options
             .content_encoding
-            .or_else(|| content_encoding.map(|ce| ce.to_string()));
+            .or_else(|| content_encoding.map(str::to_string));
         let content_type = options
             .content_type
             .or_else(|| Some("text/x-log".to_owned()));

@@ -1,0 +1,9 @@
+sources:
+  my_source_id:
+    type: aws_sqs
+    delete_message: true
+    endpoint: http://127.0.0.0:5000/path/to/service
+    poll_secs: 15
+    queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue
+    region: us-east-1
+    visibility_timeout_secs: 300

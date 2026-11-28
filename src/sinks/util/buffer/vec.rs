@@ -15,6 +15,7 @@ pub struct VecBuffer<T> {
 }
 
 impl<T> VecBuffer<T> {
+    #[must_use]
     pub const fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_settings(settings)
     }
@@ -48,7 +49,7 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
     }
 
     fn is_empty(&self) -> bool {
-        self.batch.as_ref().map(Vec::is_empty).unwrap_or(true)
+        self.batch.as_ref().is_none_or(Vec::is_empty)
     }
 
     fn fresh(&self) -> Self {
@@ -60,7 +61,7 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
     }
 
     fn num_items(&self) -> usize {
-        self.batch.as_ref().map(Vec::len).unwrap_or(0)
+        self.batch.as_ref().map_or(0, Vec::len)
     }
 }
 

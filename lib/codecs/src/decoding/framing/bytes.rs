@@ -10,11 +10,13 @@ pub struct BytesDecoderConfig;
 
 impl BytesDecoderConfig {
     /// Creates a new `BytesDecoderConfig`.
+    #[must_use]
     pub const fn new() -> Self {
         Self
     }
 
     /// Build the `ByteDecoder` from this configuration.
+    #[must_use]
     pub const fn build(&self) -> BytesDecoder {
         BytesDecoder::new()
     }
@@ -32,6 +34,7 @@ pub struct BytesDecoder {
 
 impl BytesDecoder {
     /// Creates a new `BytesDecoder`.
+    #[must_use]
     pub const fn new() -> Self {
         Self { flushed: false }
     }

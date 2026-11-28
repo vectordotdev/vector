@@ -12,7 +12,6 @@ use crate::{
 
 #[derive(Clone)]
 pub(super) struct PulsarMetadata {
-    pub finalizers: EventFinalizers,
     pub key: Option<Bytes>,
     pub properties: Option<HashMap<KeyString, Bytes>>,
     pub timestamp_millis: Option<i64>,
@@ -40,29 +39,33 @@ impl RequestBuilder<PulsarEvent> for PulsarRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut input: PulsarEvent,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut input: PulsarEvent) -> RequestParts<Self::Metadata, Self::Events> {
         let builder = RequestMetadataBuilder::from_event(&input.event);
+        let finalizers = input.event.take_finalizers();
         let metadata = PulsarMetadata {
-            finalizers: input.event.take_finalizers(),
             key: input.key,
             timestamp_millis: input.timestamp_millis,
             properties: input.properties,
             topic: input.topic,
         };
-        (metadata, builder, input.event)
+        RequestParts {
+            metadata,
+            request_metadata_builder: builder,
+            events: input.event,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let body = payload.into_payload();
         PulsarRequest {
+            finalizers,
             body,
             metadata,
             request_metadata,

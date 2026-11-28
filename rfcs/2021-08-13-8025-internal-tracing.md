@@ -81,10 +81,10 @@ The step after that is a bit fuzzy, however. You could jump straight to
 profiling, but it has a few weaknesses:
 
 1. It's not something that can easily be run in customer environments
-1. The focus on CPU time vs wall clock time means it can miss issues like bad
+2. The focus on CPU time vs wall clock time means it can miss issues like bad
    rate limits, waiting on downstream components, slow IO operations or
    syscalls, etc
-1. The output tends to require interpretation by an experienced engineer, and
+3. The output tends to require interpretation by an experienced engineer, and
    doesn't always indicate clearly where time is being spent from a Vector
    perspective
 
@@ -251,10 +251,10 @@ as follows:
    corresponding visualizations means it would take more interpretation and
    external knowledge to derive the same signal.
 
-1. Their aggregated nature would put a limit on the level of detail (e.g. no
+2. Their aggregated nature would put a limit on the level of detail (e.g. no
    file name field on a `read` span from the file source).
 
-1. Collecting timings directly is likely to require more explicit
+3. Collecting timings directly is likely to require more explicit
    instrumentation code than simply adding spans.
 
 ### Do nothing

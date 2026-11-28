@@ -20,15 +20,17 @@ transform since it is much more expressive.
 
 ## Get Started
 
-```toml title="vector.toml"
-[transforms.haproxy_errors]
-  # General
-  type = "filter"
-  inputs = ["my-source-id"]
+```yaml title="vector.yaml"
+transforms:
+  haproxy_errors:
+    # General
+    type: "filter"
+    inputs: ["my-source-id"]
 
-  # Conditions
-  condition."level.eq" = "error"
-  condition."service.eq" = "haproxy"
+    # Conditions
+    condition:
+      "level.eq": "error"
+      "service.eq": "haproxy"
 ```
 
 Check out the [docs][docs.transforms.filter] for a fill list of available

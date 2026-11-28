@@ -1,7 +1,9 @@
 use std::{
     cmp,
     collections::HashMap,
-    fmt, io,
+    fmt,
+    future::{Future, ready},
+    io,
     path::{Path, PathBuf},
     pin::Pin,
     sync::{Arc, Mutex},
@@ -205,6 +207,10 @@ impl AsyncWrite for TestFile {
     }
 }
 
+#[expect(
+    clippy::unused_async_trait_impl,
+    reason = "Test files implement the async production interface"
+)]
 impl AsyncFile for TestFile {
     #[instrument(skip(self), level = "debug")]
     async fn metadata(&self) -> io::Result<Metadata> {
@@ -214,6 +220,26 @@ impl AsyncFile for TestFile {
         };
 
         Ok(Metadata { len: len as u64 })
+    }
+
+    async fn truncate(&self, size: u64) -> io::Result<()> {
+        if !self.is_writable {
+            return Err(io_err_permission_denied());
+        }
+
+        let size = usize::try_from(size)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "file size out of range"))?;
+        let mut inner = self.inner.lock().expect("poisoned");
+        let buf = inner.buf.as_mut().expect("file buf consumed");
+        if size > buf.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot extend a file through the truncation API",
+            ));
+        }
+        buf.truncate(size);
+
+        Ok(())
     }
 
     async fn sync_all(&self) -> io::Result<()> {
@@ -272,6 +298,14 @@ impl FilesystemInner {
     fn delete_file(&mut self, path: &Path) -> bool {
         self.files.remove(path).is_some()
     }
+
+    fn list_files(&self, path: &Path) -> Vec<PathBuf> {
+        self.files
+            .keys()
+            .filter(|file_path| file_path.parent() == Some(path))
+            .cloned()
+            .collect()
+    }
 }
 
 /// A `Filesystem` that tracks files in memory and allows introspection from the outside.
@@ -302,6 +336,10 @@ impl Default for TestFilesystem {
     }
 }
 
+#[expect(
+    clippy::unused_async_trait_impl,
+    reason = "The test filesystem implements the async production interface"
+)]
 impl Filesystem for TestFilesystem {
     type File = TestFile;
     type MemoryMap = TestMmap;
@@ -344,12 +382,37 @@ impl Filesystem for TestFilesystem {
         }
     }
 
-    async fn delete_file(&self, path: &Path) -> io::Result<()> {
+    async fn truncate_file(&self, path: &Path, size: u64) -> io::Result<()> {
+        let file = {
+            let mut inner = self.inner.lock().expect("poisoned");
+            inner.open_file_writable(path)
+        };
+        file.truncate(size).await?;
+        file.sync_all().await
+    }
+
+    fn delete_file<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<()>> + Send + 'a {
         let mut inner = self.inner.lock().expect("poisoned");
-        if inner.delete_file(path) {
+        let result = if inner.delete_file(path) {
             Ok(())
         } else {
             Err(io_err_not_found())
-        }
+        };
+        ready(result)
+    }
+
+    fn list_files<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<Vec<PathBuf>>> + Send + 'a {
+        let inner = self.inner.lock().expect("poisoned");
+        ready(Ok(inner.list_files(path)))
+    }
+
+    fn supports_background_cleanup(&self) -> bool {
+        false
     }
 }

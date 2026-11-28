@@ -1,6 +1,7 @@
 #![cfg(feature = "aws-sqs-integration-tests")]
 #![cfg(test)]
 
+use crate::config::ProxyConfig;
 use std::{collections::HashSet, time::Duration};
 
 use aws_sdk_sqs::operation::create_queue::CreateQueueOutput;
@@ -10,7 +11,8 @@ use tokio::time::timeout;
 
 use crate::{
     SourceSender,
-    aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
+    aws::{RegionOrEndpoint, auth::AwsAuthentication, create_client},
+    common::sqs::SqsClientBuilder,
     config::{SourceConfig, SourceContext, log_schema},
     event::Event,
     sources::aws_sqs::config::AwsSqsConfig,
@@ -50,23 +52,22 @@ async fn send_test_events(count: u32, queue_url: &str, client: &aws_sdk_sqs::Cli
 }
 
 async fn get_sqs_client() -> aws_sdk_sqs::Client {
-    let config = aws_sdk_sqs::config::Builder::new()
-        .credentials_provider(
-            AwsAuthentication::test_auth()
-                .credentials_provider(Region::new("custom"), &Default::default(), None)
-                .await
-                .unwrap(),
-        )
-        .endpoint_url(sqs_address())
-        .region(Some(Region::new("us-east-1")))
-        .build();
-
-    aws_sdk_sqs::Client::from_conf(config)
+    create_client::<SqsClientBuilder>(
+        &SqsClientBuilder {},
+        &AwsAuthentication::test_auth(),
+        Some(Region::new("us-east-1")),
+        Some(sqs_address()),
+        &ProxyConfig::default(),
+        None,
+        None,
+    )
+    .await
+    .unwrap()
 }
 
 #[tokio::test]
 pub(crate) async fn test() {
-    assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async {
+    Box::pin(assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async {
         let sqs_client = get_sqs_client().await;
         let queue_name = gen_queue_name();
         let queue_url = ensure_queue(&queue_name, &sqs_client)
@@ -91,7 +92,7 @@ pub(crate) async fn test() {
                 .await
                 .unwrap()
                 .await
-                .unwrap()
+                .unwrap();
         });
 
         let mut expected_messages = HashSet::new();
@@ -112,12 +113,13 @@ pub(crate) async fn test() {
                 .get(log_schema().message_key_target_path().unwrap())
                 .unwrap()
                 .to_string_lossy();
-            if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {message:?}");
-            }
+            assert!(
+                expected_messages.remove(message.as_ref()),
+                "Received unexpected message: {message:?}"
+            );
         }
         assert!(expected_messages.is_empty());
-    })
+    }))
     .await;
 }
 

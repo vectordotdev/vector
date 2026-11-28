@@ -25,10 +25,21 @@ use vector_lib::{
 };
 
 use super::{
-    IncrementalRequestBuilder, Normalizer, RequestBuilder, buffer::metrics::MetricNormalize,
+    IncrementalRequestBuilder, Normalizer, RequestBuilder, RequestParts,
+    buffer::metrics::MetricNormalize, request_builder::EncodedChunk,
 };
 
+fn metric_ttl(maybe_ttl_secs: Option<f64>) -> Option<Duration> {
+    maybe_ttl_secs
+        .and_then(|ttl| Duration::try_from_secs_f64(ttl).ok())
+        .filter(|ttl| !ttl.is_zero())
+}
+
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
+
+/// The stream returned by [`SinkBuilderExt::incremental_request_builder`].
+type IncrementalRequests<St, Request, Error> =
+    Map<St, Box<dyn FnMut(<St as Stream>::Item) -> Vec<Result<Request, Error>> + Send + Sync>>;
 
 pub trait SinkBuilderExt: Stream {
     /// Converts a stream of infallible results by unwrapping them.
@@ -45,21 +56,26 @@ pub trait SinkBuilderExt: Stream {
     ///
     /// The stream will yield batches of events, with their partition key, when either a batch fills
     /// up or times out. [`Partitioner`] operates on a per-event basis, and has access to the event
-    /// itself, and so can access any and all fields of an event.
+    /// itself, and so can access any and all fields of an event. A partition error is yielded
+    /// after the affected event finalizers have been updated.
+    ///
+    /// The `settings` closure receives the partition key for each new partition, allowing callers
+    /// to vary the batch configuration (e.g. byte size limit) per partition.
     fn batched_partitioned<P, C, F, B>(
         self,
         partitioner: P,
+        timeout: Duration,
         settings: F,
     ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>, C, F, B>
     where
         Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,
         P::Key: Eq + Hash + Clone,
-        P::Item: ByteSizeOf,
+        P::Item: ByteSizeOf + Finalizable,
         C: BatchConfig<P::Item>,
-        F: Fn() -> C + Send,
+        F: Fn(&P::Key) -> C + Send,
     {
-        PartitionedBatcher::new(self, partitioner, settings)
+        PartitionedBatcher::new(self, partitioner, timeout, settings)
     }
 
     /// Batches the stream based on the given batch settings and item size calculator.
@@ -128,11 +144,16 @@ pub trait SinkBuilderExt: Stream {
             Box::pin(async move {
                 let _entered = span.enter();
 
-                // Split the input into metadata and events.
-                let (metadata, request_metadata_builder, events) = builder.split_input(input);
+                let RequestParts {
+                    metadata,
+                    request_metadata_builder,
+                    events,
+                    finalizers,
+                } = builder.split_input(input);
 
-                // Encode the events.
-                let payload = builder.encode_events(events)?;
+                let payload = builder
+                    .encode_events(events)
+                    .map_err(|error| error.record_failure(&finalizers))?;
 
                 // Note: it would be nice for the RequestMetadataBuilder to build be created from the
                 // events here, and not need to be required by split_input(). But this then requires
@@ -143,7 +164,7 @@ pub trait SinkBuilderExt: Stream {
                 let request_metadata = request_metadata_builder.build(&payload);
 
                 // Now build the actual request.
-                Ok(builder.build_request(metadata, request_metadata, payload))
+                Ok(builder.build_request(metadata, finalizers, request_metadata, payload))
             })
         })
     }
@@ -174,7 +195,7 @@ pub trait SinkBuilderExt: Stream {
     fn incremental_request_builder<B>(
         self,
         mut builder: B,
-    ) -> Map<Self, Box<dyn FnMut(Self::Item) -> Vec<Result<B::Request, B::Error>> + Send + Sync>>
+    ) -> IncrementalRequests<Self, B::Request, B::Error>
     where
         Self: Sized,
         Self::Item: Send + 'static,
@@ -186,8 +207,10 @@ pub trait SinkBuilderExt: Stream {
             builder
                 .encode_events_incremental(input)
                 .into_iter()
-                .map(|result| {
-                    result.map(|(metadata, payload)| builder.build_request(metadata, payload))
+                .map(|EncodedChunk { result, finalizers }| {
+                    let (metadata, payload) =
+                        result.map_err(|error| error.record_failure(&finalizers))?;
+                    Ok(builder.build_request(metadata, finalizers, payload))
                 })
                 .collect()
         }))
@@ -227,11 +250,9 @@ pub trait SinkBuilderExt: Stream {
         Self: Stream<Item = Metric> + Unpin + Sized,
         N: MetricNormalize + Default,
     {
-        match maybe_ttl_secs {
+        match metric_ttl(maybe_ttl_secs) {
             None => Normalizer::new(self, N::default()),
-            Some(ttl) => {
-                Normalizer::new_with_ttl(self, N::default(), Duration::from_secs(ttl as u64))
-            }
+            Some(ttl) => Normalizer::new_with_ttl(self, N::default(), ttl),
         }
     }
 
@@ -271,5 +292,90 @@ where
         this.st
             .poll_next(cx)
             .map(|maybe| maybe.map(|result| result.unwrap()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use futures_util::stream;
+    use tokio::sync::oneshot::error::TryRecvError;
+    use vector_lib::{
+        event::{BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers, EventStatus},
+        sink::PreparationError,
+    };
+
+    use super::*;
+    use crate::sinks::util::request_builder::IncrementalPayloads;
+
+    #[tokio::test]
+    async fn incremental_builder_rejects_only_the_failed_chunk() {
+        struct TwoChunks;
+
+        impl IncrementalRequestBuilder<[EventFinalizers; 2]> for TwoChunks {
+            type Metadata = ();
+            type Payload = ();
+            type Request = EventFinalizers;
+            type Error = io::Error;
+
+            fn encode_events_incremental(
+                &mut self,
+                [valid, invalid]: [EventFinalizers; 2],
+            ) -> IncrementalPayloads<(), (), io::Error> {
+                vec![
+                    EncodedChunk {
+                        result: Ok(((), ())),
+                        finalizers: valid,
+                    },
+                    EncodedChunk {
+                        result: Err(PreparationError::Permanent(io::Error::other(
+                            "encode error",
+                        ))),
+                        finalizers: invalid,
+                    },
+                ]
+            }
+
+            fn build_request(
+                &mut self,
+                (): (),
+                finalizers: EventFinalizers,
+                (): (),
+            ) -> Self::Request {
+                finalizers
+            }
+        }
+
+        let (valid, mut valid_status) = BatchNotifier::new_with_receiver();
+        let (invalid, invalid_status) = BatchNotifier::new_with_receiver();
+        let input = [valid, invalid].map(|batch| EventFinalizers::new(EventFinalizer::new(batch)));
+        let mut requests = stream::iter([input]).incremental_request_builder(TwoChunks);
+        let mut chunks = requests.next().await.unwrap().into_iter();
+        let request = chunks.next().unwrap().unwrap();
+        assert_eq!(
+            chunks.next().unwrap().unwrap_err().to_string(),
+            "encode error"
+        );
+        assert_eq!(invalid_status.await, BatchStatus::Rejected);
+
+        assert_eq!(valid_status.try_recv(), Err(TryRecvError::Empty));
+        request.update_status(EventStatus::Errored);
+        drop(request);
+        assert_eq!(valid_status.await, BatchStatus::Errored);
+    }
+
+    #[test]
+    fn metric_ttl_preserves_fractional_seconds() {
+        assert_eq!(metric_ttl(Some(0.5)), Some(Duration::from_millis(500)));
+    }
+
+    #[test]
+    fn metric_ttl_ignores_invalid_or_zero_durations() {
+        assert_eq!(metric_ttl(None), None);
+        assert_eq!(metric_ttl(Some(0.0)), None);
+        assert_eq!(metric_ttl(Some(-1.0)), None);
+        assert_eq!(metric_ttl(Some(f64::NAN)), None);
+        assert_eq!(metric_ttl(Some(f64::INFINITY)), None);
     }
 }

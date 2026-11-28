@@ -1,4 +1,5 @@
 use std::time::Duration;
+use vector_lib::internal_event::emit;
 
 use rdkafka::{
     ClientConfig,
@@ -27,17 +28,17 @@ pub(super) enum BuildError {
     KafkaCreateFailed { source: KafkaError },
 }
 
-pub struct KafkaSink {
+pub(crate) struct KafkaSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     service: RateLimit<KafkaService>,
-    topic: Template,
+    topic: ConfinedTemplate,
     key_field: Option<OwnedTargetPath>,
     headers_key: Option<OwnedTargetPath>,
 }
 
 pub(crate) fn create_producer(
-    client_config: ClientConfig,
+    client_config: &ClientConfig,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
         .create_with_context(KafkaStatisticsContext {
@@ -49,9 +50,9 @@ pub(crate) fn create_producer(
 }
 
 impl KafkaSink {
-    pub(crate) fn new(config: KafkaSinkConfig) -> crate::Result<Self> {
+    pub(crate) fn new(config: KafkaSinkConfig, topic: ConfinedTemplate) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka()?;
-        let producer = create_producer(producer_config)?;
+        let producer = create_producer(&producer_config)?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -66,7 +67,7 @@ impl KafkaSink {
                     Duration::from_secs(config.rate_limit_duration_secs),
                 )
                 .service(KafkaService::new(producer)),
-            topic: config.topic,
+            topic,
             key_field: config.key_field.map(|key| key.0),
         })
     }
@@ -85,7 +86,7 @@ impl KafkaSink {
                     self.topic
                         .render_string(&event)
                         .map_err(|error| {
-                            emit!(TemplateRenderingError {
+                            emit(TemplateRenderingError {
                                 field: None,
                                 drop_event: true,
                                 error,
@@ -99,7 +100,7 @@ impl KafkaSink {
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -114,13 +115,14 @@ impl KafkaSink {
 
 pub(crate) async fn healthcheck(
     config: KafkaSinkConfig,
+    topic_template: ConfinedTemplate,
     healthcheck_options: SinkHealthcheckOptions,
 ) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client_config = config.to_rdkafka().unwrap();
     let topic: Option<String> = match config.healthcheck_topic {
         Some(topic) => Some(topic),
-        _ => match config.topic.render_string(&LogEvent::from_str_legacy("")) {
+        _ => match topic_template.render_string(&LogEvent::from_str_legacy("")) {
             Ok(topic) => Some(topic),
             Err(error) => {
                 warn!(
@@ -134,7 +136,7 @@ pub(crate) async fn healthcheck(
 
     tokio::task::spawn_blocking(move || {
         let producer: BaseProducer = client_config.create().unwrap();
-        let topic = topic.as_ref().map(|topic| &topic[..]);
+        let topic = topic.as_deref();
 
         producer
             .client()

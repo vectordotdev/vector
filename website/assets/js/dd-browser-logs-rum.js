@@ -12,10 +12,15 @@ if (datadogRum) {
     datadogRum.init({
       applicationId: '{{ $ddConfig.application_id }}',
       clientToken: '{{ $ddConfig.client_token }}',
+      site: '{{ $ddConfig.site }}',
       env,
       service: '{{ $ddConfig.service_name }}',
       version: '{{ $latest }}',
-      trackInteractions: true,
+      sessionSampleRate: 100,
+      sessionReplaySampleRate: 20,
+      trackResources: true,
+      trackUserInteractions: true,
+      trackLongTasks: true,
       internalAnalyticsSubdomain: '8b61d74c'
     });
   }
@@ -25,7 +30,9 @@ if (datadogLogs) {
   if (env === 'preview' || env === 'production') {
     datadogLogs.init({
       clientToken: '{{ $ddConfig.client_token }}',
+      site: '{{ $ddConfig.site }}',
       forwardErrorsToLogs: true,
+      forwardConsoleLogs: ['error'],
       env,
       service: '{{ $ddConfig.service_name }}',
       version: '{{ $latest }}',
@@ -33,4 +40,3 @@ if (datadogLogs) {
     })
   }
 }
-

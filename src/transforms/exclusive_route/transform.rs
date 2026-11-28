@@ -11,23 +11,28 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct ResolvedRoute {
+pub(crate) struct ResolvedRoute {
     name: String,
     condition: Condition,
 }
 
 #[derive(Clone)]
-pub struct ExclusiveRoute {
+pub(crate) struct ExclusiveRoute {
     routes: Vec<ResolvedRoute>,
 }
 
 impl ExclusiveRoute {
-    pub fn new(config: &ExclusiveRouteConfig, context: &TransformContext) -> crate::Result<Self> {
+    pub(crate) fn new(
+        config: &ExclusiveRouteConfig,
+        context: &TransformContext,
+    ) -> crate::Result<Self> {
         let resolved_routes = config
             .routes
             .iter()
             .map(|route| {
-                let condition = route.condition.build(&context.enrichment_tables)?;
+                let condition = route
+                    .condition
+                    .build(&context.enrichment_tables, &context.metrics_storage)?;
                 Ok(ResolvedRoute {
                     name: route.name.clone(),
                     condition,
@@ -42,7 +47,7 @@ impl ExclusiveRoute {
 }
 
 impl SyncTransform for ExclusiveRoute {
-    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
+    fn transform(&self, event: Event, output: &mut TransformOutputsBuf) {
         for route in &self.routes {
             let (result, event) = route.condition.check(event.clone());
             if result {

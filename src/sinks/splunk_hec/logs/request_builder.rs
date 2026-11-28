@@ -13,19 +13,19 @@ use super::{
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
     util::{
-        Compression, RequestBuilder, metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
+        Compression, RequestBuilder,
+        metadata::RequestMetadataBuilder,
+        request_builder::{EncodeResult, RequestParts},
     },
 };
 
-pub struct HecLogsRequestBuilder {
+pub(super) struct HecLogsRequestBuilder {
     pub encoder: HecLogsEncoder,
     pub compression: Compression,
 }
 
 #[derive(Debug, Clone)]
-pub struct HecRequestMetadata {
-    finalizers: EventFinalizers,
+pub(super) struct HecRequestMetadata {
     partition: Option<Arc<str>>,
     source: Option<String>,
     sourcetype: Option<String>,
@@ -52,36 +52,37 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
     fn split_input(
         &self,
         input: (Option<Partitioned>, Vec<HecProcessedEvent>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (mut partition, mut events) = input;
 
         let finalizers = events.take_finalizers();
 
         let builder = RequestMetadataBuilder::from_events(&events);
 
-        (
-            HecRequestMetadata {
-                finalizers,
+        RequestParts {
+            metadata: HecRequestMetadata {
                 partition: partition.as_ref().and_then(|p| p.token.clone()),
                 source: partition.as_mut().and_then(|p| p.source.take()),
                 sourcetype: partition.as_mut().and_then(|p| p.sourcetype.take()),
                 index: partition.as_mut().and_then(|p| p.index.take()),
                 host: partition.as_mut().and_then(|p| p.host.take()),
             },
-            builder,
+            request_metadata_builder: builder,
             events,
-        )
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         hec_metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         HecRequest {
             body: payload.into_payload(),
-            finalizers: hec_metadata.finalizers,
+            finalizers,
             passthrough_token: hec_metadata.partition,
             source: hec_metadata.source,
             sourcetype: hec_metadata.sourcetype,

@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use vector_lib::{
     ByteSizeOf,
+    internal_event::emit,
     request_metadata::{MetaDescriptive, RequestMetadata},
 };
 
@@ -9,15 +10,15 @@ use crate::{
     event::{Event, EventFinalizers, Finalizable},
     internal_events::TemplateRenderingError,
     sinks::util::{
-        Compression, EncodedLength, RequestBuilder, metadata::RequestMetadataBuilder,
-        request_builder::EncodeResult,
+        Compression, EncodedLength, RequestBuilder,
+        metadata::RequestMetadataBuilder,
+        request_builder::{EncodeResult, RequestParts},
     },
-    template::Template,
+    template::UnconfinedTemplate,
 };
 
 #[derive(Clone)]
 pub(super) struct SSMetadata {
-    pub(super) finalizers: EventFinalizers,
     pub(super) message_group_id: Option<String>,
     pub(super) message_deduplication_id: Option<String>,
 }
@@ -25,15 +26,15 @@ pub(super) struct SSMetadata {
 #[derive(Clone)]
 pub(super) struct SSRequestBuilder {
     encoder: (Transformer, Encoder<()>),
-    message_group_id: Option<Template>,
-    message_deduplication_id: Option<Template>,
+    message_group_id: Option<UnconfinedTemplate>,
+    message_deduplication_id: Option<UnconfinedTemplate>,
 }
 
 impl SSRequestBuilder {
     pub(super) fn new(
-        message_group_id: Option<Template>,
-        message_deduplication_id: Option<Template>,
-        encoding_config: EncodingConfig,
+        message_group_id: Option<UnconfinedTemplate>,
+        message_deduplication_id: Option<UnconfinedTemplate>,
+        encoding_config: &EncodingConfig,
     ) -> crate::Result<Self> {
         let transformer = encoding_config.transformer();
         let serializer = encoding_config.build()?;
@@ -63,15 +64,12 @@ impl RequestBuilder<Event> for SSRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut event: Event,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut event: Event) -> RequestParts<Self::Metadata, Self::Events> {
         let message_group_id = match self.message_group_id {
             Some(ref tpl) => match tpl.render_string(&event) {
                 Ok(value) => Some(value),
                 Err(error) => {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("message_group_id"),
                         drop_event: true,
@@ -85,7 +83,7 @@ impl RequestBuilder<Event> for SSRequestBuilder {
             Some(ref tpl) => match tpl.render_string(&event) {
                 Ok(value) => Some(value),
                 Err(error) => {
-                    emit!(TemplateRenderingError {
+                    emit(TemplateRenderingError {
                         error,
                         field: Some("message_deduplication_id"),
                         drop_event: true,
@@ -98,17 +96,23 @@ impl RequestBuilder<Event> for SSRequestBuilder {
 
         let builder = RequestMetadataBuilder::from_event(&event);
 
+        let finalizers = event.take_finalizers();
         let metadata = SSMetadata {
-            finalizers: event.take_finalizers(),
             message_group_id,
             message_deduplication_id,
         };
-        (metadata, builder, event)
+        RequestParts {
+            metadata,
+            request_metadata_builder: builder,
+            events: event,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         client_metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -119,7 +123,7 @@ impl RequestBuilder<Event> for SSRequestBuilder {
             message_body,
             message_group_id: client_metadata.message_group_id,
             message_deduplication_id: client_metadata.message_deduplication_id,
-            finalizers: client_metadata.finalizers,
+            finalizers,
             metadata,
         }
     }

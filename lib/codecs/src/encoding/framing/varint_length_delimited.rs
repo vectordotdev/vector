@@ -1,5 +1,4 @@
 use bytes::{BufMut, BytesMut};
-use derivative::Derivative;
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
@@ -17,8 +16,7 @@ impl FramingError for VarintFramingError {}
 
 /// Config used to build a `VarintLengthDelimitedEncoder`.
 #[configurable_component]
-#[derive(Debug, Clone, PartialEq, Eq, Derivative)]
-#[derivative(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct VarintLengthDelimitedEncoderConfig {
     /// Maximum frame length
     #[serde(default = "default_max_frame_length")]
@@ -31,6 +29,7 @@ const fn default_max_frame_length() -> usize {
 
 impl VarintLengthDelimitedEncoderConfig {
     /// Build the `VarintLengthDelimitedEncoder` from this configuration.
+    #[must_use]
     pub fn build(&self) -> VarintLengthDelimitedEncoder {
         VarintLengthDelimitedEncoder::new(self.max_frame_length)
     }
@@ -45,11 +44,17 @@ pub struct VarintLengthDelimitedEncoder {
 
 impl VarintLengthDelimitedEncoder {
     /// Creates a new `VarintLengthDelimitedEncoder`.
+    #[must_use]
     pub fn new(max_frame_length: usize) -> Self {
         Self { max_frame_length }
     }
 
     /// Encode a varint into the buffer
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Preserve the existing numeric conversion and wire-format behavior."
+    )]
     fn encode_varint(&self, value: usize, buf: &mut BytesMut) -> Result<(), BoxedFramingError> {
         if value > self.max_frame_length {
             return Err(VarintFramingError::FrameTooLarge {
@@ -78,7 +83,7 @@ impl Default for VarintLengthDelimitedEncoder {
 impl Encoder<()> for VarintLengthDelimitedEncoder {
     type Error = BoxedFramingError;
 
-    fn encode(&mut self, _: (), buffer: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, (): (), buffer: &mut BytesMut) -> Result<(), Self::Error> {
         // This encoder expects the data to already be in the buffer
         // We just need to prepend the varint length
         let data_length = buffer.len();

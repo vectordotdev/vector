@@ -1,4 +1,7 @@
 CUE = ../scripts/cue.sh
+VDEV ?= cargo vdev
+
+export CI ?= false
 
 # Override to specify which network address to use in Hugo/HTTP servers for binding
 export SERVER_BIND ?= 127.0.0.1
@@ -8,7 +11,12 @@ export SERVER_PORT ?= 1313
 clean:
 	rm -rf public resources data/cargo-lock.toml data/docs.json
 
-setup:
+.PHONY: setup-vdev
+setup-vdev:
+	cd .. && scripts/environment/prepare.sh --modules=vdev,prettier
+
+.PHONY: setup
+setup: setup-vdev
 	yarn
 
 # Copy Cargo data such as the dependency information file
@@ -16,29 +24,47 @@ cargo-data:
 	cp -f ../Cargo.lock data/cargo-lock.toml
 
 # Build JSON from CUE sources with `make cue-build`. Run other commands with `make cue-*`
+cue-build:
+	$(VDEV) build docs-json
+
 cue-%:
 	${CUE} $*
 
-config-examples:
-	yarn config-examples
+.PHONY: component-examples
+component-examples: generate-vrl-docs
+	$(VDEV) build component-examples website/generated/example-configs
 
-structured-data: cue-build config-examples
+.PHONY: config-examples
+config-examples: component-examples
+
+generate-vrl-docs: setup-vdev
+	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
+		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA),)
+
+structured-data: generate-vrl-docs component-examples
 
 serve: clean setup cargo-data structured-data
-	hugo server \
-	--bind $(SERVER_BIND) \
-	--port $(SERVER_PORT) \
+	$(MAKE) serve-development
+
+.PHONY: serve-development
+serve-development:
+	hugo \
 	--buildDrafts \
 	--buildFuture \
 	--environment "development"
+	$(MAKE) highlight-vrl pagefind
+	yarn concurrently --kill-others --success first --names hugo,pagefind \
+		"hugo server --bind $(SERVER_BIND) --port $(SERVER_PORT) --buildDrafts --buildFuture --environment development" \
+		"yarn pagefind:watch"
 
 # Live site
 production-build:
 	hugo \
 	--environment "production" \
 	--minify
+	$(MAKE) highlight-vrl pagefind
 
-ci-production-build: setup cargo-data structured-data production-build typesense-production
+ci-production-build: setup cargo-data structured-data production-build
 
 # Preview site
 preview-build:
@@ -48,8 +74,9 @@ preview-build:
 	--environment "preview" \
 	--minify
 	cp ./custom-headers/_preview ./public/_headers
+	$(MAKE) highlight-vrl pagefind
 
-ci-preview-build: setup cargo-data structured-data preview-build typesense-preview
+ci-preview-build: setup cargo-data structured-data preview-build
 
 run-link-checker:
 	htmltest
@@ -60,14 +87,15 @@ run-external-link-checker:
 # Check links without rebuilding the CUE sources. Optimal for fixing links locally.
 check-links: production-build run-link-checker
 
-# Search
-typesense-preview:
-	yarn typesense-index
-	yarn typesense-sync:preview
+# Highlight VRL in rendered pages before indexing or serving them.
+.PHONY: highlight-vrl
+highlight-vrl:
+	# Installed vdev binaries may predate this command; use the checkout's version.
+	cargo vdev build vrl-highlights
 
-typesense-production:
-	yarn typesense-index
-	yarn typesense-sync:production
+# Search
+pagefind:
+	yarn pagefind --site public
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
@@ -85,3 +113,9 @@ local-preview-build: clean setup cargo-data structured-data preview-build run-li
 # Generate Lighthouse scores locally
 lighthouse-report:
 	yarn lighthouse
+
+# Browser tests use a static server over the same minified assets as deployment.
+.PHONY: test
+test: cargo-data structured-data
+	$(MAKE) production-build
+	yarn test

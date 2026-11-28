@@ -1,32 +1,19 @@
-import presetEnv from '@babel/preset-env';
-import presetReact from '@babel/preset-react';
-import presetTypeScript from '@babel/preset-typescript';
+import presetEnv from "@babel/preset-env";
+import presetReact from "@babel/preset-react";
+import presetTypeScript from "@babel/preset-typescript";
 
 export default function (api) {
   api.cache(true);
 
   const presets = [
-    [
-      presetEnv,
-      {
-        "useBuiltIns": 'entry',
-        "corejs": 3
-      }
-    ],
+    presetEnv,
     [
       presetReact,
       {
-        "flow": false,
-        "typescript": true
+        runtime: "automatic"
       }
     ],
-    [
-      presetTypeScript,
-      {
-        "isTSX": true,
-        "allExtensions": true
-      }
-    ]
+    presetTypeScript
   ];
 
   const plugins = [];

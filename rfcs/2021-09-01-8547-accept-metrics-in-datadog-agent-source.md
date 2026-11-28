@@ -78,7 +78,7 @@ https://vector.mycompany.tld` to forward metrics to a Vector deployment.
 
 The current `dd_url` endpoint configuration has a [conditional
 behavior](https://github.com/DataDog/datadog-agent/blob/main/pkg/config/config.go#L1199-L1201) (also
-[here](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/forwarder_health.go#L131-L143)). I.e. if
+[in the forwarder health check](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/forwarder_health.go#L131-L143)). I.e. if
 `dd_url` contains a known pattern (i.e. it has a suffix that matches a Datadog site) some extra hostname manipulation
 happens. But overall, the following paths are expected to be supported on the host behind `dd_url`:
 
@@ -100,20 +100,20 @@ A few details about the Datadog Agents & [Datadog metrics](https://docs.datadogh
   [`MetricSample`](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/metric_sample.go#L81-L94) and can be
   of [several types](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/metric_sample.go#L20-L31)
 * Major Agent usecases:
-  * Metrics are send from corechecks (i.e. go code)
-    [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/aggregator/sender.go#L227-L252)
-  * Dogstatsd metrics are converted to the `MetricSample` structure
-    [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/dogstatsd/enrich.go#L87-L137) However Datadog Agents
+  * Metrics are send from corechecks (i.e. go code) via the
+    [aggregator sender](https://github.com/DataDog/datadog-agent/blob/main/pkg/aggregator/sender.go#L227-L252)
+  * Dogstatsd metrics are converted to the `MetricSample` structure in the
+    [dogstatsd enrich module](https://github.com/DataDog/datadog-agent/blob/main/pkg/dogstatsd/enrich.go#L87-L137). However Datadog Agents
     metrics are transformed before being sent, ultimately metrics accounts for two different kind of payload:
 * The count, gauge and rate series kind of payload, sent to `/api/v1/series` using the [JSON schema officially
   documented](https://docs.datadoghq.com/api/latest/metrics) with few undocumented [additional
   fields](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/series.go#L45-L57), but this align very well
   with the existing `datadog_metrics` sinks.
-* The sketches kind of payload, sent to `/api/beta/sketches` and serialized as protobuf as shown
-  [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/serializer/serializer.go#L315-L338) (it ultimately lands
-  [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/sketch_series.go#L103-L269)). Public `.proto`
-  definition can be found
-  [here](https://github.com/DataDog/agent-payload/blob/master/proto/metrics/agent_payload.proto#L47-L81).
+* The sketches kind of payload, sent to `/api/beta/sketches` and serialized as protobuf as shown in the
+  [serializer](https://github.com/DataDog/datadog-agent/blob/main/pkg/serializer/serializer.go#L315-L338) (it ultimately lands in the
+  [sketch_series module](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/sketch_series.go#L103-L269)). Public `.proto`
+  definition can be found in the
+  [agent-payload proto](https://github.com/DataDog/agent-payload/blob/master/proto/metrics/agent_payload.proto#L47-L81).
 
 Vector has a nice description of its [metrics data
 model](https://vector.dev/docs/architecture/data-model/metric/) and a [concise enum for

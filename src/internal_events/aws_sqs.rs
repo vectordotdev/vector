@@ -1,11 +1,11 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
-use metrics::counter;
 #[cfg(feature = "sources-aws_s3")]
-pub use s3::*;
+pub(crate) use s3::*;
+use vector_lib::counter;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
-use vector_lib::internal_event::{error_stage, error_type};
-use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
+use vector_lib::{
+    NamedInternalEvent,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {
@@ -15,13 +15,14 @@ mod s3 {
         BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
         SendMessageBatchRequestEntry, SendMessageBatchResultEntry,
     };
-    use metrics::histogram;
+    use vector_lib::histogram;
+    use vector_lib::internal_event::HistogramName;
 
-    use super::*;
+    use super::{CounterName, InternalEvent, NamedInternalEvent, counter, error_stage, error_type};
     use crate::sources::aws_s3::sqs::ProcessingError;
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct S3ObjectProcessingSucceeded<'a> {
+    pub(crate) struct S3ObjectProcessingSucceeded<'a> {
         pub bucket: &'a str,
         pub duration: Duration,
     }
@@ -34,7 +35,7 @@ mod s3 {
                 duration_ms = %self.duration.as_millis(),
             );
             histogram!(
-                "s3_object_processing_succeeded_duration_seconds",
+                HistogramName::S3ObjectProcessingSucceededDurationSeconds,
                 "bucket" => self.bucket.to_owned(),
             )
             .record(self.duration);
@@ -42,7 +43,7 @@ mod s3 {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct S3ObjectProcessingFailed<'a> {
+    pub(crate) struct S3ObjectProcessingFailed<'a> {
         pub bucket: &'a str,
         pub duration: Duration,
     }
@@ -55,7 +56,7 @@ mod s3 {
                 duration_ms = %self.duration.as_millis(),
             );
             histogram!(
-                "s3_object_processing_failed_duration_seconds",
+                HistogramName::S3ObjectProcessingFailedDurationSeconds,
                 "bucket" => self.bucket.to_owned(),
             )
             .record(self.duration);
@@ -63,7 +64,7 @@ mod s3 {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SqsMessageProcessingError<'a> {
+    pub(crate) struct SqsMessageProcessingError<'a> {
         pub message_id: &'a str,
         pub error: &'a ProcessingError,
     }
@@ -79,7 +80,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "failed_processing_sqs_message",
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -89,7 +90,7 @@ mod s3 {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SqsMessageDeleteSucceeded {
+    pub(crate) struct SqsMessageDeleteSucceeded {
         pub message_ids: Vec<DeleteMessageBatchResultEntry>,
     }
 
@@ -100,12 +101,13 @@ mod s3 {
                 .map(|x| x.id.as_str())
                 .collect::<Vec<_>>()
                 .join(", "));
-            counter!("sqs_message_delete_succeeded_total").increment(self.message_ids.len() as u64);
+            counter!(CounterName::SqsMessageDeleteSucceededTotal)
+                .increment(self.message_ids.len() as u64);
         }
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SqsMessageDeletePartialError {
+    pub(crate) struct SqsMessageDeletePartialError {
         pub entries: Vec<BatchResultErrorEntry>,
     }
 
@@ -122,7 +124,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "failed_deleting_some_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -132,7 +134,7 @@ mod s3 {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SqsMessageDeleteBatchError<E> {
+    pub(crate) struct SqsMessageDeleteBatchError<E> {
         pub entries: Vec<DeleteMessageBatchRequestEntry>,
         pub error: E,
     }
@@ -151,7 +153,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "failed_deleting_all_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -161,7 +163,7 @@ mod s3 {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SqsMessageSentSucceeded {
+    pub(crate) struct SqsMessageSentSucceeded {
         pub message_ids: Vec<SendMessageBatchResultEntry>,
     }
 
@@ -172,12 +174,13 @@ mod s3 {
                 .map(|x| x.id.as_str())
                 .collect::<Vec<_>>()
                 .join(", "));
-            counter!("sqs_message_defer_succeeded_total").increment(self.message_ids.len() as u64);
+            counter!(CounterName::SqsMessageDeferSucceededTotal)
+                .increment(self.message_ids.len() as u64);
         }
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SqsMessageSentPartialError {
+    pub(crate) struct SqsMessageSentPartialError {
         pub entries: Vec<BatchResultErrorEntry>,
     }
 
@@ -194,7 +197,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "failed_deferring_some_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -204,7 +207,7 @@ mod s3 {
     }
 
     #[derive(Debug, NamedInternalEvent)]
-    pub struct SqsMessageSendBatchError<E> {
+    pub(crate) struct SqsMessageSendBatchError<E> {
         pub entries: Vec<SendMessageBatchRequestEntry>,
         pub error: E,
     }
@@ -223,7 +226,7 @@ mod s3 {
                 stage = error_stage::PROCESSING,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "failed_deferring_all_sqs_messages",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::PROCESSING,
@@ -231,10 +234,52 @@ mod s3 {
             .increment(1);
         }
     }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct SqsMessageReceiveSucceeded {
+        pub count: usize,
+    }
+
+    impl InternalEvent for SqsMessageReceiveSucceeded {
+        fn emit(self) {
+            trace!(message = "Received SQS messages.", count = %self.count);
+            counter!(CounterName::SqsMessageReceiveSucceededTotal).increment(1);
+            counter!(CounterName::SqsMessageReceivedMessagesTotal).increment(self.count as u64);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct SqsMessageProcessingSucceeded<'a> {
+        pub message_id: &'a str,
+    }
+
+    impl InternalEvent for SqsMessageProcessingSucceeded<'_> {
+        fn emit(self) {
+            trace!(message = "Processed SQS message successfully.", message_id = %self.message_id);
+            counter!(CounterName::SqsMessageProcessingSucceededTotal).increment(1);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub(crate) struct SqsS3EventRecordInvalidEventIgnored<'a> {
+        pub bucket: &'a str,
+        pub key: &'a str,
+        pub kind: &'a str,
+        pub name: &'a str,
+    }
+
+    impl InternalEvent for SqsS3EventRecordInvalidEventIgnored<'_> {
+        fn emit(self) {
+            warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.",
+                bucket = %self.bucket, key = %self.key, kind = %self.kind, name = %self.name);
+            counter!(CounterName::SqsS3EventRecordIgnoredTotal, "ignore_type" => "invalid_event_kind")
+                .increment(1);
+        }
+    }
 }
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct SqsMessageReceiveError<'a, E> {
+pub(crate) struct SqsMessageReceiveError<'a, E> {
     pub error: &'a E,
 }
 
@@ -248,7 +293,7 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'_, E> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_fetching_sqs_events",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -257,36 +302,11 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'_, E> {
     }
 }
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct SqsMessageReceiveSucceeded {
-    pub count: usize,
-}
-
-impl InternalEvent for SqsMessageReceiveSucceeded {
-    fn emit(self) {
-        trace!(message = "Received SQS messages.", count = %self.count);
-        counter!("sqs_message_receive_succeeded_total").increment(1);
-        counter!("sqs_message_received_messages_total").increment(self.count as u64);
-    }
-}
-
-#[derive(Debug, NamedInternalEvent)]
-pub struct SqsMessageProcessingSucceeded<'a> {
-    pub message_id: &'a str,
-}
-
-impl InternalEvent for SqsMessageProcessingSucceeded<'_> {
-    fn emit(self) {
-        trace!(message = "Processed SQS message successfully.", message_id = %self.message_id);
-        counter!("sqs_message_processing_succeeded_total").increment(1);
-    }
-}
-
 // AWS SQS source
 
 #[cfg(feature = "sources-aws_sqs")]
 #[derive(Debug, NamedInternalEvent)]
-pub struct SqsMessageDeleteError<'a, E> {
+pub(crate) struct SqsMessageDeleteError<'a, E> {
     pub error: &'a E,
 }
 
@@ -300,29 +320,10 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'_, E> {
             stage = error_stage::PROCESSING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-    }
-}
-
-// AWS s3 source
-
-#[derive(Debug, NamedInternalEvent)]
-pub struct SqsS3EventRecordInvalidEventIgnored<'a> {
-    pub bucket: &'a str,
-    pub key: &'a str,
-    pub kind: &'a str,
-    pub name: &'a str,
-}
-
-impl InternalEvent for SqsS3EventRecordInvalidEventIgnored<'_> {
-    fn emit(self) {
-        warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.",
-            bucket = %self.bucket, key = %self.key, kind = %self.kind, name = %self.name);
-        counter!("sqs_s3_event_record_ignored_total", "ignore_type" => "invalid_event_kind")
-            .increment(1);
     }
 }

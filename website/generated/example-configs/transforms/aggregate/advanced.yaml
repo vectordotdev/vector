@@ -1,0 +1,8 @@
+transforms:
+  my_transform_id:
+    type: aggregate
+    inputs:
+      - my-source-or-transform-id
+    interval_ms: 10000
+    measure_cpu_usage: false
+    mode: Auto

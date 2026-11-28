@@ -1,0 +1,7 @@
+sources:
+  my_source_id:
+    type: mongodb_metrics
+    endpoints:
+      - mongodb://localhost:27017
+    namespace: mongodb
+    scrape_interval_secs: 15

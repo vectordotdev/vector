@@ -1,9 +1,10 @@
 use std::time::Duration;
 
-use metrics::{Histogram, counter, gauge, histogram};
+use metrics::Histogram;
 use vector_common::NamedInternalEvent;
 use vector_common::{
-    internal_event::{InternalEvent, error_type},
+    counter, gauge, histogram,
+    internal_event::{CounterName, GaugeName, HistogramName, InternalEvent, error_type},
     registered_event,
 };
 
@@ -18,19 +19,20 @@ pub struct BufferCreated {
 impl InternalEvent for BufferCreated {
     #[expect(clippy::cast_precision_loss)]
     fn emit(self) {
+        let stage = self.idx.to_string();
         if self.max_size_events != 0 {
             gauge!(
-                "buffer_max_event_size",
+                GaugeName::BufferMaxSizeEvents,
                 "buffer_id" => self.buffer_id.clone(),
-                "stage" => self.idx.to_string(),
+                "stage" => stage.clone(),
             )
             .set(self.max_size_events as f64);
         }
         if self.max_size_bytes != 0 {
             gauge!(
-                "buffer_max_byte_size",
+                GaugeName::BufferMaxSizeBytes,
                 "buffer_id" => self.buffer_id,
-                "stage" => self.idx.to_string(),
+                "stage" => stage,
             )
             .set(self.max_size_bytes as f64);
         }
@@ -51,27 +53,27 @@ impl InternalEvent for BufferEventsReceived {
     #[expect(clippy::cast_precision_loss)]
     fn emit(self) {
         counter!(
-            "buffer_received_events_total",
+            CounterName::BufferReceivedEventsTotal,
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .increment(self.count);
 
         counter!(
-            "buffer_received_bytes_total",
+            CounterName::BufferReceivedBytesTotal,
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .increment(self.byte_size);
         gauge!(
-            "buffer_events",
+            GaugeName::BufferSizeEvents,
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_count as f64);
         gauge!(
-            "buffer_byte_size",
-            "buffer_id" => self.buffer_id,
+            GaugeName::BufferSizeBytes,
+            "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_byte_size as f64);
@@ -92,26 +94,26 @@ impl InternalEvent for BufferEventsSent {
     #[expect(clippy::cast_precision_loss)]
     fn emit(self) {
         counter!(
-            "buffer_sent_events_total",
+            CounterName::BufferSentEventsTotal,
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .increment(self.count);
         counter!(
-            "buffer_sent_bytes_total",
+            CounterName::BufferSentBytesTotal,
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .increment(self.byte_size);
         gauge!(
-            "buffer_events",
+            GaugeName::BufferSizeEvents,
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_count as f64);
         gauge!(
-            "buffer_byte_size",
-            "buffer_id" => self.buffer_id,
+            GaugeName::BufferSizeBytes,
+            "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_byte_size as f64);
@@ -157,28 +159,28 @@ impl InternalEvent for BufferEventsDropped {
         }
 
         counter!(
-            "buffer_discarded_events_total",
+            CounterName::BufferDiscardedEventsTotal,
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string(),
             "intentional" => intentional_str,
         )
         .increment(self.count);
         counter!(
-            "buffer_discarded_bytes_total",
+            CounterName::BufferDiscardedBytesTotal,
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string(),
             "intentional" => intentional_str,
         )
         .increment(self.byte_size);
         gauge!(
-            "buffer_events",
+            GaugeName::BufferSizeEvents,
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_count as f64);
         gauge!(
-            "buffer_byte_size",
-            "buffer_id" => self.buffer_id,
+            GaugeName::BufferSizeBytes,
+            "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_byte_size as f64);
@@ -201,7 +203,7 @@ impl InternalEvent for BufferReadError {
             stage = "processing",
         );
         counter!(
-            "buffer_errors_total", "error_code" => self.error_code,
+            CounterName::BufferErrorsTotal, "error_code" => self.error_code,
             "error_type" => "reader_failed",
             "stage" => "processing",
         )
@@ -213,7 +215,7 @@ registered_event! {
     BufferSendDuration {
         stage: usize,
     } => {
-        send_duration: Histogram = histogram!("buffer_send_duration_seconds", "stage" => self.stage.to_string()),
+        send_duration: Histogram = histogram!(HistogramName::BufferSendDurationSeconds, "stage" => self.stage.to_string()),
     }
 
     fn emit(&self, duration: Duration) {

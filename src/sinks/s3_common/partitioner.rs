@@ -1,6 +1,13 @@
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{
+    event::Event,
+    partition::{PartitionDecision, Partitioner},
+    sink::PreparationError,
+};
 
-use crate::{internal_events::TemplateRenderingError, template::Template};
+use crate::{
+    sinks::util::partitioner::{render_key_with_fallback, render_partition_value},
+    template::ConfinedTemplate,
+};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct S3PartitionKey {
@@ -9,16 +16,21 @@ pub struct S3PartitionKey {
 }
 
 /// Partitions items based on the generated key for the given event.
+///
+/// If the template was built with a confinement check (via
+/// [`Template::confine`][crate::template::Template::confine]),
+/// keys that escape the base prefix are dropped as intentional security discards.
 pub struct S3KeyPartitioner {
-    key_prefix_template: Template,
-    ssekms_key_id_template: Option<Template>,
+    key_prefix_template: ConfinedTemplate,
+    ssekms_key_id_template: Option<ConfinedTemplate>,
     dead_letter_key_prefix: Option<String>,
 }
 
 impl S3KeyPartitioner {
+    #[must_use]
     pub const fn new(
-        key_prefix_template: Template,
-        ssekms_key_id_template: Option<Template>,
+        key_prefix_template: ConfinedTemplate,
+        ssekms_key_id_template: Option<ConfinedTemplate>,
         dead_letter_key_prefix: Option<String>,
     ) -> Self {
         Self {
@@ -31,47 +43,36 @@ impl S3KeyPartitioner {
 
 impl Partitioner for S3KeyPartitioner {
     type Item = Event;
-    type Key = Option<S3PartitionKey>;
+    type Key = S3PartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        let key_prefix = self
-            .key_prefix_template
-            .render_string(item)
-            .or_else(|error| {
-                if let Some(dead_letter_key_prefix) = &self.dead_letter_key_prefix {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("key_prefix"),
-                        drop_event: false,
-                    });
-                    Ok(dead_letter_key_prefix.clone())
-                } else {
-                    Err(emit!(TemplateRenderingError {
-                        error,
-                        field: Some("key_prefix"),
-                        drop_event: true,
-                    }))
-                }
-            })
-            .ok()?;
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        let PartitionDecision::Route(key_prefix) = render_key_with_fallback(
+            &self.key_prefix_template,
+            item,
+            self.dead_letter_key_prefix.as_deref(),
+        )?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
 
-        let ssekms_key_id = self
-            .ssekms_key_id_template
-            .as_ref()
-            .map(|ssekms_key_id| {
-                ssekms_key_id.render_string(item).map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("ssekms_key_id"),
-                        drop_event: true,
-                    });
-                })
-            })
-            .transpose()
-            .ok()?;
-        Some(S3PartitionKey {
+        let ssekms_key_id = if let Some(template) = &self.ssekms_key_id_template {
+            let PartitionDecision::Route(key_id) =
+                render_partition_value(template.render_string(item), "ssekms_key_id")?
+            else {
+                return Ok(PartitionDecision::Discard);
+            };
+            Some(key_id)
+        } else {
+            None
+        };
+
+        Ok(PartitionDecision::Route(S3PartitionKey {
             key_prefix,
             ssekms_key_id,
-        })
+        }))
     }
 }

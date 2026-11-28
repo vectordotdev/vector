@@ -1,0 +1,40 @@
+transforms:
+  canary:
+    inputs: []
+    type: "remap"
+    source: ""
+
+  remap_test_metadata:
+    inputs: []
+    type: "remap"
+    source: |
+      .event = .
+      .metadata = %
+
+tests:
+  - name: "canary"
+    inputs:
+      - insert_at: "canary"
+        type: "vrl"
+        source: |
+          . = {"a": {"b": "c"}, "d": now()}
+    outputs:
+      - extract_from: "canary"
+        conditions:
+          - type: "vrl"
+            source: '.a.b == "c" && is_timestamp(.d)'
+
+  - name: "remap_test_metadata"
+    inputs:
+      - insert_at: "remap_test_metadata"
+        type: "vrl"
+        source: |
+          . = "Event"
+          % = "Metadata"
+    outputs:
+      - extract_from: "remap_test_metadata"
+        conditions:
+          - type: "vrl"
+            source: |
+              assert_eq!(.event, "Event")
+              assert_eq!(.metadata, "Metadata")

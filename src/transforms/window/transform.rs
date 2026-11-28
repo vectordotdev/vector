@@ -1,12 +1,12 @@
 use std::collections::VecDeque;
 
-use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered};
+use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered, register};
 
 use crate::{
     conditions::Condition,
     event::Event,
     internal_events::WindowEventsDropped,
-    transforms::{FunctionTransform, OutputBuffer},
+    transforms::{StatefulTransform, TransformOutputsBuf},
 };
 
 #[derive(Clone)]
@@ -17,37 +17,49 @@ pub struct Window {
     num_events_before: usize,
     num_events_after: usize,
 
-    // Internal variables
+    events_dropped: Registered<WindowEventsDropped>,
+}
+
+/// Event history retained by one inline window execution.
+pub struct WindowState {
     buffer: VecDeque<Event>,
     events_counter: usize,
-    events_dropped: Registered<WindowEventsDropped>,
     is_flushing: bool,
 }
 
 impl Window {
+    ///
+    /// # Errors
+    ///
+    /// This constructor currently always succeeds.
     pub fn new(
         forward_when: Option<Condition>,
         flush_when: Condition,
         num_events_before: usize,
         num_events_after: usize,
     ) -> crate::Result<Self> {
-        let buffer = VecDeque::with_capacity(num_events_before);
-
         Ok(Window {
             forward_when,
             flush_when,
             num_events_before,
             num_events_after,
-            events_dropped: register!(WindowEventsDropped),
-            buffer,
-            events_counter: 0,
-            is_flushing: false,
+            events_dropped: register(WindowEventsDropped),
         })
     }
 }
 
-impl FunctionTransform for Window {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+impl StatefulTransform for Window {
+    type State = WindowState;
+
+    fn new_state(&self) -> WindowState {
+        WindowState {
+            buffer: VecDeque::with_capacity(self.num_events_before),
+            events_counter: 0,
+            is_flushing: false,
+        }
+    }
+
+    fn transform(&self, state: &mut WindowState, event: Event, output: &mut TransformOutputsBuf) {
         let (pass, event) = match self.forward_when.as_ref() {
             Some(condition) => {
                 let (result, event) = condition.check(event);
@@ -58,36 +70,39 @@ impl FunctionTransform for Window {
 
         let (flush, event) = self.flush_when.check(event);
 
-        if self.buffer.capacity() < self.num_events_before {
-            self.buffer.reserve(self.num_events_before);
+        if state.buffer.capacity() < self.num_events_before {
+            state.buffer.reserve(self.num_events_before);
         }
 
         if pass {
-            output.push(event);
+            output.push(None, event);
         } else if flush {
             if self.num_events_before > 0 {
-                self.buffer.drain(..).for_each(|evt| output.push(evt));
+                state
+                    .buffer
+                    .drain(..)
+                    .for_each(|evt| output.push(None, evt));
             }
 
-            self.events_counter = 0;
-            self.is_flushing = true;
-            output.push(event);
-        } else if self.is_flushing {
-            self.events_counter += 1;
+            state.events_counter = 0;
+            state.is_flushing = true;
+            output.push(None, event);
+        } else if state.is_flushing {
+            state.events_counter += 1;
 
-            if self.events_counter > self.num_events_after {
-                self.events_counter = 0;
-                self.is_flushing = false;
+            if state.events_counter > self.num_events_after {
+                state.events_counter = 0;
+                state.is_flushing = false;
                 self.events_dropped.emit(Count(1));
             } else {
-                output.push(event);
+                output.push(None, event);
             }
-        } else if self.buffer.len() >= self.num_events_before {
-            self.buffer.pop_front();
-            self.buffer.push_back(event);
+        } else if state.buffer.len() >= self.num_events_before {
+            state.buffer.pop_front();
+            state.buffer.push_back(event);
             self.events_dropped.emit(Count(1));
         } else if self.num_events_before > 0 {
-            self.buffer.push_back(event);
+            state.buffer.push_back(event);
         } else {
             self.events_dropped.emit(Count(1));
         }
@@ -97,13 +112,14 @@ impl FunctionTransform for Window {
 #[cfg(test)]
 mod test {
     use std::ops::RangeInclusive;
+    use vrl::compiler::VrlRuntime;
 
     use tokio::sync::{
         mpsc,
         mpsc::{Receiver, Sender},
     };
     use tokio_stream::wrappers::ReceiverStream;
-    use vrl::core::Value;
+    use vrl::{core::Value, event_path};
 
     use crate::{
         conditions::{AnyCondition, ConditionConfig, VrlConfig},
@@ -114,7 +130,7 @@ mod test {
 
     #[tokio::test]
     async fn test_flush() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 1, 0);
 
@@ -123,19 +139,19 @@ mod test {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             send_event(&tx, "flush").await;
-            assert_event("flush", out.recv().await).await;
+            assert_event("flush", out.recv().await);
 
             drop(tx);
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_pass() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let forward_when = get_condition("forward");
             let transform_config = get_transform_config(flush_when, Some(forward_when), 1, 0);
@@ -145,19 +161,19 @@ mod test {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             send_event(&tx, "forward").await;
-            assert_event("forward", out.recv().await).await;
+            assert_event("forward", out.recv().await);
 
             drop(tx);
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_10_in_50() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 50, 0);
 
@@ -178,13 +194,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_50_in_10() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 10, 0);
 
@@ -205,13 +221,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_before_and_after() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 10, 5);
 
@@ -234,13 +250,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_flush_and_pass() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let forward_when = get_condition("forward");
             let transform_config = get_transform_config(flush_when, Some(forward_when), 50, 5);
@@ -270,13 +286,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_zero_before() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 0, 5);
 
@@ -295,13 +311,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_zero_flush() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let transform_config = get_transform_config(flush_when, None, 0, 0);
 
@@ -320,13 +336,13 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
     #[tokio::test]
     async fn test_zero_pass() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let flush_when = get_condition("flush");
             let forward_when = get_condition("forward");
             let transform_config = get_transform_config(flush_when, Some(forward_when), 0, 0);
@@ -350,7 +366,7 @@ mod test {
             topology.stop().await;
 
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 
@@ -361,8 +377,8 @@ mod test {
         num_events_after: usize,
     ) -> WindowConfig {
         WindowConfig {
-            flush_when,
             forward_when,
+            flush_when,
             num_events_before,
             num_events_after,
         }
@@ -371,7 +387,7 @@ mod test {
     fn get_condition(message: &str) -> AnyCondition {
         AnyCondition::from(ConditionConfig::Vrl(VrlConfig {
             source: format!(r#".message == "{message}""#),
-            runtime: Default::default(),
+            runtime: VrlRuntime::default(),
         }))
     }
 
@@ -392,16 +408,16 @@ mod test {
         tx.send(Event::from(LogEvent::from(message))).await.unwrap();
     }
 
-    async fn assert_event(message: &str, event: Option<Event>) {
+    fn assert_event(message: &str, event: Option<Event>) {
         assert_eq!(
             &Value::from(message),
-            event.unwrap().as_log().get("message").unwrap()
+            event.unwrap().as_log().get(event_path!("message")).unwrap()
         );
     }
 
     async fn assert_events(messages: &mut [&str], out: &mut Receiver<Event>) {
         for message in messages {
-            assert_event(message, out.recv().await).await;
+            assert_event(message, out.recv().await);
         }
     }
 }

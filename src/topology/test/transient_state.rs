@@ -1,3 +1,5 @@
+use vector_lib::extra_context::ExtraContext;
+
 use crate::{
     config::Config,
     test_util::{
@@ -30,7 +32,7 @@ async fn closed_source() {
     topology.sources_finished().await;
 
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }
@@ -52,7 +54,7 @@ async fn remove_sink() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }
@@ -75,7 +77,7 @@ async fn remove_transform() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }
@@ -99,7 +101,7 @@ async fn replace_transform() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .reload_config_and_respawn(new_config.build().unwrap(), ExtraContext::default())
         .await
         .unwrap();
 }

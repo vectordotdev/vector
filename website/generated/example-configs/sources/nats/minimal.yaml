@@ -1,0 +1,6 @@
+sources:
+  my_source_id:
+    type: nats
+    connection_name: vector
+    subject: foo
+    url: nats://demo.nats.io

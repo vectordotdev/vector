@@ -1,0 +1,67 @@
+{
+  "anchor": "find_vector_metrics",
+  "name": "find_vector_metrics",
+  "category": "Metrics",
+  "description": "Searches internal Vector metrics by name and optionally by tags. Returns all matching metrics.\n\nInternal Vector metrics functions work with a snapshot of the metrics. The interval at which the snapshot is updated is controlled through the [`metrics_storage_refresh_period`](/docs/reference/configuration/global-options/#metrics_storage_refresh_period) global option. Higher values can reduce performance impact of that process, but may cause stale metrics data in the snapshot.",
+  "arguments": [
+    {
+      "name": "key",
+      "description": "The metric name to search.",
+      "required": true,
+      "type": [
+        "string"
+      ]
+    },
+    {
+      "name": "tags",
+      "description": "Tags to filter the results on. Values in this object support wildcards ('*') to match on parts of the tag value.",
+      "required": false,
+      "type": [
+        "object"
+      ],
+      "default": "{  }"
+    }
+  ],
+  "return": {
+    "types": [
+      "array"
+    ]
+  },
+  "examples": [
+    {
+      "title": "Find vector internal metrics matching the name",
+      "source": "find_vector_metrics(\"utilization\")",
+      "return": [
+        {
+          "name": "utilization",
+          "tags": {
+            "component_id": [
+              "test"
+            ]
+          },
+          "type": "gauge",
+          "kind": "absolute",
+          "value": 0.5
+        }
+      ]
+    },
+    {
+      "title": "Find vector internal metrics matching the name and tags",
+      "source": "find_vector_metrics(\"utilization\", tags: {\"component_id\": \"test\"})",
+      "return": [
+        {
+          "name": "utilization",
+          "tags": {
+            "component_id": [
+              "test"
+            ]
+          },
+          "type": "gauge",
+          "kind": "absolute",
+          "value": 0.5
+        }
+      ]
+    }
+  ],
+  "pure": true
+}

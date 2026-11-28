@@ -1,0 +1,49 @@
+# Log payload for the 15-processor sync chain.
+# Shapes:
+#   - .message: nginx access-log string parsed by parse_grok (rule nginx_access).
+#   - .source: const "nginx_access" so parse_grok matches every event.
+#   - .raw_message: JSON-encoded string decoded by parse_json.
+#   - .raw_xml: XML-encoded string decoded by parse_xml.
+#   - .ddtags: array of "k:v" strings; datadog_tags drops 4 noisy keys, keeps env/service.
+#   - .service: one of the 4 listed services so filter passes every event.
+#   - .level = "info" and upstream_status = 200 so remap_vrl takes the info branch.
+#   - .tags: 3-element array so split_array fans out 3 events downstream.
+generator: !with
+  bind:
+    id: !range { min: 1, max: 10000000 }
+  in: !object
+    id: !var id
+    message: !format
+      template: '192.168.1.1 - user{} [23/Apr/2026:12:34:56 +0000] "GET /api/v1/users HTTP/1.1" 200 1234'
+      args:
+        - !var id
+    status: !const "ok"
+    timestamp: !timestamp
+    source: !const "nginx_access"
+    env: !choose ["production", "production", "staging", "development"]
+    service: !choose ["api-service", "auth-service", "internal-metrics-agent", "billing-service"]
+    level: !const "info"
+    host: !choose ["host-01", "host-02", "canary-node-01", "host-03"]
+    region: !const "us-east-1"
+    correlation_id: !format
+      template: "corr-{}-a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      args:
+        - !var id
+    trace_id: !format
+      template: "trace-{}-00000000000000000000000000000000"
+      args:
+        - !var id
+    span_id: !format
+      template: "span-{}-aaaaaaaaaaaaaaaa"
+      args:
+        - !var id
+    raw_message: !const '{"api_version":"v2","trace_sampled":true,"upstream_latency_ms":12.3,"upstream_status":200,"feature_flags":["checkout_v3","recs_v2"]}'
+    raw_xml: !const '<event><id>42</id><type>http</type><latency_ms>12.3</latency_ms><attrs><attr name="region">us-east-1</attr></attrs></event>'
+    ddtags: !const
+      - "filename:/var/log/app.log"
+      - "container_id:cid-deadbeef0000"
+      - "image_id:imageid-cafef00d0000"
+      - "docker_image:registry.example.com/app:1.2.3"
+      - "env:production"
+      - "service:api-service"
+    tags: !const ["load-test", "synthetic", "batch"]

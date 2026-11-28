@@ -1,9 +1,10 @@
 use vector_lib::{
-    codecs::{CsvSerializerConfig, JsonSerializerConfig, encoding::SerializerConfig},
+    codecs::{
+        CsvSerializerConfig, EncodingConfig, JsonSerializerConfig, Transformer,
+        encoding::SerializerConfig,
+    },
     configurable::configurable_component,
 };
-
-use crate::codecs::{EncodingConfig, Transformer};
 
 /// Serializer configuration for Databend.
 #[configurable_component]
@@ -69,8 +70,8 @@ impl DatabendEncodingConfig {
     }
 }
 
-/// Defines how missing fields are handled for NDJson.
-/// Refer to https://docs.databend.com/sql/sql-reference/file-format-options#null_field_as
+/// Defines how missing fields are handled for `NDJson`.
+/// Refer to <https://docs.databend.com/sql/sql-reference/file-format-options#null_field_as>
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]

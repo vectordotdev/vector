@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use async_trait::async_trait;
 use vector_lib::{
-    config::{DataType, Input, LogNamespace, TransformOutput},
+    config::{DataType, Input, TransformOutput},
     configurable::configurable_component,
     event::{
         Event, MetricValue,
@@ -29,6 +29,7 @@ pub struct BasicTransformConfig {
 impl_generate_config_from_default!(BasicTransformConfig);
 
 impl BasicTransformConfig {
+    #[must_use]
     pub const fn new(suffix: String, increase: f64) -> Self {
         Self { suffix, increase }
     }
@@ -38,7 +39,7 @@ impl BasicTransformConfig {
 #[typetag::serde(name = "test_basic")]
 impl TransformConfig for BasicTransformConfig {
     async fn build(&self, _globals: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(BasicTransform {
+        Ok(Transform::stateless(BasicTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
         }))
@@ -50,9 +51,8 @@ impl TransformConfig for BasicTransformConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::all_bits(),
@@ -71,7 +71,7 @@ struct BasicTransform {
 }
 
 impl FunctionTransform for BasicTransform {
-    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
                 if let Some(message_key) = crate::config::log_schema().message_key_target_path() {
@@ -97,9 +97,9 @@ impl FunctionTransform for BasicTransform {
                             statistic: *statistic,
                         })
                     }
-                    MetricValue::AggregatedHistogram { .. } => None,
-                    MetricValue::AggregatedSummary { .. } => None,
-                    MetricValue::Sketch { .. } => None,
+                    MetricValue::AggregatedHistogram { .. }
+                    | MetricValue::AggregatedSummary { .. }
+                    | MetricValue::Sketch { .. } => None,
                     MetricValue::Set { .. } => {
                         let mut values = BTreeSet::new();
                         values.insert(self.suffix.clone());
@@ -125,7 +125,7 @@ impl FunctionTransform for BasicTransform {
                     trace.insert(message_key, Value::from(v));
                 }
             }
-        };
+        }
         output.push(event);
     }
 }

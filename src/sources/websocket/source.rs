@@ -1,15 +1,17 @@
 use std::pin::Pin;
+use vector_lib::internal_event::{emit, register};
 
-use chrono::Utc;
+use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
 use snafu::Snafu;
 use tokio::time;
 use tokio_tungstenite::tungstenite::{
     Message, error::Error as TungsteniteError, protocol::CloseFrame,
 };
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::DecoderFramedRead,
     config::LogNamespace,
     event::{Event, LogEvent},
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
@@ -31,8 +33,8 @@ use crate::{
 
 macro_rules! fail_with_event {
     ($context:expr_2021) => {{
-        emit!(WebSocketConnectionFailedError {
-            error: Box::new($context.build())
+        emit(WebSocketConnectionFailedError {
+            error: Box::new($context.build()),
         });
         return $context.fail();
     }};
@@ -66,7 +68,7 @@ pub enum WebSocketSourceError {
     ConnectionClosedPrematurely,
 
     #[snafu(display("Connection closed by server with code '{}' and reason: '{}'", frame.code, frame.reason))]
-    RemoteClosed { frame: CloseFrame<'static> },
+    RemoteClosed { frame: CloseFrame },
 
     #[snafu(display("Connection closed by server without a close frame"))]
     RemoteClosedEmpty,
@@ -79,12 +81,12 @@ pub enum WebSocketSourceError {
 }
 
 impl WebSocketSource {
-    pub const fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> Self {
+    pub(crate) const fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> Self {
         Self { config, params }
     }
 
-    pub async fn run(self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
-        let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+    pub(crate) async fn run(self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
+        let _open_token = OpenGauge::new().open(|count| emit(ConnectionOpen { count }));
         let mut ping_manager = PingManager::new(&self.config);
 
         let mut out = cx.out;
@@ -106,7 +108,7 @@ impl WebSocketSource {
                     match msg_result {
                         Ok(msg) => self.handle_message(msg, &mut ping_manager, &mut out).await,
                         Err(error) => {
-                            emit!(WebSocketReceiveError { error: &error });
+                            emit(WebSocketReceiveError { error: &error });
                             Err(WebSocketSourceError::Tungstenite { source: error })
                         }
                     }
@@ -121,26 +123,26 @@ impl WebSocketSource {
                             code = %frame.code,
                             reason = %frame.reason
                         );
-                        emit!(WebSocketConnectionShutdown);
+                        emit(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::RemoteClosedEmpty => {
                         warn!("Connection closed by server without a close frame.");
-                        emit!(WebSocketConnectionShutdown);
+                        emit(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::PongTimeout => {
                         error!("Disconnecting due to pong timeout.");
-                        emit!(WebSocketReceiveError {
+                        emit(WebSocketReceiveError {
                             error: &TungsteniteError::Io(std::io::Error::new(
                                 std::io::ErrorKind::TimedOut,
-                                "Pong timeout"
-                            ))
+                                "Pong timeout",
+                            )),
                         });
-                        emit!(WebSocketConnectionShutdown);
+                        emit(WebSocketConnectionShutdown);
                         return Err(error);
                     }
                     WebSocketSourceError::Tungstenite { source: ws_err } => {
                         if is_closed(&ws_err) {
-                            emit!(WebSocketConnectionShutdown);
+                            emit(WebSocketConnectionShutdown);
                         }
                         error!(message = "WebSocket connection error.", error = %ws_err);
                     }
@@ -150,8 +152,7 @@ impl WebSocketSource {
                     | WebSocketSourceError::InitialMessageTimeout
                     | WebSocketSourceError::ConnectionClosedPrematurely => {
                         unreachable!(
-                            "Encountered a connection-time error during runtime: {:?}",
-                            error
+                            "Encountered a connection-time error during runtime: {error:?}"
                         );
                     }
                 }
@@ -194,7 +195,7 @@ impl WebSocketSource {
                 Ok(())
             }
             Message::Ping(_) => Ok(()),
-            Message::Close(frame) => self.handle_close_frame(frame),
+            Message::Close(frame) => Self::handle_close_frame(frame),
             Message::Frame(_) => {
                 warn!("Unsupported message type received: frame.");
                 Ok(())
@@ -208,13 +209,13 @@ impl WebSocketSource {
     {
         let payload_bytes = payload.as_ref();
 
-        emit!(WebSocketBytesReceived {
+        emit(WebSocketBytesReceived {
             byte_size: payload_bytes.len(),
             url: &self.config.common.uri,
             protocol: PROTOCOL,
             kind,
         });
-        let mut stream = FramedRead::new(payload_bytes, self.params.decoder.clone());
+        let mut stream = DecoderFramedRead::new(payload_bytes, self.params.decoder.clone());
 
         while let Some(result) = stream.next().await {
             match result {
@@ -226,8 +227,8 @@ impl WebSocketSource {
                     let event_count = events.len();
                     let byte_size = events.estimated_json_encoded_size_of();
 
-                    register!(EventsReceived).emit(CountByteSize(event_count, byte_size));
-                    emit!(WebSocketMessageReceived {
+                    register(EventsReceived).emit(CountByteSize(event_count, byte_size));
+                    emit(WebSocketMessageReceived {
                         count: event_count,
                         byte_size,
                         url: &self.config.common.uri,
@@ -235,9 +236,10 @@ impl WebSocketSource {
                         kind,
                     });
 
+                    let now = Utc::now();
                     let events_with_meta = events.into_iter().map(|mut event| {
                         if let Event::Log(event) = &mut event {
-                            self.add_metadata(event);
+                            self.add_metadata(event, now);
                         }
                         event
                     });
@@ -255,10 +257,10 @@ impl WebSocketSource {
         }
     }
 
-    fn add_metadata(&self, event: &mut LogEvent) {
+    fn add_metadata(&self, event: &mut LogEvent, now: DateTime<Utc>) {
         self.params
             .log_namespace
-            .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME, Utc::now());
+            .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME, now);
     }
 
     async fn reconnect(
@@ -315,10 +317,10 @@ impl WebSocketSource {
     ) -> Result<(), WebSocketSourceError> {
         let initial_message = self.config.initial_message.as_ref().unwrap();
         ws_sink
-            .send(Message::Text(initial_message.clone()))
+            .send(Message::text(initial_message.clone()))
             .await
             .map_err(|error| {
-                emit!(WebSocketSendError { error: &error });
+                emit(WebSocketSendError { error: &error });
                 WebSocketSourceError::Tungstenite { source: error }
             })?;
 
@@ -332,7 +334,7 @@ impl WebSocketSource {
             };
 
         let message = response.map_err(|source| {
-            emit!(WebSocketReceiveError { error: &source });
+            emit(WebSocketReceiveError { error: &source });
             WebSocketSourceError::Tungstenite { source }
         })?;
 
@@ -345,24 +347,19 @@ impl WebSocketSource {
                 self.process_message(&bin, WebSocketKind::Binary, out).await;
                 Ok(())
             }
-            Message::Close(frame) => self.handle_close_frame(frame),
+            Message::Close(frame) => Self::handle_close_frame(frame),
             _ => Ok(()),
         }
     }
 
-    fn handle_close_frame(
-        &self,
-        frame: Option<CloseFrame<'_>>,
-    ) -> Result<(), WebSocketSourceError> {
+    fn handle_close_frame(frame: Option<CloseFrame>) -> Result<(), WebSocketSourceError> {
         let (error_message, specific_error) = match frame {
             Some(frame) => {
                 let msg = format!(
                     "Connection closed by server with code '{}' and reason: '{}'",
                     frame.code, frame.reason
                 );
-                let err = WebSocketSourceError::RemoteClosed {
-                    frame: frame.into_owned(),
-                };
+                let err = WebSocketSourceError::RemoteClosed { frame };
                 (msg, err)
             }
             None => (
@@ -375,7 +372,7 @@ impl WebSocketSource {
             std::io::ErrorKind::ConnectionAborted,
             error_message,
         ));
-        emit!(WebSocketReceiveError { error: &error });
+        emit(WebSocketReceiveError { error: &error });
 
         Err(specific_error)
     }
@@ -397,9 +394,9 @@ struct PingManager {
 impl PingManager {
     fn new(config: &WebSocketConfig) -> Self {
         let ping_message = if let Some(ping_msg) = &config.ping_message {
-            Message::Text(ping_msg.clone())
+            Message::text(ping_msg.clone())
         } else {
-            Message::Ping(vec![])
+            Message::Ping(Bytes::new())
         };
 
         Self {
@@ -421,7 +418,7 @@ impl PingManager {
         }
 
         ws_sink.send(self.message.clone()).await.map_err(|error| {
-            emit!(WebSocketSendError { error: &error });
+            emit(WebSocketSendError { error: &error });
             WebSocketSourceError::Tungstenite { source: error }
         })?;
 
@@ -432,7 +429,8 @@ impl PingManager {
 
 #[cfg(test)]
 mod tests {
-    use std::{borrow::Cow, num::NonZeroU64};
+    use std::num::NonZeroU64;
+    use vector_lib::codecs::decoding::JsonDeserializerConfig;
 
     use futures::{StreamExt, sink::SinkExt};
     use tokio::{net::TcpListener, time::Duration};
@@ -477,9 +475,9 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
 
-            let binary_payload = br#"{"message": "binary data"}"#.to_vec();
+            let binary_payload = br#"{"message": "binary data"}"#.as_slice();
             websocket
-                .send(Message::Binary(binary_payload))
+                .send(Message::binary(binary_payload))
                 .await
                 .unwrap();
         });
@@ -500,7 +498,7 @@ mod tests {
 
             // Immediately send a message to the connected client (which will be our source)
             websocket
-                .send(Message::Text("message from server".to_string()))
+                .send(Message::text("message from server"))
                 .await
                 .unwrap();
         });
@@ -525,7 +523,7 @@ mod tests {
             {
                 // Received correct initial message, send response
                 websocket
-                    .send(Message::Text(response_message))
+                    .send(Message::text(response_message))
                     .await
                     .unwrap();
             }
@@ -544,7 +542,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
             websocket
-                .send(Message::Text("first message".to_string()))
+                .send(Message::text("first message"))
                 .await
                 .unwrap();
             // Close the connection to force a reconnect from the client
@@ -554,7 +552,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
             websocket
-                .send(Message::Text("second message".to_string()))
+                .send(Message::text("second message"))
                 .await
                 .unwrap();
         });
@@ -588,7 +586,7 @@ mod tests {
     async fn websocket_source_consume_binary_event() {
         let server_addr = start_binary_push_server().await;
         let mut config = make_config(&server_addr);
-        let decoding = DeserializerConfig::Json(Default::default());
+        let decoding = DeserializerConfig::Json(JsonDeserializerConfig::default());
         config.decoding = decoding;
 
         let events =
@@ -646,9 +644,9 @@ mod tests {
             if websocket.next().await.is_some() {
                 let close_frame = CloseFrame {
                     code: CloseCode::Error,
-                    reason: Cow::from("Simulated Internal Server Error"),
+                    reason: "Simulated Internal Server Error".into(),
                 };
-                let _ = websocket.close(Some(close_frame)).await;
+                websocket.close(Some(close_frame)).await.ok(); // connection may already be gone
             }
         });
 
@@ -656,7 +654,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn websocket_source_exits_on_rejected_intial_messsage() {
+    async fn websocket_source_exits_on_rejected_initial_message() {
         let server_addr = start_reject_initial_message_server().await;
 
         let mut config = make_config(&server_addr);

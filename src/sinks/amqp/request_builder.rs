@@ -13,7 +13,6 @@ pub(super) struct AmqpMetadata {
     exchange: String,
     routing_key: String,
     properties: BasicProperties,
-    finalizers: EventFinalizers,
 }
 
 /// Build the request to send to `AMQP` by using the encoder to convert it into
@@ -39,25 +38,28 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut input: AmqpEvent,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut input: AmqpEvent) -> RequestParts<Self::Metadata, Self::Events> {
         let builder = RequestMetadataBuilder::from_event(&input.event);
 
+        let finalizers = input.event.take_finalizers();
         let metadata = AmqpMetadata {
             exchange: input.exchange,
             routing_key: input.routing_key,
             properties: input.properties,
-            finalizers: input.event.take_finalizers(),
         };
 
-        (metadata, builder, input.event)
+        RequestParts {
+            metadata,
+            request_metadata_builder: builder,
+            events: input.event,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         amqp_metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -67,7 +69,7 @@ impl RequestBuilder<AmqpEvent> for AmqpRequestBuilder {
             amqp_metadata.exchange,
             amqp_metadata.routing_key,
             amqp_metadata.properties,
-            amqp_metadata.finalizers,
+            finalizers,
             metadata,
         )
     }

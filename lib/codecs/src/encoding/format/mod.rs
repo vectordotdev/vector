@@ -17,15 +17,24 @@ mod native;
 mod native_json;
 #[cfg(feature = "opentelemetry")]
 mod otlp;
+#[cfg(feature = "parquet")]
+mod parquet;
 mod protobuf;
 mod raw_message;
+#[cfg(feature = "syslog")]
+mod syslog;
 mod text;
 
 use std::fmt::Debug;
 
+#[cfg(feature = "parquet")]
+pub use self::parquet::{
+    ParquetCompression, ParquetSchemaMode, ParquetSerializer, ParquetSerializerConfig,
+};
 #[cfg(feature = "arrow")]
 pub use arrow::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
+    find_null_non_nullable_fields,
 };
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
@@ -44,6 +53,8 @@ pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
 pub use otlp::{OtlpSerializer, OtlpSerializerConfig};
 pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
+#[cfg(feature = "syslog")]
+pub use syslog::{SyslogSerializer, SyslogSerializerConfig};
 pub use text::{TextSerializer, TextSerializerConfig};
 use vector_core::event::Event;
 

@@ -1,0 +1,50 @@
+{{/* VRL changelogs are Markdown, with entries ending in author/PR credits.
+     Keep every block between the opening bullet and its credit in one card.
+     Older entries without these credits retain their original Markdown. */}}
+{{- $prefix := "" -}}
+{{- $entry := "" -}}
+{{- $fence := "" -}}
+{{- $markdown := "" -}}
+{{- $cards := slice -}}
+{{- range split . "\n" -}}
+  {{- $line := . -}}
+  {{- $credit := and (eq $fence "")
+    (findRE `^[ \t]*(\*?Thanks to |(~~)?\[PR #)` $line)
+    (findRE `\]\(https://github\.com/[^/()]+\)` $line)
+    (findRE `\]\(https://github\.com/vectordotdev/vrl/pull/[0-9]+\)` $line) -}}
+  {{- if and (eq $fence "") (hasPrefix $line "- ") -}}
+    {{- $prefix = printf "%s%s" $prefix $entry -}}
+    {{- $entry = printf "%s\n" $line -}}
+  {{- else if and $entry $credit -}}
+    {{- $card := partial "releases/changelog-card.html" (dict
+        "body" ($entry | markdownify)
+        "footer" (strings.TrimSpace $line | markdownify)
+        "class" "vrl-changelog-entry") -}}
+    {{- $placeholder := printf `<div data-vrl-changelog-card="%d"></div>` (len $cards) -}}
+    {{- $markdown = printf "%s%s\n\n%s\n\n" $markdown $prefix $placeholder -}}
+    {{- $cards = $cards | append (dict "placeholder" $placeholder "html" (printf `<ul class="list-none p-0">%s</ul>` $card)) -}}
+    {{- $prefix = "" -}}
+    {{- $entry = "" -}}
+  {{- else if $entry -}}
+    {{- $entry = printf "%s%s\n" $entry $line -}}
+  {{- else -}}
+    {{- $prefix = printf "%s%s\n" $prefix $line -}}
+  {{- end -}}
+
+  {{/* Ignore bullet and credit lookalikes inside fenced code examples. */}}
+  {{- $markers := findRE "^[ \\t]*(`{3,}|~{3,})" $line -}}
+  {{- with $markers -}}
+    {{- $marker := strings.TrimSpace (index . 0) -}}
+    {{- if eq $fence "" -}}
+      {{- $fence = $marker -}}
+    {{- else if and (hasPrefix $marker $fence) (eq (strings.TrimSpace $line) $marker) -}}
+      {{- $fence = "" -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{/* Render headings together so repeated section names retain unique IDs. */}}
+{{- $html := printf "%s%s%s" $markdown $prefix $entry | markdownify -}}
+{{- range $cards -}}
+  {{- $html = replace $html .placeholder .html -}}
+{{- end -}}
+{{- $html | safeHTML -}}

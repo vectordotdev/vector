@@ -1,12 +1,11 @@
-use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
-use tokio_util::codec::FramedRead;
+use vector_lib::internal_event::{emit, register};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
@@ -19,8 +18,7 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
-    codecs::{Decoder, DecodingConfig},
-    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput, log_schema},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
@@ -28,6 +26,8 @@ use crate::{
 
 mod channel;
 mod list;
+
+const KEY: &str = "key";
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -37,12 +37,11 @@ enum BuildError {
 
 /// Data type to use for reading messages from Redis.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Copy, Clone, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DataTypeConfig {
     /// The `list` data type.
-    #[derivative(Default)]
+    #[default]
     List,
 
     /// The `channel` data type.
@@ -53,21 +52,19 @@ pub enum DataTypeConfig {
 
 /// Options for the Redis `list` data type.
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Default, Derivative, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct ListOption {
-    #[configurable(derived)]
     method: Method,
 }
 
 /// Method for getting events from the `list` data type.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Method {
     /// Pop messages from the head of the list.
-    #[derivative(Default)]
+    #[default]
     Lpop,
 
     /// Pop messages from the tail of the list.
@@ -100,7 +97,6 @@ pub struct RedisSourceConfig {
     #[serde(default)]
     data_type: DataTypeConfig,
 
-    #[configurable(derived)]
     list: Option<ListOption>,
 
     /// The Redis URL to connect to.
@@ -121,12 +117,10 @@ pub struct RedisSourceConfig {
     #[configurable(metadata(docs::examples = "redis_key"))]
     redis_key: Option<OptionalValuePath>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
@@ -138,16 +132,17 @@ pub struct RedisSourceConfig {
 }
 
 impl GenerateConfig for RedisSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
             r#"
-            url = "redis://127.0.0.1:6379/0"
-            key = "vector"
-            data_type = "list"
-            list.method = "lpop"
-            redis_key = "redis_key"
+            url: "redis://127.0.0.1:6379/0"
+            key: vector
+            data_type: list
+            list:
+              method: lpop
+            redis_key: redis_key
             "#,
-        )
+        })
         .unwrap()
     }
 }
@@ -170,10 +165,10 @@ impl SourceConfig for RedisSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let bytes_received = register!(BytesReceived::from(Protocol::from(
-            connection_info.protocol
+        let bytes_received = register(BytesReceived::from(Protocol::from(
+            connection_info.protocol,
         )));
-        let events_received = register!(EventsReceived);
+        let events_received = register(EventsReceived);
         let handler = InputHandler {
             client,
             bytes_received: bytes_received.clone(),
@@ -209,7 +204,7 @@ impl SourceConfig for RedisSourceConfig {
             .with_source_metadata(
                 Self::NAME,
                 redis_key_path,
-                &owned_value_path!("key"),
+                &owned_value_path!(KEY),
                 Kind::bytes(),
                 None,
             )
@@ -243,7 +238,7 @@ impl InputHandler {
 
         self.bytes_received.emit(ByteSize(line.len()));
 
-        let mut stream = FramedRead::new(line.as_ref(), self.decoder.clone());
+        let mut stream = DecoderFramedRead::new(line.as_ref(), self.decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
@@ -253,16 +248,9 @@ impl InputHandler {
 
                     let events = events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
-                            self.log_namespace.insert_vector_metadata(
+                            self.log_namespace.insert_standard_vector_source_metadata(
                                 log,
-                                log_schema().source_type_key(),
-                                path!("source_type"),
-                                Bytes::from(RedisSourceConfig::NAME),
-                            );
-                            self.log_namespace.insert_vector_metadata(
-                                log,
-                                log_schema().timestamp_key(),
-                                path!("ingest_timestamp"),
+                                RedisSourceConfig::NAME,
                                 now,
                             );
 
@@ -270,21 +258,21 @@ impl InputHandler {
                                 RedisSourceConfig::NAME,
                                 log,
                                 self.redis_key.as_ref().map(LegacyKey::InsertIfEmpty),
-                                path!("key"),
+                                path!(KEY),
                                 self.key.as_str(),
                             );
-                        };
+                        }
 
                         event
                     });
 
                     if (self.cx.out.send_batch(events).await).is_err() {
-                        emit!(StreamClosedError { count });
+                        emit(StreamClosedError { count });
                         return Err(());
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;
@@ -308,13 +296,28 @@ mod test {
 
 #[cfg(all(test, feature = "redis-integration-tests"))]
 mod integration_test {
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
+
+    use futures::StreamExt;
     use redis::AsyncCommands;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
+        sync::Notify,
+        time::Instant,
+    };
     use vrl::value;
 
     use super::*;
     use crate::{
         SourceSender,
-        config::log_schema,
+        config::{ComponentKey, log_schema},
         test_util::{
             collect_n,
             components::{SOURCE_TAGS, run_and_assert_source_compliance_n},
@@ -322,16 +325,18 @@ mod integration_test {
         },
     };
 
-    const REDIS_SERVER: &str = "redis://redis-primary:6379/0";
+    fn redis_url() -> String {
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/0".to_owned())
+    }
 
     #[tokio::test]
     async fn redis_source_list_rpop() {
         // Push some test data into a list object which we'll read from.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
         let _: i32 = conn.rpush(&key, "2").await.unwrap();
@@ -343,7 +348,7 @@ mod integration_test {
             list: Some(ListOption {
                 method: Method::Rpop,
             }),
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -370,11 +375,11 @@ mod integration_test {
     #[tokio::test]
     async fn redis_source_list_rpop_with_log_namespace() {
         // Push some test data into a list object which we'll read from.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
 
@@ -384,7 +389,7 @@ mod integration_test {
             list: Some(ListOption {
                 method: Method::Rpop,
             }),
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: Some(OptionalValuePath::from(owned_value_path!("remapped_key"))),
             framing: default_framing_message_based(),
@@ -409,11 +414,11 @@ mod integration_test {
     #[tokio::test]
     async fn redis_source_list_lpop() {
         // Push some test data into a list object which we'll read from.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
         let _: i32 = conn.rpush(&key, "2").await.unwrap();
@@ -425,7 +430,7 @@ mod integration_test {
             list: Some(ListOption {
                 method: Method::Lpop,
             }),
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -449,6 +454,177 @@ mod integration_test {
         );
     }
 
+    /// Holds a pop reply after Redis removes the entry, then shuts down before delivering it.
+    async fn assert_no_entries_lost_on_shutdown(method: Method) {
+        let client = redis::Client::open(redis_url()).unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
+        let key = format!("test-key-{}", random_string(10));
+        let _: i64 = conn.rpush(&key, "held entry").await.unwrap();
+
+        let proxy = freezable_redis_proxy().await;
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption { method }),
+            url: proxy.url.clone(),
+            key: key.clone(),
+            redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+        let (tx, rx) = SourceSender::new_test();
+        let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+        let mut source = config.build(cx).await.unwrap();
+
+        // Connection setup has completed, so the next reply belongs to the blocking pop.
+        proxy.frozen.store(true, Ordering::SeqCst);
+        tokio::time::timeout(Duration::from_secs(10), async {
+            tokio::select! {
+                () = proxy.reply_held.notified() => {}
+                result = &mut source => panic!("source stopped before its reply was held: {result:?}"),
+            }
+        })
+        .await
+        .expect("proxy did not capture the pop reply");
+        let remaining: usize = conn.llen(&key).await.unwrap();
+        assert_eq!(remaining, 0, "Redis must have removed the entry");
+
+        // shutdown_all signals synchronously. Poll the source before releasing the reply so it
+        // must observe shutdown with a pop in flight, regardless of executor scheduling.
+        let shutdown = shutdown.shutdown_all(Some(Instant::now() + Duration::from_secs(10)));
+        assert!(
+            futures::poll!(&mut source).is_pending(),
+            "source abandoned the in-flight pop during shutdown"
+        );
+        proxy.frozen.store(false, Ordering::SeqCst);
+        proxy.release_reply.notify_one();
+
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let (result, ()) = tokio::join!(source, shutdown);
+            result.unwrap();
+        })
+        .await
+        .expect("source did not finish after its reply was released");
+        let events = rx.collect::<Vec<_>>().await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            "held entry".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_lpop_loses_no_entries_on_shutdown() {
+        assert_no_entries_lost_on_shutdown(Method::Lpop).await;
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_rpop_loses_no_entries_on_shutdown() {
+        assert_no_entries_lost_on_shutdown(Method::Rpop).await;
+    }
+
+    struct RedisProxy {
+        url: String,
+        frozen: Arc<AtomicBool>,
+        reply_held: Arc<Notify>,
+        release_reply: Arc<Notify>,
+    }
+
+    /// Starts a TCP proxy whose replies can be held until explicitly released.
+    async fn freezable_redis_proxy() -> RedisProxy {
+        let client = redis::Client::open(redis_url()).unwrap();
+        let redis::ConnectionAddr::Tcp(host, port) = client.get_connection_info().addr.clone()
+        else {
+            panic!("test Redis must be reachable over plain TCP");
+        };
+        let db = client.get_connection_info().redis.db;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_url = format!("redis://{}/{db}", listener.local_addr().unwrap());
+        let frozen = Arc::new(AtomicBool::new(false));
+        let reply_held = Arc::new(Notify::new());
+        let release_reply = Arc::new(Notify::new());
+
+        let frozen_replies = Arc::clone(&frozen);
+        let held = Arc::clone(&reply_held);
+        let release = Arc::clone(&release_reply);
+        tokio::spawn(async move {
+            loop {
+                let (inbound, _) = listener.accept().await.unwrap();
+                let outbound = TcpStream::connect((host.as_str(), port)).await.unwrap();
+                let (mut client_read, mut client_write) = inbound.into_split();
+                let (mut server_read, mut server_write) = outbound.into_split();
+                tokio::spawn(async move {
+                    _ = tokio::io::copy(&mut client_read, &mut server_write).await;
+                });
+                let frozen = Arc::clone(&frozen_replies);
+                let held = Arc::clone(&held);
+                let release = Arc::clone(&release);
+                tokio::spawn(async move {
+                    let mut buf = vec![0; 16 * 1024];
+                    loop {
+                        let Ok(n @ 1..) = server_read.read(&mut buf).await else {
+                            return;
+                        };
+                        if frozen.load(Ordering::SeqCst) {
+                            held.notify_one();
+                            release.notified().await;
+                        }
+                        if client_write.write_all(&buf[..n]).await.is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+
+        RedisProxy {
+            url: proxy_url,
+            frozen,
+            reply_held,
+            release_reply,
+        }
+    }
+
+    #[tokio::test]
+    async fn redis_source_list_shutdown_is_bounded_when_replies_stop() {
+        let proxy = freezable_redis_proxy().await;
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::List,
+            list: Some(ListOption {
+                method: Method::Lpop,
+            }),
+            url: proxy.url,
+            key: format!("test-key-{}", random_string(10)),
+            redis_key: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+
+        let (tx, rx) = SourceSender::new_test();
+        let (cx, shutdown) = SourceContext::new_shutdown(&ComponentKey::from("redis"), tx);
+        let source = tokio::spawn(config.build(cx).await.unwrap());
+        let _received = tokio::spawn(rx.count());
+
+        // Let the source connect and block on the empty list, then stop delivering replies so
+        // its in-flight pop never completes.
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        proxy.frozen.store(true, Ordering::SeqCst);
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        let stopped = tokio::time::timeout(Duration::from_secs(10), async {
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_secs(30)))
+                .await;
+            source.await.unwrap().unwrap();
+        })
+        .await;
+        assert!(
+            stopped.is_ok(),
+            "source did not stop while its Redis connection was unresponsive"
+        );
+    }
+
     #[tokio::test]
     async fn redis_source_channel_consume_event() {
         let key = format!("test-channel-{}", random_string(10));
@@ -458,7 +634,7 @@ mod integration_test {
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Channel,
             list: None,
-            url: REDIS_SERVER.to_owned(),
+            url: redis_url(),
             key: key.clone(),
             redis_key: None,
             framing: default_framing_message_based(),
@@ -482,7 +658,7 @@ mod integration_test {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Now create a normal Redis client and use it to publish a bunch of message, which we'll ensure the source consumes.
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let client = redis::Client::open(redis_url()).unwrap();
 
         let mut async_conn = client
             .get_multiplexed_async_connection()

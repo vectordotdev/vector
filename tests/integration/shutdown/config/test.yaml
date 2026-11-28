@@ -1,9 +1,9 @@
 args:
-- --test-threads
-- '4'
+  - --test-threads
+  - "4"
 
 features:
-- shutdown-tests
+  - shutdown-tests
 
 test: "integration"
 
