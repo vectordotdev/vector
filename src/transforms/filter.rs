@@ -1,7 +1,7 @@
 use vector_lib::{
     config::clone_input_definitions,
     configurable::configurable_component,
-    internal_event::{Count, InternalEventHandle as _, Registered},
+    internal_event::{Count, InternalEventHandle as _, Registered, register},
 };
 
 use crate::{
@@ -21,7 +21,6 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
-    #[configurable(derived)]
     /// The condition that every input event is matched against.
     ///
     /// If an event is matched by the condition, it is forwarded. Otherwise, the event is dropped.
@@ -35,8 +34,8 @@ impl From<AnyCondition> for FilterConfig {
 }
 
 impl GenerateConfig for FilterConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(r#"condition = ".message == \"value\"""#).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(r#"condition: '.message == "value"'"#).unwrap()
     }
 }
 
@@ -44,7 +43,7 @@ impl GenerateConfig for FilterConfig {
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Filter::new(self.condition.build(
+        Ok(Transform::stateless(Filter::new(self.condition.build(
             &context.enrichment_tables,
             &context.metrics_storage,
         )?)))
@@ -86,13 +85,13 @@ impl Filter {
     pub fn new(condition: Condition) -> Self {
         Self {
             condition,
-            events_dropped: register!(FilterEventsDropped),
+            events_dropped: register(FilterEventsDropped),
         }
     }
 }
 
 impl FunctionTransform for Filter {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, event: Event) {
         let (result, event) = self.condition.check(event);
         if result {
             output.push(event);
@@ -142,7 +141,7 @@ mod test {
 
     #[tokio::test]
     async fn filter_basic() {
-        assert_transform_compliance(async {
+        Box::pin(assert_transform_compliance(async {
             let transform_config = FilterConfig::from(AnyCondition::from(ConditionConfig::IsLog));
 
             let (tx, rx) = mpsc::channel(1);
@@ -166,7 +165,7 @@ mod test {
             drop(tx);
             topology.stop().await;
             assert_eq!(out.recv().await, None);
-        })
+        }))
         .await;
     }
 }

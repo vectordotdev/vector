@@ -104,35 +104,7 @@ generated: components: sources: host_metrics: configuration: {
 				I/O utilization metrics.
 				"""
 			required: false
-			type: object: {
-				examples: [{
-					excludes: ["dm-*"]
-					includes: ["sda"]
-				}]
-				options: {
-					excludes: {
-						description: """
-																Any patterns which should be excluded.
-
-																The patterns are matched using globbing.
-																"""
-						required: false
-						type: array: items: type: string: {}
-					}
-					includes: {
-						description: """
-																Any patterns which should be included.
-
-																The patterns are matched using globbing.
-																"""
-						required: false
-						type: array: {
-							default: ["*"]
-							items: type: string: {}
-						}
-					}
-				}
-			}
+			type:     _schemaDefinitions["derived::a92b0a9eb567f8513c87e07b"]
 		}
 	}
 	filesystem: {
@@ -145,35 +117,7 @@ generated: components: sources: host_metrics: configuration: {
 					usage metrics.
 					"""
 				required: false
-				type: object: {
-					examples: [{
-						excludes: ["dm-*"]
-						includes: ["sda"]
-					}]
-					options: {
-						excludes: {
-							description: """
-																Any patterns which should be excluded.
-
-																The patterns are matched using globbing.
-																"""
-							required: false
-							type: array: items: type: string: {}
-						}
-						includes: {
-							description: """
-																Any patterns which should be included.
-
-																The patterns are matched using globbing.
-																"""
-							required: false
-							type: array: {
-								default: ["*"]
-								items: type: string: {}
-							}
-						}
-					}
-				}
+				type:     _schemaDefinitions["derived::a92b0a9eb567f8513c87e07b"]
 			}
 			filesystems: {
 				description: """
@@ -263,35 +207,7 @@ generated: components: sources: host_metrics: configuration: {
 				network utilization metrics.
 				"""
 			required: false
-			type: object: {
-				examples: [{
-					excludes: ["dm-*"]
-					includes: ["sda"]
-				}]
-				options: {
-					excludes: {
-						description: """
-																Any patterns which should be excluded.
-
-																The patterns are matched using globbing.
-																"""
-						required: false
-						type: array: items: type: string: {}
-					}
-					includes: {
-						description: """
-																Any patterns which should be included.
-
-																The patterns are matched using globbing.
-																"""
-						required: false
-						type: array: {
-							default: ["*"]
-							items: type: string: {}
-						}
-					}
-				}
-			}
+			type:     _schemaDefinitions["derived::a92b0a9eb567f8513c87e07b"]
 		}
 	}
 	process: {

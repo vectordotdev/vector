@@ -4,14 +4,14 @@ use super::{
     super::{Event, LogEvent, Metric},
     metric::LuaMetric,
 };
+use crate::event::MetricTagMode;
 
 pub struct LuaEvent {
     pub event: Event,
-    pub metric_multi_value_tags: bool,
+    pub metric_tag_mode: MetricTagMode,
 }
 
 impl IntoLua for LuaEvent {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
         match self.event {
@@ -20,16 +20,12 @@ impl IntoLua for LuaEvent {
                 "metric",
                 LuaMetric {
                     metric,
-                    multi_value_tags: self.metric_multi_value_tags,
+                    tag_mode: self.metric_tag_mode,
                 }
                 .into_lua(lua)?,
             )?,
             Event::Trace(_) => {
-                return Err(LuaError::ToLuaConversionError {
-                    from: String::from("Event"),
-                    to: "table",
-                    message: Some("Trace are not supported".to_string()),
-                });
+                return Err(LuaError::external("Trace events are not supported"));
             }
         }
         Ok(LuaValue::Table(table))
@@ -80,15 +76,14 @@ mod test {
                 "event",
                 LuaEvent {
                     event,
-                    metric_multi_value_tags: false,
+                    metric_tag_mode: MetricTagMode::Single,
                 },
             )
             .unwrap();
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
-                "{}",
-                assertion
+                "{assertion}"
             );
         }
     }
@@ -110,6 +105,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn into_lua_metric() {
         let event = Event::Metric(Metric::new(
             "example counter",
@@ -149,6 +145,7 @@ mod test {
     }
 
     #[test]
+    #[expect(clippy::approx_constant, reason = "Matches the Lua test fixture")]
     fn from_lua_metric() {
         let lua_event = r#"
         {

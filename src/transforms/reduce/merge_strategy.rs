@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use dyn_clone::DynClone;
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
+use vrl::compiler::value::VrlValueArithmetic;
 use vrl::path::{OwnedSegment, OwnedTargetPath};
 
 use crate::event::{LogEvent, Value};
@@ -86,8 +87,7 @@ struct RetainMerger {
 }
 
 impl RetainMerger {
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    fn new(v: Value) -> Self {
+    const fn new(v: Value) -> Self {
         Self { v }
     }
 }
@@ -117,7 +117,7 @@ struct ConcatMerger {
 }
 
 impl ConcatMerger {
-    fn new(v: Bytes, join_by: Option<char>) -> Self {
+    fn new(v: &Bytes, join_by: Option<char>) -> Self {
         // We need to get the resulting bytes for this character in case it's actually a multi-byte character.
         let join_by = join_by.map(|c| c.to_string().into_bytes());
 
@@ -130,11 +130,11 @@ impl ConcatMerger {
 
 impl ReduceValueMerger for ConcatMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
-        if let Value::Bytes(b) = v {
+        if let Some(b) = v.as_bytes() {
             if let Some(buf) = self.join_by.as_ref() {
                 self.v.extend(&buf[..]);
             }
-            self.v.extend_from_slice(&b);
+            self.v.extend_from_slice(b);
             Ok(())
         } else {
             Err(format!(
@@ -351,7 +351,7 @@ impl TimestampWindowMerger {
 impl ReduceValueMerger for TimestampWindowMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         if let Value::Timestamp(ts) = v {
-            self.latest = ts
+            self.latest = ts;
         } else {
             return Err(format!(
                 "expected timestamp value, found: {}",
@@ -412,24 +412,17 @@ impl ReduceValueMerger for AddNumbersMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
-        match v {
-            Value::Integer(i) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Int(i + j),
-                NumberMergerValue::Float(j) => {
-                    self.v = NumberMergerValue::Float(NotNan::new(i as f64).unwrap() + j)
-                }
-            },
-            Value::Float(f) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + j as f64),
-                NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(f + j),
-            },
-            _ => {
-                return Err(format!(
-                    "expected numeric value, found: '{}'",
-                    v.to_string_lossy()
-                ));
-            }
-        }
+        let current = match &self.v {
+            NumberMergerValue::Int(value) => Value::Integer(*value),
+            NumberMergerValue::Float(value) => Value::Float(*value),
+        };
+        let sum = current.try_add(v).map_err(|error| error.to_string())?;
+        self.v = match sum {
+            Value::Integer(value) => NumberMergerValue::Int(value),
+            Value::Float(value) => NumberMergerValue::Float(value),
+            _ => return Err("summing numeric values produced a non-numeric value".to_owned()),
+        };
+
         Ok(())
     }
 
@@ -458,25 +451,27 @@ impl MaxNumberMerger {
 }
 
 impl ReduceValueMerger for MaxNumberMerger {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
         match v {
-            Value::Integer(i) => {
-                match self.v {
-                    NumberMergerValue::Int(i2) => {
-                        if i > i2 {
-                            self.v = NumberMergerValue::Int(i);
-                        }
+            Value::Integer(i) => match self.v {
+                NumberMergerValue::Int(i2) => {
+                    if i > i2 {
+                        self.v = NumberMergerValue::Int(i);
                     }
-                    NumberMergerValue::Float(f2) => {
-                        let f = NotNan::new(i as f64).unwrap();
-                        if f > f2 {
-                            self.v = NumberMergerValue::Float(f);
-                        }
+                }
+                NumberMergerValue::Float(f2) => {
+                    let f = NotNan::new(i as f64).unwrap();
+                    if f > f2 {
+                        self.v = NumberMergerValue::Float(f);
                     }
-                };
-            }
+                }
+            },
             Value::Float(f) => {
                 let f2 = match self.v {
                     NumberMergerValue::Int(i2) => NotNan::new(i2 as f64).unwrap(),
@@ -521,25 +516,27 @@ impl MinNumberMerger {
 }
 
 impl ReduceValueMerger for MinNumberMerger {
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Preserve existing numeric conversion behavior. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
         match v {
-            Value::Integer(i) => {
-                match self.v {
-                    NumberMergerValue::Int(i2) => {
-                        if i < i2 {
-                            self.v = NumberMergerValue::Int(i);
-                        }
+            Value::Integer(i) => match self.v {
+                NumberMergerValue::Int(i2) => {
+                    if i < i2 {
+                        self.v = NumberMergerValue::Int(i);
                     }
-                    NumberMergerValue::Float(f2) => {
-                        let f = NotNan::new(i as f64).unwrap();
-                        if f < f2 {
-                            self.v = NumberMergerValue::Float(f);
-                        }
+                }
+                NumberMergerValue::Float(f2) => {
+                    let f = NotNan::new(i as f64).unwrap();
+                    if f < f2 {
+                        self.v = NumberMergerValue::Float(f);
                     }
-                };
-            }
+                }
+            },
             Value::Float(f) => {
                 let f2 = match self.v {
                     NumberMergerValue::Int(i2) => NotNan::new(i2 as f64).unwrap(),
@@ -573,7 +570,15 @@ impl ReduceValueMerger for MinNumberMerger {
 }
 
 pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync + DynClone {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value is incompatible with the merge strategy or target path.
     fn add(&mut self, v: Value) -> Result<(), String>;
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value is incompatible with the merge strategy or target path.
     fn insert_into(self: Box<Self>, path: &OwnedTargetPath, v: &mut LogEvent)
     -> Result<(), String>;
 }
@@ -586,12 +591,13 @@ impl From<Value> for Box<dyn ReduceValueMerger> {
             Value::Integer(i) => Box::new(AddNumbersMerger::new(i.into())),
             Value::Float(f) => Box::new(AddNumbersMerger::new(f.into())),
             Value::Timestamp(ts) => Box::new(TimestampWindowMerger::new(ts)),
-            Value::Object(_) => Box::new(DiscardMerger::new(v)),
-            Value::Null => Box::new(DiscardMerger::new(v)),
-            Value::Boolean(_) => Box::new(DiscardMerger::new(v)),
-            Value::Bytes(_) => Box::new(DiscardMerger::new(v)),
-            Value::Regex(_) => Box::new(DiscardMerger::new(v)),
-            Value::Array(_) => Box::new(DiscardMerger::new(v)),
+            Value::Object(_)
+            | Value::Null
+            | Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::String(_)
+            | Value::Regex(_)
+            | Value::Array(_) => Box::new(DiscardMerger::new(v)),
         }
     }
 }
@@ -626,7 +632,8 @@ pub(crate) fn get_value_merger(
             )),
         },
         MergeStrategy::Concat => match v {
-            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, Some(' ')))),
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(&b, Some(' ')))),
+            Value::String(s) => Ok(Box::new(ConcatMerger::new(&s.into_bytes(), Some(' ')))),
             Value::Array(a) => Ok(Box::new(ConcatArrayMerger::new(a))),
             _ => Err(format!(
                 "expected string or array value, found: '{}'",
@@ -634,14 +641,16 @@ pub(crate) fn get_value_merger(
             )),
         },
         MergeStrategy::ConcatNewline => match v {
-            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, Some('\n')))),
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(&b, Some('\n')))),
+            Value::String(s) => Ok(Box::new(ConcatMerger::new(&s.into_bytes(), Some('\n')))),
             _ => Err(format!(
                 "expected string value, found: '{}'",
                 v.to_string_lossy()
             )),
         },
         MergeStrategy::ConcatRaw => match v {
-            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, None))),
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(&b, None))),
+            Value::String(s) => Ok(Box::new(ConcatMerger::new(&s.into_bytes(), None))),
             _ => Err(format!(
                 "expected string value, found: '{}'",
                 v.to_string_lossy()
@@ -785,6 +794,10 @@ mod test {
     }
 
     #[test]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep this operation and its cases together. https://github.com/vectordotdev/vector/issues/23659"
+    )]
     fn merging_values() {
         assert_eq!(
             merge("foo".into(), "bar".into(), &MergeStrategy::Discard),
@@ -826,6 +839,14 @@ mod test {
         assert_eq!(
             merge(21.into(), 21.into(), &MergeStrategy::Sum),
             Ok(42.into())
+        );
+        assert_eq!(
+            merge(21.into(), 21.0.into(), &MergeStrategy::Sum),
+            Ok(42.0.into())
+        );
+        assert_eq!(
+            merge(21.0.into(), 21.into(), &MergeStrategy::Sum),
+            Ok(42.0.into())
         );
         assert_eq!(
             merge(41.into(), 42.into(), &MergeStrategy::Max),
@@ -932,6 +953,36 @@ mod test {
         } else {
             panic!("Not array");
         }
+    }
+
+    #[test]
+    fn concatenates_strings_and_bytes() {
+        for (strategy, separator) in [
+            (MergeStrategy::Concat, " "),
+            (MergeStrategy::ConcatNewline, "\n"),
+            (MergeStrategy::ConcatRaw, ""),
+        ] {
+            for initial in [Value::from("café"), Value::Bytes("café".into())] {
+                for additional in [Value::from("tea"), Value::Bytes("tea".into())] {
+                    assert_eq!(
+                        merge(initial.clone(), additional, &strategy).unwrap(),
+                        Value::from(format!("café{separator}tea"))
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn sum_returns_nan_errors() {
+        assert_eq!(
+            merge(
+                f64::INFINITY.into(),
+                f64::NEG_INFINITY.into(),
+                &MergeStrategy::Sum,
+            ),
+            Err("operation would produce NaN".to_owned())
+        );
     }
 
     fn merge(initial: Value, additional: Value, strategy: &MergeStrategy) -> Result<Value, String> {

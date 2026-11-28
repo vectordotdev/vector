@@ -1,0 +1,6 @@
+transforms:
+  my_transform_id:
+    type: delay
+    inputs:
+      - my-source-or-transform-id
+    delay_ms: 5000

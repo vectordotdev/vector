@@ -364,7 +364,6 @@ impl BatchStatus {
     ///
     /// As not every status has the same priority, some updates may end up being a no-op either due to not being any
     /// different or due to being lower priority than the current status.
-    #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
     fn update(self, status: EventStatus) -> Self {
         match (self, status) {
             // `Dropped` and `Delivered` do not change the status.
@@ -408,7 +407,6 @@ impl EventStatus {
     /// # Panics
     ///
     /// Passing a new status of `Dropped` is a programming error and will panic in debug/test builds.
-    #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
     #[must_use]
     pub fn update(self, status: Self) -> Self {
         match (self, status) {
@@ -475,6 +473,22 @@ pub trait GroupedFinalizable: Finalizable {
 impl<T: MergeFinalizable> GroupedFinalizable for T {
     fn merge_finalizer_groups(&mut self, finalizers: EventFinalizerGroups) {
         self.merge_finalizers(finalizers.flatten());
+    }
+}
+
+impl<T: Finalizable> Finalizable for Option<T> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        match self {
+            Some(item) => item.take_finalizers(),
+            None => EventFinalizers::default(),
+        }
+    }
+
+    fn take_finalizer_groups(&mut self) -> EventFinalizerGroups {
+        match self {
+            Some(item) => item.take_finalizer_groups(),
+            None => EventFinalizerGroups::default(),
+        }
     }
 }
 

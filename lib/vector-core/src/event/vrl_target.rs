@@ -7,6 +7,7 @@ use std::{
 };
 
 use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix, lookup_v2::OwnedSegment};
+use smallvec::SmallVec;
 use snafu::Snafu;
 use vrl::{
     compiler::{ProgramInfo, SecretTarget, Target, value::VrlValueConvert},
@@ -14,23 +15,65 @@ use vrl::{
     value::{Kind, ObjectMap, Value},
 };
 
-use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, metric::TagValue};
+use super::{
+    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, TraceEvent,
+    metric::{
+        Bucket, MetricSketch, MetricTags, Quantile, Sample, StatisticKind, TagValue, TagValueSet,
+    },
+};
 use crate::{
     config::{LogNamespace, log_schema},
     schema::Definition,
 };
 
-const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags";
-
-/// We can get the `type` of the metric in Remap, but can't set it.
-const VALID_METRIC_PATHS_GET: &str =
+const VALID_METRIC_PATHS_SET: &str =
     ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
-/// Metrics aren't interested in paths that have a length longer than 3.
+const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type, \
+    .counter, .gauge, .set, .distribution, .aggregated_histogram, .aggregated_summary, .sketch";
+
+/// The fields that hold a metric's value, one per metric type.
 ///
-/// The longest path is 2, and we need to check that a third segment doesn't exist as we don't want
-/// fields such as `.tags.host.thing`.
+/// These match the JSON encoding of metrics, which is what `vector tap` shows. Only the
+/// field for the metric's current type is present; the others read as `null`.
+const METRIC_VALUE_FIELDS: [&str; 7] = [
+    "counter",
+    "gauge",
+    "set",
+    "distribution",
+    "aggregated_histogram",
+    "aggregated_summary",
+    "sketch",
+];
+
+/// How many segments to look at in a path to a metric field other than its value.
+///
+/// The longest of these paths is `.tags.<name>`, and the third segment is checked so that paths
+/// such as `.tags.host.thing` are rejected. Paths into the value, such as
+/// `.distribution.samples[0].value`, aren't limited.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
+
+/// How metric tags are exposed to and accepted from VRL or Lua.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum MetricTagMode {
+    /// Tags are exposed as single strings (last value wins for multi-value
+    /// tags); writes always produce single-value tags.
+    #[default]
+    Single,
+    /// Tags are always exposed as arrays; writes always produce multi-value
+    /// tags regardless of whether the assigned value is scalar or array.
+    Full,
+    /// Tags are exposed using their underlying shape: single-value tags as
+    /// strings, multi-value tags as arrays. Writes: scalar values produce
+    /// single-value tags; arrays of length >= 2 produce multi-value tags.
+    ///
+    /// A length-1 array is normalised to a single-value tag by the metric
+    /// storage layer (`TagValueSet::Set` is never reduced below 2 elements),
+    /// so an assignment like `.tags.region = ["us-east-1"]` round-trips as
+    /// a scalar on the next read. Use `Full` to force array shape regardless
+    /// of length.
+    Auto,
+}
 
 /// An adapter to turn `Event`s into `vrl_lib::Target`s.
 #[allow(clippy::large_enum_variant)]
@@ -42,7 +85,7 @@ pub enum VrlTarget {
     Metric {
         metric: Metric,
         value: Value,
-        multi_value_tags: bool,
+        tag_mode: MetricTagMode,
     },
     Trace(Value, EventMetadata),
 }
@@ -100,7 +143,7 @@ impl Iterator for TargetIter<TraceEvent> {
 }
 
 impl VrlTarget {
-    pub fn new(event: Event, info: &ProgramInfo, multi_value_metric_tags: bool) -> Self {
+    pub fn new(event: Event, info: &ProgramInfo, tag_mode: MetricTagMode) -> Self {
         match event {
             Event::Log(event) => {
                 let (value, metadata) = event.into_parts();
@@ -110,12 +153,12 @@ impl VrlTarget {
                 // We pre-generate [`Value`] types for the metric fields accessed in
                 // the event. This allows us to then return references to those
                 // values, even if the field is accessed more than once.
-                let value = precompute_metric_value(&metric, info, multi_value_metric_tags);
+                let value = precompute_metric_value(&metric, info, tag_mode);
 
                 VrlTarget::Metric {
                     metric,
                     value,
-                    multi_value_tags: multi_value_metric_tags,
+                    tag_mode,
                 }
             }
             Event::Trace(event) => {
@@ -163,7 +206,7 @@ impl VrlTarget {
                     LogNamespace::Legacy => TargetEvents::One(create_log_event(v, metadata).into()),
                 },
             },
-            VrlTarget::Trace(value, metadata) => match value {
+            VrlTarget::Trace(value, mut metadata) => match value {
                 value @ Value::Object(_) => {
                     let log = LogEvent::from_parts(value, metadata);
                     TargetEvents::One(TraceEvent::from(log).into())
@@ -176,7 +219,10 @@ impl VrlTarget {
                     log_namespace,
                 }),
 
-                v => TargetEvents::One(create_log_event(v, metadata).into()),
+                v => {
+                    metadata.clear_trace_layout();
+                    TargetEvents::One(create_log_event(v, metadata).into())
+                }
             },
             VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
         }
@@ -246,8 +292,22 @@ fn merge_array_definitions(mut definition: Definition) -> Definition {
     definition
 }
 
-fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi_value_tags: bool) {
-    if multi_value_tags {
+fn set_metric_tag_values(
+    name: String,
+    value: &Value,
+    metric: &mut Metric,
+    tag_mode: MetricTagMode,
+) {
+    // `Auto` dispatches by the *shape* of the assigned value: arrays go through
+    // the multi-value path, scalars go through the single-value path. `Full`
+    // and `Single` are unchanged.
+    let multi_value = match tag_mode {
+        MetricTagMode::Single => false,
+        MetricTagMode::Full => true,
+        MetricTagMode::Auto => matches!(value, Value::Array(_)),
+    };
+
+    if multi_value {
         let values = if let Value::Array(values) = value {
             values.as_slice()
         } else {
@@ -260,6 +320,7 @@ fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi
                 Value::Bytes(bytes) => {
                     Some(TagValue::Value(String::from_utf8_lossy(bytes).to_string()))
                 }
+                Value::String(string) => Some(TagValue::Value(string.to_string())),
                 Value::Null => Some(TagValue::Bare),
                 _ => None,
             })
@@ -276,6 +337,61 @@ fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi
     }
 }
 
+/// Converts a counter to a gauge or a gauge to a counter, keeping its value and kind.
+///
+/// Other metric types carry values that have no meaningful scalar equivalent, so they are
+/// rejected both as the current type and as the target type.
+fn set_metric_type(metric: &mut Metric, value: &Value) -> Result<(), String> {
+    let target_type = value.clone().try_bytes().map_err(|e| e.to_string())?;
+    let current = match metric.value() {
+        MetricValue::Counter { value } | MetricValue::Gauge { value } => *value,
+        other => {
+            return Err(format!(
+                "cannot change the type of a {} metric, only `counter` and `gauge` metrics can be converted",
+                other.as_name()
+            ));
+        }
+    };
+    *metric.value_mut() = match target_type.as_ref() {
+        b"counter" => MetricValue::Counter { value: current },
+        b"gauge" => MetricValue::Gauge { value: current },
+        other => {
+            return Err(format!(
+                "invalid metric type {}, metric type must be `counter` or `gauge`",
+                String::from_utf8_lossy(other)
+            ));
+        }
+    };
+    Ok(())
+}
+
+/// Sets the value of a counter or gauge, such as `.gauge.value = 100`.
+///
+/// The value is converted before anything changes, so a rejected write leaves both the metric and
+/// the cached value as they were.
+fn set_metric_value(
+    metric: &mut Metric,
+    cached: &mut Value,
+    path: &OwnedValuePath,
+    value: &Value,
+) -> Result<(), String> {
+    let (MetricValue::Counter { value: current } | MetricValue::Gauge { value: current }) =
+        metric.value_mut()
+    else {
+        return Err(MetricPathError::InvalidPath {
+            path: &path.to_string(),
+            expected: VALID_METRIC_PATHS_SET,
+        }
+        .to_string());
+    };
+    let new_value = value.try_into_f64().map_err(|e| e.to_string())?;
+    *current = new_value;
+    // Cache the converted float rather than `value`, so that `.gauge.value = 100` reads back as
+    // `100.0`, like the output.
+    cached.insert(path, metric_float_to_vrl_value(new_value));
+    Ok(())
+}
+
 impl Target for VrlTarget {
     fn target_insert(&mut self, target_path: &OwnedTargetPath, value: Value) -> Result<(), String> {
         let path = &target_path.path;
@@ -288,7 +404,7 @@ impl Target for VrlTarget {
                 VrlTarget::Metric {
                     metric,
                     value: metric_value,
-                    multi_value_tags,
+                    tag_mode,
                 } => {
                     if path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -306,7 +422,7 @@ impl Target for VrlTarget {
                                         field.as_str().into(),
                                         value,
                                         metric,
-                                        *multi_value_tags,
+                                        *tag_mode,
                                     );
                                 }
                             }
@@ -315,7 +431,7 @@ impl Target for VrlTarget {
                                     (*field).to_owned(),
                                     &value,
                                     metric,
-                                    *multi_value_tags,
+                                    *tag_mode,
                                 );
                             }
                             ["name"] => {
@@ -344,6 +460,16 @@ impl Target for VrlTarget {
                             }
                             ["kind"] => {
                                 metric.data.kind = MetricKind::try_from(value.clone())?;
+                            }
+                            ["type"] => {
+                                let previous_field = metric_value_field(metric.value());
+                                set_metric_type(metric, &value)?;
+                                refresh_cached_metric_value(metric, metric_value, previous_field);
+                            }
+                            // Only the value of the current type can be set. Returns early so that
+                            // the raw value isn't cached below.
+                            [field, "value"] if *field == metric_value_field(metric.value()) => {
+                                return set_metric_value(metric, metric_value, path, &value);
                             }
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
@@ -375,7 +501,6 @@ impl Target for VrlTarget {
         }
     }
 
-    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
         match target_path.prefix {
             PathPrefix::Event => match self {
@@ -416,7 +541,7 @@ impl Target for VrlTarget {
                 VrlTarget::Metric {
                     metric,
                     value,
-                    multi_value_tags: _,
+                    tag_mode,
                 } => {
                     if target_path.path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -436,12 +561,15 @@ impl Target for VrlTarget {
                                 .take()
                                 .map(u32::from)
                                 .map(Into::into),
-                            ["tags"] => metric.series.tags.take().map(|map| {
-                                map.into_iter_single()
-                                    .map(|(k, v)| (k, v.into()))
-                                    .collect::<vrl::value::Value>()
-                            }),
-                            ["tags", field] => metric.remove_tag(field).map(Into::into),
+                            ["tags"] => metric
+                                .series
+                                .tags
+                                .take()
+                                .map(|tags| metric_tags_to_vrl_value(tags, *tag_mode)),
+                            ["tags", field] => metric
+                                .remove_tag_set(field)
+                                .map(|tag_set| tag_value_set_to_vrl_value(&tag_set, *tag_mode)),
+                            ["type"] => return Err(MetricPathError::RemoveTypeError.to_string()),
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &target_path.path.to_string(),
@@ -481,18 +609,11 @@ impl SecretTarget for VrlTarget {
     }
 }
 
-/// Retrieves a value from a the provided metric using the path.
-/// Currently the root path and the following paths are supported:
-/// - `name`
-/// - `namespace`
-/// - `interval_ms`
-/// - `timestamp`
-/// - `kind`
-/// - `tags`
-/// - `tags.<tagname>`
-/// - `type`
+/// Retrieves a value from the provided metric using the path.
 ///
-/// Any other paths result in a `MetricPathError::InvalidPath` being returned.
+/// Supports the root path, the metric's fields (`name`, `namespace`, `interval_ms`, `timestamp`,
+/// `kind`, `tags`, `tags.<tagname>`, and `type`), and paths into its value, under the fields listed
+/// in `METRIC_VALUE_FIELDS`.
 fn target_get_metric<'a>(
     path: &OwnedValuePath,
     value: &'a Value,
@@ -503,19 +624,17 @@ fn target_get_metric<'a>(
 
     let value = value.get(path);
 
+    if is_metric_value_path(path) {
+        return Ok(value);
+    }
+
     let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH) else {
         return Ok(None);
     };
 
     match paths.as_slice() {
-        ["name"]
-        | ["kind"]
-        | ["type"]
-        | ["tags", _]
-        | ["namespace"]
-        | ["timestamp"]
-        | ["interval_ms"]
-        | ["tags"] => Ok(value),
+        ["name" | "kind" | "type" | "namespace" | "timestamp" | "interval_ms" | "tags"]
+        | ["tags", _] => Ok(value),
         _ => Err(MetricPathError::InvalidPath {
             path: &path.to_string(),
             expected: VALID_METRIC_PATHS_GET,
@@ -539,13 +658,9 @@ fn target_get_mut_metric<'a>(
     };
 
     match paths.as_slice() {
-        ["name"]
-        | ["kind"]
-        | ["tags", _]
-        | ["namespace"]
-        | ["timestamp"]
-        | ["interval_ms"]
-        | ["tags"] => Ok(value),
+        ["name" | "kind" | "namespace" | "timestamp" | "interval_ms" | "tags"] | ["tags", _] => {
+            Ok(value)
+        }
         _ => Err(MetricPathError::InvalidPath {
             path: &path.to_string(),
             expected: VALID_METRIC_PATHS_SET,
@@ -554,67 +669,301 @@ fn target_get_mut_metric<'a>(
     }
 }
 
+struct MetricProperty {
+    property: &'static str,
+    getter: fn(&Metric) -> Option<Value>,
+    set: bool,
+}
+
+impl MetricProperty {
+    fn new(property: &'static str, getter: fn(&Metric) -> Option<Value>) -> Self {
+        Self {
+            property,
+            getter,
+            set: false,
+        }
+    }
+
+    fn insert(&mut self, metric: &Metric, map: &mut ObjectMap) {
+        if self.set {
+            return;
+        }
+        if let Some(value) = (self.getter)(metric) {
+            map.insert(self.property.into(), value);
+            self.set = true;
+        }
+    }
+}
+
+fn get_single_value_tags(metric: &Metric) -> Option<Value> {
+    metric
+        .tags()
+        .cloned()
+        .map(|tags| metric_tags_to_vrl_value(tags, MetricTagMode::Single))
+}
+
+fn get_multi_value_tags(metric: &Metric) -> Option<Value> {
+    metric
+        .tags()
+        .cloned()
+        .map(|tags| metric_tags_to_vrl_value(tags, MetricTagMode::Full))
+}
+
+/// `Auto` keeps the underlying shape: a tag with exactly one value renders
+/// as a scalar (string for `Value(_)`, null for `Bare`), and a tag with two
+/// or more values renders as an array. The discriminator must be `len()` --
+/// `as_single()` deliberately collapses multi-value sets to their last
+/// value to support `Single`-mode semantics, which is the opposite of what
+/// we want here.
+fn get_auto_value_tags(metric: &Metric) -> Option<Value> {
+    metric
+        .tags()
+        .cloned()
+        .map(|tags| metric_tags_to_vrl_value(tags, MetricTagMode::Auto))
+}
+
+fn tag_ref_to_vrl_value(value: Option<&str>) -> Value {
+    value.map_or(Value::Null, Value::from)
+}
+
+fn tag_value_set_to_vrl_value(tag_set: &TagValueSet, tag_mode: MetricTagMode) -> Value {
+    match tag_mode {
+        MetricTagMode::Single => tag_set.as_single().map_or(Value::Null, Value::from),
+        MetricTagMode::Full => Value::Array(tag_set.iter().map(tag_ref_to_vrl_value).collect()),
+        MetricTagMode::Auto => match tag_set.len() {
+            1 => match tag_set.iter().next() {
+                Some(Some(s)) => Value::from(s),
+                _ => Value::Null,
+            },
+            _ => Value::Array(tag_set.iter().map(tag_ref_to_vrl_value).collect()),
+        },
+    }
+}
+
+fn metric_tags_to_vrl_value(tags: MetricTags, tag_mode: MetricTagMode) -> Value {
+    match tag_mode {
+        MetricTagMode::Single => tags
+            .into_iter_single()
+            .map(|(tag, value)| (tag.into(), value.into()))
+            .collect::<ObjectMap>()
+            .into(),
+        MetricTagMode::Full | MetricTagMode::Auto => tags
+            .iter_sets()
+            .map(|(tag, tag_set)| (tag.into(), tag_value_set_to_vrl_value(tag_set, tag_mode)))
+            .collect::<ObjectMap>()
+            .into(),
+    }
+}
+
+/// Returns the field that holds the value of a metric of this type.
+const fn metric_value_field(value: &MetricValue) -> &'static str {
+    match value {
+        MetricValue::Counter { .. } => "counter",
+        MetricValue::Gauge { .. } => "gauge",
+        MetricValue::Set { .. } => "set",
+        MetricValue::Distribution { .. } => "distribution",
+        MetricValue::AggregatedHistogram { .. } => "aggregated_histogram",
+        MetricValue::AggregatedSummary { .. } => "aggregated_summary",
+        MetricValue::Sketch { .. } => "sketch",
+    }
+}
+
+/// Returns `true` if the path reads a metric's value, such as `.gauge.value`.
+fn is_metric_value_path(path: &OwnedValuePath) -> bool {
+    matches!(
+        path.segments.first(),
+        Some(OwnedSegment::Field(field)) if METRIC_VALUE_FIELDS.contains(&field.as_ref())
+    )
+}
+
+/// Converts a float for VRL.
+///
+/// VRL floats can't hold NaN, so NaN is exposed as the string `"NaN"`. This matches how NaN is
+/// written in the JSON encoding of histogram buckets. Infinities are kept as floats.
+fn metric_float_to_vrl_value(value: f64) -> Value {
+    if value.is_nan() {
+        Value::from("NaN")
+    } else {
+        Value::from_f64_or_zero(value)
+    }
+}
+
+/// Converts an unsigned count for VRL.
+///
+/// VRL integers are signed 64-bit, so counts above `i64::MAX` are exposed as exact decimal
+/// strings rather than being truncated or rounded to a float.
+fn metric_count_to_vrl_value(count: u64) -> Value {
+    i64::try_from(count).map_or_else(|_| Value::from(count.to_string()), Value::from)
+}
+
+fn optional_metric_float_to_vrl_value(value: Option<f64>) -> Value {
+    value.map_or(Value::Null, metric_float_to_vrl_value)
+}
+
+fn sample_to_vrl_value(sample: &Sample) -> Value {
+    ObjectMap::from([
+        ("value".into(), metric_float_to_vrl_value(sample.value)),
+        ("rate".into(), Value::from(i64::from(sample.rate))),
+    ])
+    .into()
+}
+
+fn bucket_to_vrl_value(bucket: &Bucket) -> Value {
+    ObjectMap::from([
+        (
+            "upper_limit".into(),
+            metric_float_to_vrl_value(bucket.upper_limit),
+        ),
+        ("count".into(), metric_count_to_vrl_value(bucket.count)),
+    ])
+    .into()
+}
+
+fn quantile_to_vrl_value(quantile: &Quantile) -> Value {
+    ObjectMap::from([
+        (
+            "quantile".into(),
+            metric_float_to_vrl_value(quantile.quantile),
+        ),
+        ("value".into(), metric_float_to_vrl_value(quantile.value)),
+    ])
+    .into()
+}
+
+/// Converts a metric's value to the object VRL reads under the field for its type.
+fn metric_value_to_vrl_value(value: &MetricValue) -> Value {
+    metric_value_subfields_to_vrl_value(value, |_| true).into()
+}
+
+/// Converts the subfields of a metric's value that `wanted` accepts, and leaves out the rest.
+///
+/// Whole-value reads, such as `get!(.aggregated_histogram, ["count"])`, and subfield reads, such
+/// as `.aggregated_histogram.count`, both use this function, so they can't disagree on which
+/// subfields exist. Only wanted subfields are converted, so reading `count` doesn't convert the
+/// buckets. A missing subfield, like the sum of a histogram that doesn't have one, is left out.
+fn metric_value_subfields_to_vrl_value(
+    value: &MetricValue,
+    wanted: impl Fn(&str) -> bool,
+) -> ObjectMap {
+    let mut map = ObjectMap::new();
+    let wanted = &wanted;
+    match value {
+        MetricValue::Counter { value } | MetricValue::Gauge { value } => {
+            insert_if_wanted(&mut map, wanted, "value", || {
+                metric_float_to_vrl_value(*value)
+            });
+        }
+        MetricValue::Set { values } => {
+            insert_if_wanted(&mut map, wanted, "values", || {
+                Value::Array(values.iter().map(|value| value.as_str().into()).collect())
+            });
+        }
+        MetricValue::Distribution { samples, statistic } => {
+            insert_if_wanted(&mut map, wanted, "samples", || {
+                Value::Array(samples.iter().map(sample_to_vrl_value).collect())
+            });
+            insert_if_wanted(&mut map, wanted, "statistic", || {
+                match statistic {
+                    StatisticKind::Histogram => "histogram",
+                    StatisticKind::Summary => "summary",
+                }
+                .into()
+            });
+        }
+        MetricValue::AggregatedHistogram {
+            buckets,
+            count,
+            sum,
+        } => {
+            insert_if_wanted(&mut map, wanted, "buckets", || {
+                Value::Array(buckets.iter().map(bucket_to_vrl_value).collect())
+            });
+            insert_if_wanted(&mut map, wanted, "count", || {
+                metric_count_to_vrl_value(*count)
+            });
+            // Like the JSON encoding, a missing sum is left out, so `exists` can tell it apart
+            // from a sum of zero.
+            if let Some(sum) = sum {
+                insert_if_wanted(&mut map, wanted, "sum", || metric_float_to_vrl_value(*sum));
+            }
+        }
+        MetricValue::AggregatedSummary {
+            quantiles,
+            count,
+            sum,
+        } => {
+            insert_if_wanted(&mut map, wanted, "quantiles", || {
+                Value::Array(quantiles.iter().map(quantile_to_vrl_value).collect())
+            });
+            insert_if_wanted(&mut map, wanted, "count", || {
+                metric_count_to_vrl_value(*count)
+            });
+            insert_if_wanted(&mut map, wanted, "sum", || metric_float_to_vrl_value(*sum));
+        }
+        // Only summary statistics are exposed. The bins are an internal representation and
+        // shouldn't become part of the VRL interface.
+        MetricValue::Sketch {
+            sketch: MetricSketch::AgentDDSketch(sketch),
+        } => {
+            insert_if_wanted(&mut map, wanted, "count", || {
+                Value::from(i64::from(sketch.count()))
+            });
+            insert_if_wanted(&mut map, wanted, "min", || {
+                optional_metric_float_to_vrl_value(sketch.min())
+            });
+            insert_if_wanted(&mut map, wanted, "max", || {
+                optional_metric_float_to_vrl_value(sketch.max())
+            });
+            insert_if_wanted(&mut map, wanted, "sum", || {
+                optional_metric_float_to_vrl_value(sketch.sum())
+            });
+            insert_if_wanted(&mut map, wanted, "avg", || {
+                optional_metric_float_to_vrl_value(sketch.avg())
+            });
+        }
+    }
+    map
+}
+
+/// Inserts a subfield if `wanted` accepts it. The value is only converted then.
+fn insert_if_wanted(
+    map: &mut ObjectMap,
+    wanted: &impl Fn(&str) -> bool,
+    subfield: &str,
+    convert: impl FnOnce() -> Value,
+) {
+    if wanted(subfield) {
+        map.insert(subfield.into(), convert());
+    }
+}
+
+/// Moves the cached value to the field of the new type after a metric's type changed from
+/// `previous_field`. Nothing is added if the value wasn't cached.
+fn refresh_cached_metric_value(metric: &Metric, cached: &mut Value, previous_field: &str) {
+    if let Value::Object(map) = cached
+        && map.remove(previous_field).is_some()
+    {
+        map.insert(
+            metric_value_field(metric.value()).into(),
+            metric_value_to_vrl_value(metric.value()),
+        );
+    }
+}
+
+/// Returns `true` if the path is `.type`.
+fn is_metric_type_path(target_path: &OwnedTargetPath) -> bool {
+    target_path.prefix == PathPrefix::Event
+        && matches!(target_path.path.segments.as_slice(), [OwnedSegment::Field(field)] if field.as_ref() == "type")
+}
+
 /// pre-compute the `Value` structure of the metric.
 ///
 /// This structure is partially populated based on the fields accessed by
 /// the VRL program as informed by `ProgramInfo`.
-fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags: bool) -> Value {
-    struct MetricProperty {
-        property: &'static str,
-        getter: fn(&Metric) -> Option<Value>,
-        set: bool,
-    }
-
-    impl MetricProperty {
-        fn new(property: &'static str, getter: fn(&Metric) -> Option<Value>) -> Self {
-            Self {
-                property,
-                getter,
-                set: false,
-            }
-        }
-
-        fn insert(&mut self, metric: &Metric, map: &mut ObjectMap) {
-            if self.set {
-                return;
-            }
-            if let Some(value) = (self.getter)(metric) {
-                map.insert(self.property.into(), value);
-                self.set = true;
-            }
-        }
-    }
-
-    fn get_single_value_tags(metric: &Metric) -> Option<Value> {
-        metric.tags().cloned().map(|tags| {
-            tags.into_iter_single()
-                .map(|(tag, value)| (tag.into(), value.into()))
-                .collect::<ObjectMap>()
-                .into()
-        })
-    }
-
-    fn get_multi_value_tags(metric: &Metric) -> Option<Value> {
-        metric.tags().cloned().map(|tags| {
-            tags.iter_sets()
-                .map(|(tag, tag_set)| {
-                    let array_values: Vec<Value> = tag_set
-                        .iter()
-                        .map(|v| match v {
-                            Some(s) => Value::Bytes(s.as_bytes().to_vec().into()),
-                            None => Value::Null,
-                        })
-                        .collect();
-                    (tag.into(), Value::Array(array_values))
-                })
-                .collect::<ObjectMap>()
-                .into()
-        })
-    }
-
+fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, tag_mode: MetricTagMode) -> Value {
     let mut name = MetricProperty::new("name", |metric| Some(metric.name().to_owned().into()));
     let mut kind = MetricProperty::new("kind", |metric| Some(metric.kind().into()));
-    let mut type_ = MetricProperty::new("type", |metric| Some(metric.value().clone().into()));
+    let mut type_ = MetricProperty::new("type", |metric| Some(metric.value().as_name().into()));
     let mut namespace = MetricProperty::new("namespace", |metric| {
         metric.namespace().map(String::from).map(Into::into)
     });
@@ -624,18 +973,39 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
         MetricProperty::new("timestamp", |metric| metric.timestamp().map(Into::into));
     let mut tags = MetricProperty::new(
         "tags",
-        if multi_value_tags {
-            get_multi_value_tags
-        } else {
-            get_single_value_tags
+        match tag_mode {
+            MetricTagMode::Single => get_single_value_tags,
+            MetricTagMode::Full => get_multi_value_tags,
+            MetricTagMode::Auto => get_auto_value_tags,
         },
     );
 
     let mut map = ObjectMap::default();
+    let value_field = metric_value_field(metric.value());
+    // A counter or gauge can be converted to the other type with `.type`. In that case, reading
+    // the field of either type needs the value, so that it can be moved on conversion.
+    let convertible = matches!(
+        metric.value(),
+        MetricValue::Counter { .. } | MetricValue::Gauge { .. }
+    ) && info.target_assignments.iter().any(is_metric_type_path);
+    // Whether the program reads the whole value, or only some of its subfields, such as `count`
+    // for `.aggregated_histogram.count`.
+    let mut value_full = false;
+    let mut value_subfields: SmallVec<[&str; 4]> = SmallVec::new();
 
     for target_path in &info.target_queries {
-        // Accessing a root path requires us to pre-populate all fields.
-        if target_path == &OwnedTargetPath::event_root() {
+        // Metadata paths, such as `%distribution`, don't read the event.
+        if target_path.prefix != PathPrefix::Event {
+            continue;
+        }
+
+        // Accessing a root path requires us to pre-populate all fields, including the value. VRL
+        // records a root query for functions that read the whole event, such as `unnest`, which
+        // copies the rest of the event around each element.
+        //
+        // The root can't be built lazily on the first read instead, because the VRL runtime reads
+        // the root before running every program to check that the target exists.
+        if target_path.path.is_root() {
             let mut properties = [
                 &mut name,
                 &mut kind,
@@ -648,12 +1018,34 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
             for property in &mut properties {
                 property.insert(metric, &mut map);
             }
-            break;
+            value_full = true;
+            continue;
         }
 
         // For non-root paths, we continuously populate the value with the
         // relevant data.
         if let Some(OwnedSegment::Field(field)) = target_path.path.segments.first() {
+            // Reading the field for the current type prepares the value. Fields for other types
+            // read as `null`, so they don't, unless the type can be converted to them.
+            if METRIC_VALUE_FIELDS.contains(&field.as_ref()) {
+                if field.as_ref() == value_field {
+                    match target_path.path.segments.get(1) {
+                        None => value_full = true,
+                        // Each subfield is recorded once, however many paths read it, such
+                        // as several `.distribution.samples[i]`.
+                        Some(OwnedSegment::Field(subfield)) => {
+                            if !value_subfields.contains(&subfield.as_ref()) {
+                                value_subfields.push(subfield.as_ref());
+                            }
+                        }
+                        // An index, such as `.distribution[0]`, reads as `null`.
+                        Some(_) => {}
+                    }
+                } else if convertible && matches!(field.as_ref(), "counter" | "gauge") {
+                    value_full = true;
+                }
+                continue;
+            }
             let property = match field.as_ref() {
                 "name" => Some(&mut name),
                 "kind" => Some(&mut kind),
@@ -670,6 +1062,21 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
         }
     }
 
+    if value_full {
+        map.insert(
+            value_field.into(),
+            metric_value_to_vrl_value(metric.value()),
+        );
+    } else if !value_subfields.is_empty() {
+        // Subfields that this type doesn't have, such as `.distribution.buckets`, convert nothing.
+        let subfields = metric_value_subfields_to_vrl_value(metric.value(), |subfield| {
+            value_subfields.contains(&subfield)
+        });
+        if !subfields.is_empty() {
+            map.insert(value_field.into(), subfields.into());
+        }
+    }
+
     map.into()
 }
 
@@ -677,6 +1084,9 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
 enum MetricPathError<'a> {
     #[snafu(display("cannot set root path"))]
     SetPathError,
+
+    #[snafu(display("cannot delete metric type"))]
+    RemoveTypeError,
 
     #[snafu(display("invalid path {}: expected one of {}", path, expected))]
     InvalidPath { path: &'a str, expected: &'a str },
@@ -687,10 +1097,14 @@ mod test {
     use chrono::{Utc, offset::TimeZone};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vrl::{btreemap, value::kind::Index};
+    use vrl::{btreemap, event_path, objectmap, value::kind::Index};
 
-    use super::{super::MetricValue, *};
-    use crate::metric_tags;
+    use super::*;
+    use crate::{
+        event::metric::{MetricSketch, StatisticKind},
+        metric_tags,
+        metrics::AgentDDSketch,
+    };
 
     #[test]
     fn test_field_definitions_in_message() {
@@ -791,46 +1205,49 @@ mod test {
     fn log_get() {
         let cases = vec![
             (
-                BTreeMap::new(),
+                ObjectMap::new(),
                 owned_value_path!(),
-                Ok(Some(BTreeMap::new().into())),
+                Ok(Some(ObjectMap::new().into())),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(),
-                Ok(Some(BTreeMap::from([("foo".into(), "bar".into())]).into())),
+                Ok(Some(ObjectMap::from([("foo".into(), "bar".into())]).into())),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo"),
                 Ok(Some("bar".into())),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("bar"),
                 Ok(None),
             ),
             (
-                btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
+                objectmap! { "foo" => vec![objectmap! { "bar" => true }] },
                 owned_value_path!("foo", 0, "bar"),
                 Ok(Some(true.into())),
             ),
             (
-                btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
+                objectmap! { "foo" => objectmap! { "bar baz" => objectmap! { "baz" => 2 } } },
                 owned_value_path!("foo", r"bar baz", "baz"),
                 Ok(Some(2.into())),
             ),
         ];
 
         for (value, path, expect) in cases {
-            let value: ObjectMap = value;
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let target = VrlTarget::new(Event::Log(LogEvent::from(value)), &info, false);
+            let target = VrlTarget::new(
+                Event::Log(LogEvent::from(value)),
+                &info,
+                MetricTagMode::Single,
+            );
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
@@ -845,39 +1262,39 @@ mod test {
     fn log_insert() {
         let cases = vec![
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(0),
-                btreemap! { "baz" => "qux" }.into(),
-                btreemap! { "baz" => "qux" },
+                objectmap! { "baz" => "qux" }.into(),
+                objectmap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo"),
                 "baz".into(),
-                btreemap! { "foo" => "baz" },
+                objectmap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo", 2, "bar baz", "a", "b"),
                 true.into(),
-                btreemap! {
+                objectmap! {
                     "foo" => vec![
                         Value::Null,
                         Value::Null,
-                        btreemap! {
-                            "bar baz" => btreemap! { "a" => btreemap! { "b" => true } },
+                        objectmap! {
+                            "bar baz" => objectmap! { "a" => objectmap! { "b" => true } },
                         }.into()
                     ]
                 },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => vec![0, 1, 2] },
+                objectmap! { "foo" => vec![0, 1, 2] },
                 owned_value_path!("foo", 5),
                 "baz".into(),
-                btreemap! {
+                objectmap! {
                     "foo" => vec![
                         0.into(),
                         1.into(),
@@ -890,51 +1307,54 @@ mod test {
                 Ok(()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                objectmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![]) },
+                objectmap! { "foo" => Value::Array(vec![]) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                objectmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into()]) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                objectmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 owned_value_path!("foo", 0),
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
+                objectmap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 owned_value_path!("foo", 1),
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
+                objectmap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
             ),
         ];
 
         for (object, path, value, expect, result) in cases {
-            let object: ObjectMap = object;
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
+            let mut target = VrlTarget::new(
+                Event::Log(LogEvent::from(object)),
+                &info,
+                MetricTagMode::Single,
+            );
             let expect = LogEvent::from(expect);
             let value: Value = value;
             let path = OwnedTargetPath::event(path);
@@ -965,64 +1385,64 @@ mod test {
     fn log_remove() {
         let cases = vec![
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!("foo"),
                 false,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                BTreeMap::from([("foo".into(), "bar".into())]),
+                ObjectMap::from([("foo".into(), "bar".into())]),
                 owned_value_path!(r"foo bar", "foo"),
                 false,
-                Some(btreemap! { "foo" => "bar"}.into()),
+                Some(objectmap! { "foo" => "bar"}.into()),
             ),
             (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
+                objectmap! { "foo" => "bar", "baz" => "qux" },
                 owned_value_path!(),
                 false,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
+                objectmap! { "foo" => "bar", "baz" => "qux" },
                 owned_value_path!(),
                 true,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                btreemap! { "foo" => vec![0] },
+                objectmap! { "foo" => vec![0] },
                 owned_value_path!("foo", 0),
                 false,
-                Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
+                Some(objectmap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
-                btreemap! { "foo" => vec![0] },
+                objectmap! { "foo" => vec![0] },
                 owned_value_path!("foo", 0),
                 true,
-                Some(BTreeMap::new().into()),
+                Some(ObjectMap::new().into()),
             ),
             (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
+                objectmap! {
+                    "foo" => objectmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 owned_value_path!("foo", r"bar baz", 0),
                 false,
                 Some(
-                    btreemap! {
-                        "foo" => btreemap! { "bar baz" => Value::Array(vec![]) },
+                    objectmap! {
+                        "foo" => objectmap! { "bar baz" => Value::Array(vec![]) },
                         "bar" => "baz",
                     }
                     .into(),
                 ),
             ),
             (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
+                objectmap! {
+                    "foo" => objectmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 owned_value_path!("foo", r"bar baz", 0),
                 true,
-                Some(btreemap! { "bar" => "baz" }.into()),
+                Some(objectmap! { "bar" => "baz" }.into()),
             ),
         ];
 
@@ -1033,7 +1453,11 @@ mod test {
                 target_queries: vec![],
                 target_assignments: vec![],
             };
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)), &info, false);
+            let mut target = VrlTarget::new(
+                Event::Log(LogEvent::from(object)),
+                &info,
+                MetricTagMode::Single,
+            );
             let path = OwnedTargetPath::event(path);
             let removed = Target::target_get(&target, &path).unwrap().cloned();
 
@@ -1051,28 +1475,26 @@ mod test {
 
     #[test]
     fn log_into_events() {
-        use vrl::btreemap;
-
         let cases = vec![
             (
-                Value::from(btreemap! {"foo" => "bar"}),
-                vec![btreemap! {"foo" => "bar"}],
+                Value::from(objectmap! {"foo" => "bar"}),
+                vec![objectmap! {"foo" => "bar"}],
             ),
-            (Value::from(1), vec![btreemap! {"message" => 1}]),
-            (Value::from("2"), vec![btreemap! {"message" => "2"}]),
-            (Value::from(true), vec![btreemap! {"message" => true}]),
+            (Value::from(1), vec![objectmap! {"message" => 1}]),
+            (Value::from("2"), vec![objectmap! {"message" => "2"}]),
+            (Value::from(true), vec![objectmap! {"message" => true}]),
             (
                 Value::from(vec![
                     Value::from(1),
                     Value::from("2"),
                     Value::from(true),
-                    Value::from(btreemap! {"foo" => "bar"}),
+                    Value::from(objectmap! {"foo" => "bar"}),
                 ]),
                 vec![
-                    btreemap! {"message" => 1},
-                    btreemap! {"message" => "2"},
-                    btreemap! {"message" => true},
-                    btreemap! {"foo" => "bar"},
+                    objectmap! {"message" => 1},
+                    objectmap! {"message" => "2"},
+                    objectmap! {"message" => true},
+                    objectmap! {"foo" => "bar"},
                 ],
             ),
         ];
@@ -1088,7 +1510,7 @@ mod test {
             let mut target = VrlTarget::new(
                 Event::Log(LogEvent::new_with_metadata(metadata.clone())),
                 &info,
-                false,
+                MetricTagMode::Single,
             );
 
             Target::target_insert(&mut target, &OwnedTargetPath::event_root(), value).unwrap();
@@ -1104,6 +1526,40 @@ mod test {
                     .map(|v| Event::Log(LogEvent::from_map(v, metadata.clone())))
                     .collect::<Vec<_>>()
             );
+        }
+    }
+
+    #[test]
+    fn trace_scalar_root_into_log_drops_trace_layout() {
+        let mut trace = TraceEvent::from(objectmap! {"foo" => "bar"});
+        trace
+            .metadata_mut()
+            .set_trace_layout(super::super::TraceLayout::Datadog);
+
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Trace(trace), &info, MetricTagMode::Single);
+        Target::target_insert(
+            &mut target,
+            &OwnedTargetPath::event_root(),
+            Value::from("message"),
+        )
+        .unwrap();
+
+        match target.into_events(LogNamespace::Legacy) {
+            TargetEvents::One(Event::Log(log)) => {
+                assert_eq!(log.namespace(), LogNamespace::Legacy);
+                assert_eq!(log.metadata().trace_layout(), None);
+                assert_eq!(
+                    log.get(event_path!("message")),
+                    Some(&Value::from("message"))
+                );
+            }
+            _ => panic!("expected one log event"),
         }
     }
 
@@ -1137,7 +1593,7 @@ mod test {
             ],
             target_assignments: vec![],
         };
-        let target = VrlTarget::new(Event::Metric(metric), &info, false);
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
 
         assert_eq!(
             Ok(Some(
@@ -1229,7 +1685,7 @@ mod test {
             ],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
 
         for Case {
             path,
@@ -1275,18 +1731,14 @@ mod test {
             target_queries: vec![],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
         let _result = target.target_insert(
             &OwnedTargetPath::event(owned_value_path!("tags")),
-            Value::Object(BTreeMap::from([("a".into(), "b".into())])),
+            Value::Object(ObjectMap::from([("a".into(), "b".into())])),
         );
 
         match target {
-            VrlTarget::Metric {
-                metric,
-                value: _,
-                multi_value_tags: _,
-            } => {
+            VrlTarget::Metric { metric, .. } => {
                 assert!(metric.tags().is_some());
                 assert_eq!(metric.tags().unwrap(), &crate::metric_tags!("a" => "b"));
             }
@@ -1310,6 +1762,13 @@ mod test {
             ".kind",
             ".tags",
             ".type",
+            ".counter",
+            ".gauge",
+            ".set",
+            ".distribution",
+            ".aggregated_histogram",
+            ".aggregated_summary",
+            ".sketch",
         ];
 
         let validpaths_set = [
@@ -1319,6 +1778,7 @@ mod test {
             ".timestamp",
             ".kind",
             ".tags",
+            ".type",
         ];
 
         let info = ProgramInfo {
@@ -1327,7 +1787,7 @@ mod test {
             target_queries: vec![],
             target_assignments: vec![],
         };
-        let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
 
         assert_eq!(
             Err(format!(
@@ -1367,6 +1827,197 @@ mod test {
         );
     }
 
+    /// A program that sets `.type` and reads the value of either type afterwards.
+    fn type_program_info() -> ProgramInfo {
+        ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![
+                OwnedTargetPath::event(owned_value_path!("type")),
+                OwnedTargetPath::event(owned_value_path!("counter", "value")),
+                OwnedTargetPath::event(owned_value_path!("gauge", "value")),
+            ],
+            target_assignments: vec![OwnedTargetPath::event(owned_value_path!("type"))],
+        }
+    }
+
+    fn set_type(metric: Metric, new_type: Value) -> (VrlTarget, Result<(), String>) {
+        let mut target = VrlTarget::new(
+            Event::Metric(metric),
+            &type_program_info(),
+            MetricTagMode::Single,
+        );
+        let result =
+            target.target_insert(&OwnedTargetPath::event(owned_value_path!("type")), new_type);
+        (target, result)
+    }
+
+    fn into_metric(target: VrlTarget) -> Metric {
+        match target.into_events(LogNamespace::Legacy) {
+            TargetEvents::One(Event::Metric(metric)) => metric,
+            _ => panic!("must be a metric"),
+        }
+    }
+
+    #[test]
+    fn metric_set_type_converts_between_counter_and_gauge() {
+        let cases = [
+            (
+                MetricValue::Gauge { value: 4.5 },
+                "counter",
+                MetricValue::Counter { value: 4.5 },
+            ),
+            (
+                MetricValue::Counter { value: 4.5 },
+                "gauge",
+                MetricValue::Gauge { value: 4.5 },
+            ),
+            (
+                MetricValue::Counter { value: 4.5 },
+                "counter",
+                MetricValue::Counter { value: 4.5 },
+            ),
+            (
+                MetricValue::Gauge { value: 4.5 },
+                "gauge",
+                MetricValue::Gauge { value: 4.5 },
+            ),
+        ];
+
+        for kind in [MetricKind::Absolute, MetricKind::Incremental] {
+            for (value, new_type, expected) in cases.clone() {
+                let metric =
+                    Metric::new("name", kind, value).with_tags(Some(metric_tags!("host" => "a")));
+                let (target, result) = set_type(metric, new_type.into());
+                assert_eq!(result, Ok(()));
+
+                // Later reads in the same program see the new type, with the value under it.
+                assert_eq!(
+                    target.target_get(&OwnedTargetPath::event(owned_value_path!("type"))),
+                    Ok(Some(&Value::from(new_type)))
+                );
+                assert_eq!(
+                    get(&target, owned_value_path!(new_type, "value")),
+                    Some(Value::from(4.5))
+                );
+
+                let metric = into_metric(target);
+                assert_eq!(metric.value(), &expected);
+                assert_eq!(metric.kind(), kind);
+                assert_eq!(metric.name(), "name");
+                assert_eq!(metric.tag_value("host"), Some("a".into()));
+            }
+        }
+    }
+
+    #[test]
+    fn metric_set_type_rejects_invalid_values() {
+        for new_type in [
+            Value::from("distribution"),
+            Value::from("Counter"),
+            Value::from(""),
+            Value::from(1),
+            Value::Null,
+        ] {
+            let metric = Metric::new(
+                "name",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            );
+            let (target, result) = set_type(metric, new_type.clone());
+            assert!(result.is_err(), "{new_type:?} should be rejected");
+            assert_eq!(
+                target.target_get(&OwnedTargetPath::event(owned_value_path!("type"))),
+                Ok(Some(&Value::from("gauge"))),
+                "{new_type:?} should leave `.type` reading the original type"
+            );
+            assert_eq!(
+                get(&target, owned_value_path!("gauge", "value")),
+                Some(Value::from(1.0)),
+                "{new_type:?} should leave the value readable under the original type"
+            );
+            assert_eq!(
+                into_metric(target).value(),
+                &MetricValue::Gauge { value: 1.0 },
+                "{new_type:?} should leave the metric unchanged"
+            );
+        }
+
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        );
+        assert_eq!(
+            set_type(metric, "set".into()).1,
+            Err("invalid metric type set, metric type must be `counter` or `gauge`".to_owned())
+        );
+    }
+
+    #[test]
+    fn metric_set_type_rejects_non_scalar_metrics() {
+        let values = [
+            MetricValue::Set {
+                values: ["a".to_owned()].into(),
+            },
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 1],
+                count: 1,
+                sum: Some(1.0),
+            },
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![0.5 => 1.0],
+                count: 1,
+                sum: 1.0,
+            },
+            MetricValue::Sketch {
+                sketch: MetricSketch::AgentDDSketch(AgentDDSketch::with_agent_defaults()),
+            },
+        ];
+
+        for value in values {
+            let name = value.as_name();
+            for new_type in ["counter", "gauge", name] {
+                let metric = Metric::new("name", MetricKind::Absolute, value.clone());
+                let (target, result) = set_type(metric, new_type.into());
+                assert_eq!(
+                    result,
+                    Err(format!(
+                        "cannot change the type of a {name} metric, only `counter` and `gauge` metrics can be converted"
+                    ))
+                );
+                assert_eq!(into_metric(target).value(), &value);
+            }
+        }
+    }
+
+    #[test]
+    fn metric_remove_type_is_an_error() {
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let mut target = VrlTarget::new(
+            Event::Metric(metric),
+            &type_program_info(),
+            MetricTagMode::Single,
+        );
+
+        assert_eq!(
+            target.target_remove(&OwnedTargetPath::event(owned_value_path!("type")), true),
+            Err("cannot delete metric type".to_owned())
+        );
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Counter { value: 1.0 }
+        );
+    }
+
     #[test]
     fn test_metric_insert_get_multi_value_tag() {
         let metric = Metric::new(
@@ -1381,7 +2032,7 @@ mod test {
             target_assignments: vec![],
         };
 
-        let mut target = VrlTarget::new(Event::Metric(metric), &info, true);
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Full);
 
         let value = Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()]);
         target
@@ -1398,7 +2049,7 @@ mod test {
 
         assert_eq!(
             vrl_tags_value,
-            &Value::Object(BTreeMap::from([(
+            &Value::Object(ObjectMap::from([(
                 "foo".into(),
                 Value::Array(vec!["a".into(), "".into(), Value::Null, "b".into()])
             )]))
@@ -1410,5 +2061,1169 @@ mod test {
 
         // get single value (should be the last one)
         assert_eq!(metric.tag_value("foo"), Some("b".into()));
+    }
+
+    fn auto_mode_program_info() -> ProgramInfo {
+        ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![OwnedTargetPath::event(owned_value_path!("tags"))],
+            target_assignments: vec![],
+        }
+    }
+
+    /// Auto exposes a single-value tag as a plain string -- the same shape
+    /// `Single` would produce -- so existing VRL programs that read scalar
+    /// tags work unchanged.
+    #[test]
+    fn metric_auto_read_single_value_tag_returns_string() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(metric_tags!("env" => "prod")));
+
+        let info = auto_mode_program_info();
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let tags = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(ObjectMap::from([("env".into(), Value::from("prod"))])),
+        );
+    }
+
+    /// Auto exposes a multi-value tag as an array -- the same shape `Full`
+    /// would produce -- so multi-value information survives the round trip
+    /// instead of being collapsed to the last value.
+    #[test]
+    fn metric_auto_read_multi_value_tag_returns_array() {
+        use super::super::metric::{MetricTags, TagValueSet};
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(BTreeMap::from([(
+            "shard".to_string(),
+            TagValueSet::from(vec![
+                TagValue::from("a".to_string()),
+                TagValue::from("b".to_string()),
+            ]),
+        )]))));
+
+        let info = auto_mode_program_info();
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let tags = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(ObjectMap::from([(
+                "shard".into(),
+                Value::Array(vec!["a".into(), "b".into()])
+            )])),
+        );
+    }
+
+    /// Auto reads a mixed metric (one single, one multi) preserving both
+    /// shapes -- the property the new mode exists for.
+    #[test]
+    fn metric_auto_read_mixed_tags_preserves_both_shapes() {
+        use super::super::metric::{MetricTags, TagValueSet};
+        let mut tags = BTreeMap::new();
+        tags.insert(
+            "env".to_string(),
+            TagValueSet::from(vec!["prod".to_string()]),
+        );
+        tags.insert(
+            "shard".to_string(),
+            TagValueSet::from(vec!["a".to_string(), "b".to_string()]),
+        );
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        let info = auto_mode_program_info();
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let tags = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(ObjectMap::from([
+                ("env".into(), Value::from("prod")),
+                ("shard".into(), Value::Array(vec!["a".into(), "b".into()])),
+            ])),
+        );
+    }
+
+    /// Auto write: assigning a scalar produces a single-value tag (so a VRL
+    /// program that did `.tags.env = "staging"` round-trips as `Single`-style).
+    #[test]
+    fn metric_auto_write_string_creates_single_tag() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let info = auto_mode_program_info();
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "env")),
+                Value::from("staging"),
+            )
+            .unwrap();
+
+        let VrlTarget::Metric { metric, .. } = target else {
+            unreachable!()
+        };
+        let metric_tags = metric.tags().expect("tag should be set");
+        let tag_set = metric_tags
+            .iter_sets()
+            .find(|(k, _)| *k == "env")
+            .expect("env tag missing")
+            .1;
+        assert_eq!(
+            tag_set.len(),
+            1,
+            "scalar assignment must produce a 1-element set"
+        );
+        assert_eq!(tag_set.as_single(), Some("staging"));
+    }
+
+    /// Auto write: assigning an array produces a multi-value tag (the
+    /// behaviour `Single` would silently drop and `Full` would force on
+    /// every other tag).
+    #[test]
+    fn metric_auto_write_array_creates_multi_value_tag() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let info = auto_mode_program_info();
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "shard")),
+                Value::Array(vec!["a".into(), "b".into(), "c".into()]),
+            )
+            .unwrap();
+
+        let VrlTarget::Metric { metric, .. } = target else {
+            unreachable!()
+        };
+        let metric_tags = metric.tags().expect("tag should be set");
+        let tag_set = metric_tags
+            .iter_sets()
+            .find(|(k, _)| *k == "shard")
+            .expect("shard tag missing")
+            .1;
+        assert_eq!(tag_set.len(), 3);
+        let collected: Vec<Option<&str>> = tag_set.iter().collect();
+        assert_eq!(
+            collected,
+            vec![Some("a"), Some("b"), Some("c")],
+            "array assignment must preserve every element"
+        );
+    }
+
+    /// Auto round-trip across two passes: a length-1 array write reaches the
+    /// metric storage as `TagValueSet::Single` (the storage layer never holds
+    /// a `Set` with fewer than 2 elements), so when a *subsequent* VRL pass
+    /// constructs a new `VrlTarget` around that metric, the tag surfaces as a
+    /// scalar string rather than a 1-element array. This pins that behaviour
+    /// as intentional -- a true array-shape preserving round-trip needs
+    /// `MetricTagMode::Full`.
+    ///
+    /// Within a single pass, the `VrlTarget` caches writes verbatim in its
+    /// precomputed `Value`, so an intra-pass `.tags.region` read sees the
+    /// original array; the collapse is observable only across passes.
+    #[test]
+    fn metric_auto_one_element_array_normalises_to_scalar() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let info = auto_mode_program_info();
+        let mut first_pass = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        first_pass
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "region")),
+                Value::Array(vec!["us-east-1".into()]),
+            )
+            .unwrap();
+
+        let VrlTarget::Metric { metric, .. } = first_pass else {
+            unreachable!()
+        };
+        let tag_set = metric
+            .tags()
+            .expect("tag should be set")
+            .iter_sets()
+            .find(|(k, _)| *k == "region")
+            .expect("region tag missing")
+            .1;
+        assert_eq!(
+            tag_set.len(),
+            1,
+            "storage layer must collapse a 1-element multi-value tag to a Single",
+        );
+
+        let second_pass = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+        let tags = second_pass
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(ObjectMap::from([(
+                "region".into(),
+                Value::from("us-east-1"),
+            )])),
+            "a length-1 array written in one Auto pass must read back as a \
+             scalar on the next pass",
+        );
+    }
+
+    /// Auto read: an empty tag set (`len() == 0`) keeps its array shape so a
+    /// noop `.tags = .tags` round-trip preserves it. Without this guarantee
+    /// an empty multi-value tag would silently morph into a bare single-value
+    /// tag through one Auto round-trip.
+    #[test]
+    fn metric_auto_read_empty_tag_set_returns_array() {
+        use super::super::metric::{MetricTags, TagValueSet};
+        let mut tags = BTreeMap::new();
+        tags.insert("empty".to_string(), TagValueSet::default());
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        let info = auto_mode_program_info();
+        let target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let tags = target
+            .target_get(&OwnedTargetPath::event(owned_value_path!("tags")))
+            .unwrap()
+            .unwrap()
+            .clone();
+
+        assert_eq!(
+            tags,
+            Value::Object(ObjectMap::from([("empty".into(), Value::Array(vec![]))])),
+            "empty tag set must surface as an empty array, not as null",
+        );
+    }
+
+    /// Auto write: assigning `null` falls through the scalar path, producing
+    /// a single bare tag (matches `Single` semantics so the two modes agree
+    /// on the unambiguous case).
+    #[test]
+    fn metric_auto_write_null_creates_single_bare_tag() {
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let info = auto_mode_program_info();
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("tags", "bare")),
+                Value::Null,
+            )
+            .unwrap();
+
+        let VrlTarget::Metric { metric, .. } = target else {
+            unreachable!()
+        };
+        let metric_tags = metric.tags().expect("tag should be set");
+        let tag_set = metric_tags
+            .iter_sets()
+            .find(|(k, _)| *k == "bare")
+            .expect("bare tag missing")
+            .1;
+        assert_eq!(tag_set.len(), 1);
+        let collected: Vec<Option<&str>> = tag_set.iter().collect();
+        assert_eq!(
+            collected,
+            vec![None],
+            "null must produce a single bare value"
+        );
+    }
+
+    /// `del(.tags.<field>)` must return the same shape that a read would have
+    /// exposed, so moving multi-value tags in `Auto` mode does not silently
+    /// drop values.
+    #[test]
+    fn metric_auto_remove_multi_value_tag_returns_array() {
+        use super::super::metric::{MetricTags, TagValue, TagValueSet};
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(BTreeMap::from([(
+            "shard".to_string(),
+            TagValueSet::from(vec![
+                TagValue::from("a".to_string()),
+                TagValue::from("b".to_string()),
+            ]),
+        )]))));
+
+        let info = auto_mode_program_info();
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let removed = target
+            .target_remove(
+                &OwnedTargetPath::event(owned_value_path!("tags", "shard")),
+                true,
+            )
+            .unwrap()
+            .expect("shard tag should be removed");
+
+        assert_eq!(removed, Value::Array(vec!["a".into(), "b".into()]));
+
+        let VrlTarget::Metric { metric, .. } = target else {
+            unreachable!()
+        };
+        assert!(metric.tags().is_none());
+    }
+
+    /// `del(.tags)` in `Auto` mode must preserve mixed single/multi shapes.
+    #[test]
+    fn metric_auto_remove_all_tags_preserves_shapes() {
+        use super::super::metric::{MetricTags, TagValueSet};
+        let mut tags = BTreeMap::new();
+        tags.insert(
+            "env".to_string(),
+            TagValueSet::from(vec!["prod".to_string()]),
+        );
+        tags.insert(
+            "shard".to_string(),
+            TagValueSet::from(vec!["a".to_string(), "b".to_string()]),
+        );
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(tags)));
+
+        let info = auto_mode_program_info();
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Auto);
+
+        let removed = target
+            .target_remove(&OwnedTargetPath::event(owned_value_path!("tags")), true)
+            .unwrap()
+            .expect("tags should be removed");
+
+        assert_eq!(
+            removed,
+            Value::Object(ObjectMap::from([
+                ("env".into(), Value::from("prod")),
+                ("shard".into(), Value::Array(vec!["a".into(), "b".into()]))
+            ]))
+        );
+    }
+
+    /// `del(.tags.<field>)` in `Full` mode must return the full value array.
+    #[test]
+    fn metric_full_remove_multi_value_tag_returns_array() {
+        use super::super::metric::{MetricTags, TagValue, TagValueSet};
+        let metric = Metric::new(
+            "m",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(MetricTags(BTreeMap::from([(
+            "shard".to_string(),
+            TagValueSet::from(vec![
+                TagValue::from("a".to_string()),
+                TagValue::from("b".to_string()),
+            ]),
+        )]))));
+
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Full);
+
+        let removed = target
+            .target_remove(
+                &OwnedTargetPath::event(owned_value_path!("tags", "shard")),
+                true,
+            )
+            .unwrap()
+            .expect("shard tag should be removed");
+
+        assert_eq!(removed, Value::Array(vec!["a".into(), "b".into()]));
+    }
+    fn metric_target_with_queries(value: MetricValue, queries: &[OwnedTargetPath]) -> VrlTarget {
+        let metric = Metric::new("m", MetricKind::Absolute, value);
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: queries.to_vec(),
+            target_assignments: vec![],
+        };
+        VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single)
+    }
+
+    fn get(target: &VrlTarget, path: OwnedValuePath) -> Option<Value> {
+        target
+            .target_get(&OwnedTargetPath::event(path))
+            .unwrap()
+            .cloned()
+    }
+
+    /// One metric of each type, with the VRL field for its value and the expected object.
+    ///
+    /// The expected objects are written by hand rather than built by the conversion code, so tests
+    /// catch a subfield that is missing or converted incorrectly.
+    fn metric_value_cases() -> Vec<(MetricValue, &'static str, Value)> {
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+        sketch.insert_many(&[1.0, 3.0]);
+
+        vec![
+            (
+                MetricValue::Counter { value: 1.5 },
+                "counter",
+                Value::from(objectmap! { "value" => 1.5 }),
+            ),
+            (
+                MetricValue::Gauge { value: -2.0 },
+                "gauge",
+                Value::from(objectmap! { "value" => -2.0 }),
+            ),
+            (
+                MetricValue::Set {
+                    values: ["b".to_owned(), "a".to_owned()].into(),
+                },
+                "set",
+                Value::from(objectmap! { "values" => vec!["a", "b"] }),
+            ),
+            (
+                MetricValue::Distribution {
+                    samples: crate::samples![1.0 => 2, 4.0 => 1],
+                    statistic: StatisticKind::Summary,
+                },
+                "distribution",
+                Value::from(objectmap! {
+                    "samples" => vec![
+                        Value::from(objectmap! { "value" => 1.0, "rate" => 2 }),
+                        Value::from(objectmap! { "value" => 4.0, "rate" => 1 }),
+                    ],
+                    "statistic" => "summary",
+                }),
+            ),
+            (
+                MetricValue::AggregatedHistogram {
+                    buckets: crate::buckets![1.0 => 2, f64::INFINITY => 3],
+                    count: 5,
+                    sum: Some(7.5),
+                },
+                "aggregated_histogram",
+                Value::from(objectmap! {
+                    "buckets" => vec![
+                        Value::from(objectmap! { "upper_limit" => 1.0, "count" => 2 }),
+                        Value::from(objectmap! { "upper_limit" => f64::INFINITY, "count" => 3 }),
+                    ],
+                    "count" => 5,
+                    "sum" => 7.5,
+                }),
+            ),
+            (
+                MetricValue::AggregatedSummary {
+                    quantiles: crate::quantiles![0.5 => 2.0, 0.99 => 3.0],
+                    count: 4,
+                    sum: 9.0,
+                },
+                "aggregated_summary",
+                Value::from(objectmap! {
+                    "quantiles" => vec![
+                        Value::from(objectmap! { "quantile" => 0.5, "value" => 2.0 }),
+                        Value::from(objectmap! { "quantile" => 0.99, "value" => 3.0 }),
+                    ],
+                    "count" => 4,
+                    "sum" => 9.0,
+                }),
+            ),
+            (
+                MetricValue::Sketch {
+                    sketch: MetricSketch::AgentDDSketch(sketch.clone()),
+                },
+                "sketch",
+                Value::from(objectmap! {
+                    "count" => 2,
+                    "min" => sketch.min().unwrap(),
+                    "max" => sketch.max().unwrap(),
+                    "sum" => sketch.sum().unwrap(),
+                    "avg" => sketch.avg().unwrap(),
+                }),
+            ),
+        ]
+    }
+
+    #[test]
+    fn metric_value_read_by_type() {
+        let cases = metric_value_cases();
+        let fields: Vec<_> = cases.iter().map(|(_, field, _)| *field).collect();
+
+        for (value, field, expected) in cases {
+            let queries: Vec<_> = fields
+                .iter()
+                .map(|field| OwnedTargetPath::event(owned_value_path!(*field)))
+                .collect();
+            let target = metric_target_with_queries(value, &queries);
+
+            assert_eq!(
+                get(&target, owned_value_path!(field)),
+                Some(expected),
+                "{field}"
+            );
+
+            // The fields for other types are missing, so they read as `null`.
+            for other in fields.iter().filter(|other| **other != field) {
+                assert_eq!(get(&target, owned_value_path!(*other)), None, "{field}");
+            }
+        }
+    }
+
+    #[test]
+    fn metric_value_direct_and_dynamic_reads_match() {
+        // Each read runs in its own program. In one program, `get!(., ...)` would prepare the
+        // whole event and hide a subfield that the direct path misses.
+        for (value, field, expected) in metric_value_cases() {
+            let Value::Object(expected) = expected else {
+                panic!("expected an object for {field}");
+            };
+            for (subfield, expected) in expected {
+                for source in [
+                    format!(".{field}.{subfield}"),
+                    format!(r#"get!(.{field}, ["{subfield}"])"#),
+                    format!(r#"get!(., ["{field}", "{subfield}"])"#),
+                ] {
+                    let (_, result) = run_metric_program(value.clone(), &source);
+                    assert_eq!(result, expected, "{source}");
+                }
+                let source = format!("exists(.{field}.{subfield})");
+                let (_, result) = run_metric_program(value.clone(), &source);
+                assert_eq!(result, Value::from(true), "{source}");
+            }
+        }
+    }
+
+    #[test]
+    fn metric_value_empty_sketch_statistics_are_null() {
+        // Unlike a missing histogram sum, the statistics of an empty sketch are present but
+        // `null`.
+        let empty = MetricValue::Sketch {
+            sketch: MetricSketch::AgentDDSketch(AgentDDSketch::with_agent_defaults()),
+        };
+        let (_, result) = run_metric_program(empty.clone(), ".sketch.min");
+        assert_eq!(result, Value::Null);
+        let (_, result) = run_metric_program(empty, "exists(.sketch.min)");
+        assert_eq!(result, Value::from(true));
+    }
+
+    #[test]
+    fn metric_value_merges_reads_of_the_same_array() {
+        let indexed = [
+            OwnedTargetPath::event(owned_value_path!("distribution", "samples", 0, "value")),
+            OwnedTargetPath::event(owned_value_path!("distribution", "samples", 1, "rate")),
+        ];
+        let whole = OwnedTargetPath::event(owned_value_path!("distribution"));
+
+        // Only the indexed reads: only the samples are prepared.
+        let target = metric_target_with_queries(distribution_with_samples(), &indexed);
+        let cached = cached_field(&target, "distribution").unwrap();
+        assert_eq!(
+            cached.get(&owned_value_path!("statistic")),
+            None,
+            "{cached:?}"
+        );
+        assert_eq!(
+            get(
+                &target,
+                owned_value_path!("distribution", "samples", 1, "rate")
+            ),
+            Some(Value::from(1))
+        );
+
+        // Mixed with a read of the whole value, in either order.
+        let full = metric_value_to_vrl_value(&distribution_with_samples());
+        for queries in [
+            vec![indexed[0].clone(), indexed[1].clone(), whole.clone()],
+            vec![whole, indexed[0].clone(), indexed[1].clone()],
+        ] {
+            let target = metric_target_with_queries(distribution_with_samples(), &queries);
+            assert_eq!(cached_field(&target, "distribution"), Some(full.clone()));
+        }
+    }
+
+    #[test]
+    fn metric_value_read_nested_paths() {
+        let target = metric_target_with_queries(
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 2],
+                count: 2,
+                sum: None,
+            },
+            &[OwnedTargetPath::event(owned_value_path!(
+                "aggregated_histogram",
+                "buckets"
+            ))],
+        );
+
+        assert_eq!(
+            get(
+                &target,
+                owned_value_path!("aggregated_histogram", "buckets", 0, "count")
+            ),
+            Some(Value::from(2))
+        );
+        // A missing sum is left out, as in the JSON encoding, so it reads as `null` and
+        // `exists` is `false`.
+        assert_eq!(
+            get(&target, owned_value_path!("aggregated_histogram", "sum")),
+            None
+        );
+    }
+
+    #[test]
+    fn metric_value_special_numbers() {
+        // VRL floats can't hold NaN, so it reads as the string "NaN". Infinities stay floats.
+        let floats = [
+            (1.5, Value::from(1.5)),
+            (f64::NAN, Value::from("NaN")),
+            (f64::INFINITY, Value::from(f64::INFINITY)),
+            (f64::NEG_INFINITY, Value::from(f64::NEG_INFINITY)),
+        ];
+        for (input, expected) in floats {
+            assert_eq!(metric_float_to_vrl_value(input), expected, "{input}");
+        }
+
+        // Counts that don't fit in a VRL integer read as exact decimal strings.
+        let counts = [
+            (5, Value::from(5)),
+            (i64::MAX as u64, Value::from(i64::MAX)),
+            (i64::MAX as u64 + 1, Value::from("9223372036854775808")),
+            (u64::MAX, Value::from("18446744073709551615")),
+        ];
+        for (input, expected) in counts {
+            assert_eq!(metric_count_to_vrl_value(input), expected, "{input}");
+        }
+
+        // Nested fields use these conversions, and a missing sum reads as `null`, not `0`.
+        let target = metric_target_with_queries(
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![f64::NAN => u64::MAX],
+                count: 1,
+                sum: None,
+            },
+            &[OwnedTargetPath::event(owned_value_path!(
+                "aggregated_histogram"
+            ))],
+        );
+        assert_eq!(
+            get(
+                &target,
+                owned_value_path!("aggregated_histogram", "buckets", 0)
+            ),
+            Some(Value::from(objectmap! {
+                "upper_limit" => "NaN",
+                "count" => "18446744073709551615",
+            }))
+        );
+        assert_eq!(
+            get(&target, owned_value_path!("aggregated_histogram", "sum")),
+            None
+        );
+    }
+
+    #[test]
+    fn metric_value_not_computed_for_other_types() {
+        // `exists(.gauge)` on a large distribution shouldn't convert every sample.
+        let target = metric_target_with_queries(
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 1, 2.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+            &[OwnedTargetPath::event(owned_value_path!("gauge"))],
+        );
+        assert_eq!(get(&target, owned_value_path!("gauge")), None);
+        let VrlTarget::Metric { value, .. } = &target else {
+            panic!("must be a metric");
+        };
+        assert_eq!(value.get(&owned_value_path!("distribution")), None);
+    }
+
+    #[test]
+    fn metric_value_conversion_reading_only_new_type() {
+        let metric = Metric::new("m", MetricKind::Absolute, MetricValue::Gauge { value: 3.0 });
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![OwnedTargetPath::event(owned_value_path!(
+                "counter", "value"
+            ))],
+            target_assignments: vec![OwnedTargetPath::event(owned_value_path!("type"))],
+        };
+        let mut target = VrlTarget::new(Event::Metric(metric), &info, MetricTagMode::Single);
+        assert_eq!(get(&target, owned_value_path!("counter")), None);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("type")),
+                "counter".into(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(3.0))
+        );
+    }
+
+    fn cached_field(target: &VrlTarget, field: &str) -> Option<Value> {
+        let VrlTarget::Metric { value, .. } = target else {
+            panic!("must be a metric");
+        };
+        value
+            .get(&OwnedValuePath::from(vec![OwnedSegment::field(field)]))
+            .cloned()
+    }
+
+    fn distribution_with_samples() -> MetricValue {
+        MetricValue::Distribution {
+            samples: crate::samples![1.0 => 1, 2.0 => 1, 3.0 => 1],
+            statistic: StatisticKind::Histogram,
+        }
+    }
+
+    /// Runs a program through the VRL runtime, which also reads the root before running it.
+    fn run_metric_program(value: MetricValue, source: &str) -> (VrlTarget, Value) {
+        run_metric_program_with_tags(
+            value,
+            metric_tags!("region" => "eu"),
+            MetricTagMode::Single,
+            source,
+        )
+    }
+
+    fn run_metric_program_with_tags(
+        value: MetricValue,
+        tags: MetricTags,
+        tag_mode: MetricTagMode,
+        source: &str,
+    ) -> (VrlTarget, Value) {
+        // Only the functions these tests use, since `vector_vrl_functions` depends on this crate.
+        let fns: Vec<Box<dyn vrl::compiler::Function>> = vec![
+            Box::new(vrl::stdlib::Contains),
+            Box::new(vrl::stdlib::EncodeJson),
+            Box::new(vrl::stdlib::Exists),
+            Box::new(vrl::stdlib::Get),
+            Box::new(vrl::stdlib::Unnest),
+        ];
+        let program = vrl::compiler::compile(source, &fns).unwrap().program;
+        let metric = Metric::new("m", MetricKind::Absolute, value).with_tags(Some(tags));
+        let mut target = VrlTarget::new(Event::Metric(metric), program.info(), tag_mode);
+        let result = vrl::compiler::runtime::Runtime::default()
+            .resolve(&mut target, &program, &vrl::compiler::TimeZone::default())
+            .unwrap();
+        (target, result)
+    }
+
+    #[test]
+    fn metric_value_runtime_get_on_tags_skips_value() {
+        // `get` records only the path it reads from, so reading a tag doesn't convert the samples.
+        for source in [
+            r#"get!(.tags, ["region"])"#,
+            r#"tags = .tags; get!(tags, ["region"])"#,
+        ] {
+            let (target, result) = run_metric_program(distribution_with_samples(), source);
+            assert_eq!(result, Value::from("eu"), "{source}");
+            assert_eq!(cached_field(&target, "distribution"), None, "{source}");
+        }
+    }
+
+    #[test]
+    fn metric_value_runtime_unnest_local_object_skips_value() {
+        // Unnesting a local copy of the tags reads only the tags, so the rows don't carry the
+        // samples.
+        let (target, result) = run_metric_program_with_tags(
+            distribution_with_samples(),
+            metric_tags!("region" => "eu", "region" => "us"),
+            MetricTagMode::Full,
+            r#"tag_view = {"tags": .tags}; unnest!(tag_view.tags.region)"#,
+        );
+        assert_eq!(
+            result,
+            Value::from(vec![
+                Value::from(objectmap! { "tags" => objectmap! { "region" => "eu" } }),
+                Value::from(objectmap! { "tags" => objectmap! { "region" => "us" } }),
+            ])
+        );
+        assert_eq!(cached_field(&target, "distribution"), None);
+    }
+
+    #[test]
+    fn metric_value_runtime_unnest_keeps_metric_fields() {
+        // `unnest` records the root, so each row keeps the rest of the metric.
+        let (_, result) = run_metric_program_with_tags(
+            MetricValue::Gauge { value: 3.0 },
+            metric_tags!("region" => "eu", "region" => "us"),
+            MetricTagMode::Full,
+            "rows = unnest!(.tags.region); [rows[0].name, rows[0].gauge.value]",
+        );
+        assert_eq!(
+            result,
+            Value::from(vec![Value::from("m"), Value::from(3.0)])
+        );
+
+        let (_, result) = run_metric_program(
+            distribution_with_samples(),
+            "rows = unnest!(.distribution.samples); [rows[0].name, rows[0].type, rows[0].distribution.samples.value]",
+        );
+        assert_eq!(
+            result,
+            Value::from(vec![
+                Value::from("m"),
+                Value::from("distribution"),
+                Value::from(1.0)
+            ])
+        );
+    }
+
+    #[test]
+    fn metric_value_runtime_reads_only_what_the_program_reads() {
+        // Only a metadata field: the samples aren't converted.
+        let (target, result) = run_metric_program(distribution_with_samples(), r#".name == "m""#);
+        assert_eq!(result, Value::from(true));
+        assert_eq!(cached_field(&target, "distribution"), None);
+
+        // A metadata path with the same name as a value field.
+        let (target, result) =
+            run_metric_program(distribution_with_samples(), "exists(%distribution)");
+        assert_eq!(result, Value::from(false));
+        assert_eq!(cached_field(&target, "distribution"), None);
+
+        // A scalar field next to an array: the buckets aren't converted.
+        let (target, result) = run_metric_program(
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 1, 2.0 => 2],
+                count: 3,
+                sum: Some(4.0),
+            },
+            ".aggregated_histogram.count == 3",
+        );
+        assert_eq!(result, Value::from(true));
+        assert_eq!(
+            cached_field(&target, "aggregated_histogram"),
+            Some(Value::from(objectmap! { "count" => 3 }))
+        );
+
+        // A field that the type doesn't have: nothing is converted.
+        let (target, result) =
+            run_metric_program(distribution_with_samples(), "exists(.distribution.buckets)");
+        assert_eq!(result, Value::from(false));
+        assert_eq!(cached_field(&target, "distribution"), None);
+
+        // A missing sum doesn't exist, unlike a sum of zero.
+        let histogram = |sum| MetricValue::AggregatedHistogram {
+            buckets: crate::buckets![1.0 => 1],
+            count: 1,
+            sum,
+        };
+        let (_, result) = run_metric_program(histogram(None), "exists(.aggregated_histogram.sum)");
+        assert_eq!(result, Value::from(false));
+        let (_, result) =
+            run_metric_program(histogram(Some(0.0)), "exists(.aggregated_histogram.sum)");
+        assert_eq!(result, Value::from(true));
+
+        // Reading `.` includes the value.
+        let (_, result) = run_metric_program(
+            distribution_with_samples(),
+            r#"contains(encode_json(.), "\"samples\"")"#,
+        );
+        assert_eq!(result, Value::from(true));
+        let (_, result) = run_metric_program(
+            MetricValue::Gauge { value: 2.0 },
+            r#"get!(., ["gauge", "value"])"#,
+        );
+        assert_eq!(result, Value::from(2.0));
+    }
+
+    #[test]
+    fn metric_value_scalar_reads_skip_arrays() {
+        let target = metric_target_with_queries(
+            distribution_with_samples(),
+            &[OwnedTargetPath::event(owned_value_path!(
+                "distribution",
+                "statistic"
+            ))],
+        );
+        assert_eq!(
+            cached_field(&target, "distribution"),
+            Some(Value::from(objectmap! { "statistic" => "histogram" }))
+        );
+
+        let target = metric_target_with_queries(
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 2, 2.0 => 3],
+                count: 5,
+                sum: None,
+            },
+            &[
+                OwnedTargetPath::event(owned_value_path!("aggregated_histogram", "count")),
+                OwnedTargetPath::event(owned_value_path!("aggregated_histogram", "sum")),
+            ],
+        );
+        assert_eq!(
+            cached_field(&target, "aggregated_histogram"),
+            Some(Value::from(objectmap! { "count" => 5 }))
+        );
+        assert_eq!(
+            get(&target, owned_value_path!("aggregated_histogram", "count")),
+            Some(Value::from(5))
+        );
+
+        // Reading the samples as well converts them next to the statistic.
+        let target = metric_target_with_queries(
+            distribution_with_samples(),
+            &[
+                OwnedTargetPath::event(owned_value_path!("distribution", "statistic")),
+                OwnedTargetPath::event(owned_value_path!("distribution", "samples")),
+            ],
+        );
+        assert_eq!(
+            get(
+                &target,
+                owned_value_path!("distribution", "samples", 0, "value")
+            ),
+            Some(Value::from(1.0))
+        );
+    }
+
+    #[test]
+    fn metric_value_follows_type_conversion() {
+        let queries = [
+            OwnedTargetPath::event(owned_value_path!("type")),
+            OwnedTargetPath::event(owned_value_path!("counter", "value")),
+            OwnedTargetPath::event(owned_value_path!("gauge", "value")),
+            OwnedTargetPath::event_root(),
+        ];
+        let mut target = metric_target_with_queries(MetricValue::Gauge { value: 3.0 }, &queries);
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("name")),
+                "n".into(),
+            )
+            .unwrap();
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("type")),
+                "counter".into(),
+            )
+            .unwrap();
+
+        assert_eq!(
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(3.0))
+        );
+        assert_eq!(get(&target, owned_value_path!("gauge")), None);
+        let root = target
+            .target_get(&OwnedTargetPath::event_root())
+            .unwrap()
+            .cloned()
+            .unwrap();
+        assert_eq!(root.get(&owned_value_path!("gauge")), None);
+        assert_eq!(
+            root.get(&owned_value_path!("counter")).cloned(),
+            Some(Value::from(objectmap! { "value" => 3.0 }))
+        );
+        assert_eq!(
+            root.get(&owned_value_path!("type")).cloned(),
+            Some(Value::from("counter"))
+        );
+        assert_eq!(
+            root.get(&owned_value_path!("name")).cloned(),
+            Some(Value::from("n"))
+        );
+    }
+
+    #[test]
+    fn metric_value_write_sets_counter_value() {
+        // A negative value on an incremental counter: the metric changes, the next read sees the
+        // new float, and the kind is kept.
+        let metric = Metric::new(
+            "m",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let mut target = VrlTarget::new(
+            Event::Metric(metric),
+            &type_program_info(),
+            MetricTagMode::Single,
+        );
+
+        target
+            .target_insert(
+                &OwnedTargetPath::event(owned_value_path!("counter", "value")),
+                Value::from(-2.5),
+            )
+            .unwrap();
+
+        assert_eq!(
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(-2.5))
+        );
+        let metric = into_metric(target);
+        assert_eq!(metric.value(), &MetricValue::Counter { value: -2.5 });
+        assert_eq!(metric.kind(), MetricKind::Incremental);
+    }
+
+    #[test]
+    fn metric_value_rejected_writes_keep_value() {
+        // Each write is checked before anything changes, so a rejected write leaves both the
+        // cached value and the metric as they were.
+        let mut target = metric_target_with_queries(
+            MetricValue::Gauge { value: 1.0 },
+            &[OwnedTargetPath::event(owned_value_path!("gauge"))],
+        );
+        for (path, value) in [
+            (owned_value_path!("gauge", "value"), Value::from("high")),
+            (
+                owned_value_path!("gauge"),
+                Value::from(objectmap! { "value" => 2.0 }),
+            ),
+            (owned_value_path!("gauge", "other"), Value::from(2.0)),
+            (owned_value_path!("counter", "value"), Value::from(2.0)),
+        ] {
+            target
+                .target_insert(&OwnedTargetPath::event(path.clone()), value)
+                .expect_err(&path.to_string());
+        }
+        for path in [
+            owned_value_path!("gauge"),
+            owned_value_path!("gauge", "value"),
+        ] {
+            target
+                .target_remove(&OwnedTargetPath::event(path.clone()), false)
+                .expect_err(&path.to_string());
+        }
+
+        assert_eq!(
+            get(&target, owned_value_path!("gauge")),
+            Some(Value::from(objectmap! { "value" => 1.0 }))
+        );
+        // Writing another type's field doesn't add it to the cache either.
+        assert_eq!(get(&target, owned_value_path!("counter")), None);
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Gauge { value: 1.0 }
+        );
+
+        // Only counters and gauges have a writable value. Each input is valid for its path, so the
+        // write is rejected because of the path rather than the shape of the value.
+        let mut target = metric_target_with_queries(distribution_with_samples(), &[]);
+        for (path, value) in [
+            (owned_value_path!("distribution", "value"), Value::from(1.0)),
+            (
+                owned_value_path!("distribution", "samples"),
+                Value::from(vec![Value::from(
+                    objectmap! { "value" => 2.5, "rate" => 1 },
+                )]),
+            ),
+        ] {
+            target
+                .target_insert(&OwnedTargetPath::event(path.clone()), value)
+                .expect_err(&path.to_string());
+        }
+        assert_eq!(into_metric(target).value(), &distribution_with_samples());
+    }
+
+    #[test]
+    fn metric_value_write_and_type_conversion() {
+        let new_target = || {
+            let metric = Metric::new("m", MetricKind::Absolute, MetricValue::Gauge { value: 1.0 });
+            VrlTarget::new(
+                Event::Metric(metric),
+                &type_program_info(),
+                MetricTagMode::Single,
+            )
+        };
+        let insert = |target: &mut VrlTarget, path: OwnedValuePath, value: Value| {
+            target.target_insert(&OwnedTargetPath::event(path), value)
+        };
+
+        // Written before converting: the counter carries the new value.
+        let mut target = new_target();
+        insert(&mut target, owned_value_path!("gauge", "value"), 5.0.into()).unwrap();
+        insert(&mut target, owned_value_path!("type"), "counter".into()).unwrap();
+        assert_eq!(
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(5.0))
+        );
+        assert_eq!(get(&target, owned_value_path!("gauge")), None);
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Counter { value: 5.0 }
+        );
+
+        // Converted before writing: the check uses the type at the time of the write, so
+        // `.counter.value` is writable and `.gauge.value` no longer is.
+        let mut target = new_target();
+        insert(&mut target, owned_value_path!("type"), "counter".into()).unwrap();
+        insert(
+            &mut target,
+            owned_value_path!("counter", "value"),
+            5.0.into(),
+        )
+        .unwrap();
+        insert(&mut target, owned_value_path!("gauge", "value"), 6.0.into()).unwrap_err();
+        assert_eq!(
+            get(&target, owned_value_path!("counter", "value")),
+            Some(Value::from(5.0))
+        );
+        assert_eq!(get(&target, owned_value_path!("gauge")), None);
+        assert_eq!(
+            into_metric(target).value(),
+            &MetricValue::Counter { value: 5.0 }
+        );
     }
 }

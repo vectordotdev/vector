@@ -73,7 +73,6 @@ impl MetaDescriptive for RemoteWriteRequest {
 }
 
 pub(super) struct RemoteWriteMetadata {
-    finalizers: EventFinalizers,
     tenant_id: Option<String>,
 }
 
@@ -101,28 +100,33 @@ impl RequestBuilder<(PartitionKey, EventCollection)> for RemoteWriteRequestBuild
     fn split_input(
         &self,
         input: (PartitionKey, EventCollection),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (key, events) = input;
         let finalizers = events.finalizers;
         let metrics = events.events.into_metrics();
         let builder = RequestMetadataBuilder::from_events(&metrics);
         let metadata = RemoteWriteMetadata {
-            finalizers,
             tenant_id: key.tenant_id,
         };
 
-        (metadata, builder, metrics)
+        RequestParts {
+            metadata,
+            request_metadata_builder: builder,
+            events: metrics,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         RemoteWriteRequest {
             request: payload.into_payload(),
-            finalizers: metadata.finalizers,
+            finalizers,
             tenant_id: metadata.tenant_id,
             metadata: request_metadata,
         }

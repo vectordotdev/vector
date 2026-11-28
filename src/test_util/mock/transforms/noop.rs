@@ -17,7 +17,6 @@ use crate::config::{GenerateConfig, OutputId, TransformConfig, TransformContext}
 #[configurable_component(transform("test_noop", "Test (no-op)"))]
 #[derive(Clone, Debug)]
 pub struct NoopTransformConfig {
-    #[configurable(derived)]
     transform_type: TransformType,
 
     /// Optional per-event/array delay, in milliseconds.
@@ -46,8 +45,8 @@ pub struct NoopTransformConfig {
 }
 
 impl GenerateConfig for NoopTransformConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(&Self {
             transform_type: TransformType::Function,
             delay_ms: None,
             cpu_burn_ms: None,
@@ -58,16 +57,19 @@ impl GenerateConfig for NoopTransformConfig {
 }
 
 impl NoopTransformConfig {
+    #[must_use]
     pub fn with_delay_ms(mut self, delay_ms: u64) -> Self {
         self.delay_ms = Some(delay_ms);
         self
     }
 
+    #[must_use]
     pub fn with_cpu_burn_ms(mut self, cpu_burn_ms: u64) -> Self {
         self.cpu_burn_ms = Some(cpu_burn_ms);
         self
     }
 
+    #[must_use]
     pub fn with_concurrency(mut self) -> Self {
         self.enable_concurrency = true;
         self
@@ -99,14 +101,9 @@ impl TransformConfig for NoopTransformConfig {
         let delay = self.delay_ms.map(Duration::from_millis);
         let cpu_burn = self.cpu_burn_ms.map(Duration::from_millis);
         match self.transform_type {
-            TransformType::Function => Ok(Transform::Function(Box::new(NoopTransform {
-                delay,
-                cpu_burn,
-            }))),
-            TransformType::Synchronous => Ok(Transform::Synchronous(Box::new(NoopTransform {
-                delay,
-                cpu_burn,
-            }))),
+            TransformType::Function | TransformType::Synchronous => {
+                Ok(Transform::stateless(NoopTransform { delay, cpu_burn }))
+            }
             TransformType::Task => Ok(Transform::Task(Box::new(NoopTransform { delay, cpu_burn }))),
         }
     }
@@ -135,7 +132,7 @@ struct NoopTransform {
 
 /// Actively burns CPU on the calling thread for `duration`, unlike `sleep`
 /// which yields the thread without consuming CPU time.
-fn busy_spin(duration: Duration) {
+pub(crate) fn busy_spin(duration: Duration) {
     let start = std::time::Instant::now();
     let mut acc: u64 = 0;
     while start.elapsed() < duration {
@@ -145,7 +142,7 @@ fn busy_spin(duration: Duration) {
 }
 
 impl FunctionTransform for NoopTransform {
-    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+    fn transform(&self, output: &mut OutputBuffer, event: Event) {
         if let Some(delay) = self.delay {
             std::thread::sleep(delay);
         }

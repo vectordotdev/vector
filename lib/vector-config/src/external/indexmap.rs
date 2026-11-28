@@ -17,12 +17,6 @@ where
     K: ConfigurableString + ToValue + std::hash::Hash + Eq + 'static,
     V: Configurable + ToValue + 'static,
 {
-    fn is_optional() -> bool {
-        // A hashmap with required fields would be... an object.  So if you want that, make a struct
-        // instead, not a hashmap.
-        true
-    }
-
     fn metadata() -> Metadata {
         Metadata::with_transparent(true)
     }

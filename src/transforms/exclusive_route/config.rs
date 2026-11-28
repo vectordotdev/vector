@@ -18,7 +18,7 @@ pub(super) const UNMATCHED_ROUTE: &str = "_unmatched";
 /// Individual route configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub struct Route {
+pub(crate) struct Route {
     /// The name of the route is also the name of the transform port.
     ///
     ///  The `_unmatched` name is reserved and thus cannot be used as route ID.
@@ -53,7 +53,7 @@ impl Eq for Route {}
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct ExclusiveRouteConfig {
+pub(crate) struct ExclusiveRouteConfig {
     /// An array of named routes. The route names are expected to be unique.
     /// Routes are evaluated in order from first to last, and only the first matching route receives each event
     /// (first-match-wins).
@@ -81,8 +81,8 @@ fn routes_example() -> Vec<Route> {
 }
 
 impl GenerateConfig for ExclusiveRouteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             routes: routes_example(),
         })
         .unwrap()
@@ -94,7 +94,7 @@ impl GenerateConfig for ExclusiveRouteConfig {
 impl TransformConfig for ExclusiveRouteConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let route = ExclusiveRoute::new(self, context)?;
-        Ok(Transform::synchronous(route))
+        Ok(Transform::stateless(route))
     }
 
     fn input(&self) -> Input {

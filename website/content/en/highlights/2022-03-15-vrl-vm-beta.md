@@ -40,7 +40,7 @@ If you have any feedback for us let us know on [Discord] or on [Twitter].
 Currently VRL is run using a Tree Walking interpreter. A VRL program is compiled into a tree of
 program nodes. For example, given this simple VRL program:
 
-```coffee
+```vrl
 if .flag == 42 {
   .field = 32
 } else {

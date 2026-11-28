@@ -42,8 +42,8 @@ pub struct WindowConfig {
 }
 
 impl GenerateConfig for WindowConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(r#"flush_when = ".message == \"value\"""#).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(r#"flush_when: '.message == "value"'"#).unwrap()
     }
 }
 
@@ -59,7 +59,7 @@ const fn default_events_after() -> usize {
 #[typetag::serde(name = "window")]
 impl TransformConfig for WindowConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(
+        Ok(Transform::stateful(
             Window::new(
                 self.forward_when
                     .as_ref()

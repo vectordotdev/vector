@@ -16,6 +16,7 @@ use vector_lib::{
     },
     config::{DataType, LegacyKey, LogNamespace},
     configurable::configurable_component,
+    internal_event::emit,
     lookup::{lookup_v2::parse_value_path, owned_value_path, path},
     schema::Definition,
 };
@@ -32,7 +33,7 @@ use crate::{
     event::{Event, LogEvent},
     http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_message_based},
     sources::{
         http_server::{HttpConfigParamKind, build_param_matcher, remove_duplicates},
         util::{
@@ -69,22 +70,17 @@ pub struct LogplexConfig {
     #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
-    #[serde(default, deserialize_with = "bool_or_struct")]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -92,7 +88,6 @@ pub struct LogplexConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 }
@@ -177,8 +172,8 @@ impl Default for LogplexConfig {
 }
 
 impl GenerateConfig for LogplexConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(LogplexConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(LogplexConfig::default()).unwrap()
     }
 }
 
@@ -208,6 +203,7 @@ impl SourceConfig for LogplexConfig {
             StatusCode::OK,
             true,
             self.tls.as_ref(),
+            None,
             self.auth.as_ref(),
             cx,
             self.acknowledgements,
@@ -252,10 +248,10 @@ impl LogplexSource {
         let frame_id = get_header(header_map, "Logplex-Frame-Id")?;
         let drain_token = get_header(header_map, "Logplex-Drain-Token")?;
 
-        emit!(HerokuLogplexRequestReceived {
+        emit(HerokuLogplexRequestReceived {
             msg_count,
             frame_id,
-            drain_token
+            drain_token,
         });
 
         // Deal with body
@@ -263,14 +259,13 @@ impl LogplexSource {
 
         if events.len() != msg_count {
             let error_msg = format!(
-                "Parsed event count does not match message count header: {} vs {}",
-                events.len(),
-                msg_count
+                "Parsed event count does not match message count header: {} vs {msg_count}",
+                events.len()
             );
 
-            if cfg!(test) {
-                panic!("{}", error_msg);
-            }
+            #[cfg(test)]
+            panic!("{error_msg}");
+            #[cfg(not(test))]
             return Err(header_error_message("Logplex-Msg-Count", &error_msg));
         }
 
@@ -281,7 +276,7 @@ impl LogplexSource {
         let rdr = BufReader::new(body.reader());
         rdr.lines()
             .filter_map(|res| {
-                res.map_err(|error| emit!(HerokuLogplexRequestReadError { error }))
+                res.map_err(|error| emit(HerokuLogplexRequestReadError { error }))
                     .ok()
             })
             .filter(|s| !s.is_empty())
@@ -369,8 +364,8 @@ fn line_to_events(
 
         loop {
             match decoder.decode_eof(&mut buffer) {
-                Ok(Some((decoded, _byte_size))) => {
-                    for mut event in decoded {
+                Ok(Some((decoded_events, _byte_size))) => {
+                    for mut event in decoded_events {
                         if let Event::Log(ref mut log) = event {
                             if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
                                 log_namespace.insert_vector_metadata(
@@ -423,8 +418,8 @@ fn line_to_events(
             fields = parts.len()
         );
 
-        events.push(LogEvent::from_str_legacy(line).into())
-    };
+        events.push(LogEvent::from_str_legacy(line).into());
+    }
 
     let now = Utc::now();
 
@@ -439,6 +434,8 @@ fn line_to_events(
 
 #[cfg(test)]
 mod tests {
+    use crate::codecs::Decoder;
+    use crate::http::KeepaliveConfig;
     use std::net::SocketAddr;
 
     use chrono::{DateTime, Utc};
@@ -477,7 +474,7 @@ mod tests {
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let (_guard, address) = next_addr();
+        let (port_guard, address) = next_addr();
         let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             LogplexConfig {
@@ -489,16 +486,16 @@ mod tests {
                 decoding: default_decoding(),
                 acknowledgements: acknowledgements.into(),
                 log_namespace: None,
-                keepalive: Default::default(),
+                keepalive: KeepaliveConfig::default(),
             }
             .build(context)
             .await
             .unwrap()
             .await
-            .unwrap()
+            .unwrap();
         });
         wait_for_tcp(address).await;
-        (recv, address, _guard)
+        (recv, address, port_guard)
     }
 
     async fn send(
@@ -550,7 +547,7 @@ mod tests {
                     assert_eq!(
                         200,
                         send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                    )
+                    );
                 },
                 rx,
                 SAMPLE_BODY.lines().count(),
@@ -596,7 +593,7 @@ mod tests {
                     assert_eq!(
                         200,
                         send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                    )
+                    );
                 },
                 rx,
                 SAMPLE_BODY.lines().count(),
@@ -636,7 +633,7 @@ mod tests {
                     assert_eq!(
                         400,
                         send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                    )
+                    );
                 },
                 rx,
                 SAMPLE_BODY.lines().count(),
@@ -660,7 +657,7 @@ mod tests {
                 assert_eq!(
                     200,
                     send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                )
+                );
             },
             rx,
             SAMPLE_BODY.lines().count(),
@@ -691,7 +688,7 @@ mod tests {
     fn logplex_handles_normal_lines() {
         let log_namespace = LogNamespace::Legacy;
         let body = "267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - foo bar baz";
-        let events = super::line_to_events(Default::default(), log_namespace, body.into());
+        let events = super::line_to_events(Decoder::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
         assert_eq!(*log.get_message().unwrap(), "foo bar baz".into());
@@ -710,7 +707,7 @@ mod tests {
     fn logplex_handles_malformed_lines() {
         let log_namespace = LogNamespace::Legacy;
         let body = "what am i doing here";
-        let events = super::line_to_events(Default::default(), log_namespace, body.into());
+        let events = super::line_to_events(Decoder::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
         assert_eq!(*log.get_message().unwrap(), "what am i doing here".into());
@@ -722,7 +719,7 @@ mod tests {
     fn logplex_doesnt_blow_up_on_bad_framing() {
         let log_namespace = LogNamespace::Legacy;
         let body = "1000000 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - i'm not that long";
-        let events = super::line_to_events(Default::default(), log_namespace, body.into());
+        let events = super::line_to_events(Decoder::default(), log_namespace, body.into());
         let log = events[0].as_log();
 
         assert_eq!(*log.get_message().unwrap(), "i'm not that long".into());
@@ -788,7 +785,7 @@ mod tests {
                     None,
                 );
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 
     #[test]
@@ -820,6 +817,6 @@ mod tests {
         .with_event_field(&owned_value_path!("proc_id"), Kind::bytes(), None)
         .unknown_fields(Kind::bytes());
 
-        assert_eq!(definitions, Some(expected_definition))
+        assert_eq!(definitions, Some(expected_definition));
     }
 }

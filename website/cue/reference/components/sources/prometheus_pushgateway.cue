@@ -42,7 +42,6 @@ components: sources: prometheus_pushgateway: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

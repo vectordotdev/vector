@@ -4,10 +4,10 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 use indoc::formatdoc;
 
+use crate::commands::changelog::{FRAGMENT_TYPES, FragmentType};
 use crate::utils::paths;
 
 const CHANGELOG_DIR: &str = "changelog.d";
-const FRAGMENT_TYPES: &[&str] = &["breaking", "security", "feature", "enhancement", "fix"];
 
 /// Placeholder written for the author line when no handle can be detected.
 /// The checker rejects fragments still containing this sentinel.
@@ -18,7 +18,9 @@ pub(crate) const TODO_HANDLE: &str = "TODO_your_gh_handle";
 #[command()]
 pub struct Cli {
     /// Fragment type.
-    #[arg(value_parser = clap::builder::PossibleValuesParser::new(FRAGMENT_TYPES))]
+    #[arg(value_parser = clap::builder::PossibleValuesParser::new(
+        FRAGMENT_TYPES.iter().map(|t| t.name)
+    ))]
     fragment_type: String,
     /// Unique slug (used as the filename prefix, e.g. `env_var_interpolation`).
     slug: String,
@@ -39,7 +41,13 @@ impl Cli {
         }
 
         let author = detect_gh_handle().unwrap_or_else(|| TODO_HANDLE.to_string());
-        let content = render_template(&self.fragment_type, &author);
+        let Some(entry) = FRAGMENT_TYPES
+            .iter()
+            .find(|t| t.name == self.fragment_type.as_str())
+        else {
+            bail!("unknown fragment type '{}'", self.fragment_type);
+        };
+        let content = render_template(entry, &author);
         fs::write(&file, content)?;
 
         // `git add` the new fragment so the checker (which scans `git diff --diff-filter=A`)
@@ -80,9 +88,9 @@ fn validate_slug(slug: &str) -> Result<()> {
     Ok(())
 }
 
-fn render_template(fragment_type: &str, author: &str) -> String {
-    match fragment_type {
-        "breaking" => formatdoc! {"
+fn render_template(fragment_type: &FragmentType, author: &str) -> String {
+    if fragment_type.breaking {
+        formatdoc! {"
             # TODO one-line title
 
             ## Summary
@@ -112,12 +120,13 @@ fn render_template(fragment_type: &str, author: &str) -> String {
             ```
 
             authors: {author}
-        "},
-        _ => formatdoc! {"
+        "}
+    } else {
+        formatdoc! {"
             TODO one-item description of the change.
 
             authors: {author}
-        "},
+        "}
     }
 }
 
@@ -197,5 +206,17 @@ mod tests {
         assert!(validate_slug("").is_err());
         assert!(validate_slug("foo.bar").is_err());
         assert!(validate_slug("foo bar").is_err());
+    }
+
+    #[test]
+    fn breaking_template_is_selected_via_flag() {
+        let breaking = FRAGMENT_TYPES
+            .iter()
+            .find(|t| t.name == "breaking")
+            .unwrap();
+        let fix = FRAGMENT_TYPES.iter().find(|t| t.name == "fix").unwrap();
+        assert!(render_template(breaking, "a").contains("## Summary"));
+        assert!(render_template(breaking, "a").contains("## Migration"));
+        assert!(!render_template(fix, "a").contains("## Summary"));
     }
 }

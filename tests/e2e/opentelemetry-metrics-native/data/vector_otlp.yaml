@@ -8,8 +8,7 @@ sources:
       keepalive:
         max_connection_age_jitter_factor: 0.1
         max_connection_age_secs: 300
-    # Native decoding yields Event::Metric, exercising the OTLP metric encoder.
-    use_otlp_decoding: false
+    # Omitting decoding yields native Event::Metric, exercising the OTLP metric encoder.
 
 sinks:
   otel_sink:

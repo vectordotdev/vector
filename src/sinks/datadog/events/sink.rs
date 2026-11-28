@@ -1,12 +1,13 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
+use vector_lib::internal_event::emit;
 
 use vector_lib::lookup::event_path;
 
 use crate::{
     internal_events::{DROP_EVENT, ParserMissingFieldError},
     sinks::{
-        datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
-        prelude::*,
+        datadog::events::request_builder::DatadogEventsRequestBuilder, prelude::*,
+        util::http::HttpRequest,
     },
 };
 
@@ -16,7 +17,7 @@ pub struct DatadogEventsSink<S> {
 
 impl<S> DatadogEventsSink<S>
 where
-    S: Service<DatadogEventsRequest> + Send + 'static,
+    S: Service<HttpRequest<Option<Arc<str>>>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
@@ -31,7 +32,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -47,7 +48,7 @@ async fn ensure_required_fields(event: Event) -> Option<Event> {
     let mut log = event.into_log();
 
     if !log.contains(event_path!("title")) {
-        emit!(ParserMissingFieldError::<DROP_EVENT> { field: "title" });
+        emit(ParserMissingFieldError::<DROP_EVENT> { field: "title" });
         return None;
     }
 
@@ -83,7 +84,7 @@ async fn ensure_required_fields(event: Event) -> Option<Event> {
 #[async_trait]
 impl<S> StreamSink<Event> for DatadogEventsSink<S>
 where
-    S: Service<DatadogEventsRequest> + Send + 'static,
+    S: Service<HttpRequest<Option<Arc<str>>>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,

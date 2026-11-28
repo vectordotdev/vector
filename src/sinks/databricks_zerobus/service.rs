@@ -47,7 +47,7 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
     // Validate the proxy URL once up-front so a malformed value surfaces at
     // sink startup rather than per-connection.
     ProxyConnector::new(&proxy_url).map_err(|e| ZerobusSinkError::ConfigError {
-        message: format!("Invalid proxy URL '{}': {}", proxy_url, e),
+        message: format!("Invalid proxy URL '{proxy_url}': {e}"),
     })?;
     let no_proxy = proxy.no_proxy.clone();
     Ok(Arc::new(move |host: &str| {
@@ -66,7 +66,8 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
 /// every call (not just on retry), and a deep clone of `Vec<Event>` per call
 /// would be wasteful.
 #[derive(Clone)]
-pub struct ZerobusRequest {
+pub(super) struct ZerobusRequest {
+    #[allow(clippy::rc_buffer)]
     pub events: Arc<Vec<Event>>,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
@@ -80,7 +81,7 @@ pub struct ZerobusRequest {
 /// from `Service::call` reserved for permanent failures (driver maps to
 /// `Rejected`).
 #[derive(Debug)]
-pub struct ZerobusResponse {
+pub(super) struct ZerobusResponse {
     pub events_byte_size: GroupedCountByteSize,
     pub status: vector_lib::event::EventStatus,
 }
@@ -183,7 +184,7 @@ impl ActiveStream {
 
 /// A mock stream that returns a configurable error on the next ingest call.
 #[cfg(test)]
-pub struct MockStream {
+pub(super) struct MockStream {
     /// When `Some`, the next ingest returns this error; when `None`, ingest succeeds.
     next_error: std::sync::Mutex<Option<databricks_zerobus_ingest_sdk::ZerobusError>>,
     /// Shared flag set to `true` when `ActiveStream::close()` is called.
@@ -203,7 +204,7 @@ struct MockGate {
 
 #[cfg(test)]
 #[derive(Clone)]
-pub struct MockGateHandle {
+pub(super) struct MockGateHandle {
     started: Arc<tokio::sync::Semaphore>,
     release: Arc<tokio::sync::Semaphore>,
 }
@@ -211,20 +212,20 @@ pub struct MockGateHandle {
 #[cfg(test)]
 impl MockGateHandle {
     /// Wait until `n` ingests have entered the gated region.
-    pub async fn wait_for_started(&self, n: u32) {
+    async fn wait_for_started(&self, n: u32) {
         let permit = self.started.acquire_many(n).await.unwrap();
         permit.forget();
     }
 
     /// Release `n` queued ingests so they can return their result.
-    pub fn release(&self, n: u32) {
+    pub(super) fn release(&self, n: u32) {
         self.release.add_permits(n as usize);
     }
 }
 
 #[cfg(test)]
 impl MockStream {
-    pub fn succeeding() -> Self {
+    pub(super) fn succeeding() -> Self {
         Self {
             next_error: std::sync::Mutex::new(None),
             closed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -232,7 +233,7 @@ impl MockStream {
         }
     }
 
-    pub fn failing(error: databricks_zerobus_ingest_sdk::ZerobusError) -> Self {
+    pub(super) fn failing(error: databricks_zerobus_ingest_sdk::ZerobusError) -> Self {
         Self {
             next_error: std::sync::Mutex::new(Some(error)),
             closed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -242,7 +243,7 @@ impl MockStream {
 
     /// Install a gate so ingests block until the test releases them.
     /// Returns a handle the test uses to coordinate.
-    pub fn with_gate(mut self) -> (Self, MockGateHandle) {
+    fn with_gate(mut self) -> (Self, MockGateHandle) {
         let started = Arc::new(tokio::sync::Semaphore::new(0));
         let release = Arc::new(tokio::sync::Semaphore::new(0));
         self.gate = Some(MockGate {
@@ -253,12 +254,12 @@ impl MockStream {
     }
 
     /// Returns a shared handle to the closed flag for test assertions.
-    pub fn closed_flag(&self) -> Arc<std::sync::atomic::AtomicBool> {
+    fn closed_flag(&self) -> Arc<std::sync::atomic::AtomicBool> {
         Arc::clone(&self.closed)
     }
 
     /// Set the error that will be returned on the next ingest call.
-    pub fn set_next_error(&self, error: databricks_zerobus_ingest_sdk::ZerobusError) {
+    fn set_next_error(&self, error: databricks_zerobus_ingest_sdk::ZerobusError) {
         *self.next_error.lock().unwrap() = Some(error);
     }
 
@@ -303,7 +304,7 @@ impl ResolvedSchema {
 }
 
 /// Service for handling Zerobus requests.
-pub struct ZerobusService {
+pub(super) struct ZerobusService {
     sdk: Arc<ZerobusSdk>,
     config: Arc<ZerobusSinkConfig>,
     http_client: HttpClient,
@@ -312,24 +313,31 @@ pub struct ZerobusService {
 }
 
 impl ZerobusService {
-    pub async fn new(
+    pub(super) fn new(
         config: ZerobusSinkConfig,
         proxy: &ProxyConfig,
     ) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
-            .endpoint(&config.ingestion_endpoint)
-            .unity_catalog_url(&config.unity_catalog_endpoint)
+            .endpoint(config.ingestion_endpoint.to_string())
+            .unity_catalog_url(
+                config
+                    .unity_catalog_endpoint
+                    .to_string()
+                    .trim_end_matches('/'),
+            )
             .application_name(config.user_agent_suffix());
         builder = builder.connector_factory(build_connector_factory(proxy)?);
         let sdk = builder.build().map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Failed to create Zerobus SDK: {}", e),
+            message: format!("Failed to create Zerobus SDK: {e}"),
         })?;
 
-        let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
-            ZerobusSinkError::ConfigError {
-                message: format!("Failed to create HTTP client: {}", e),
-            }
+        let tls = TlsSettings::from_options(None).map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to create TLS settings: {e}"),
         })?;
+        let http_client =
+            HttpClient::new(tls.into(), proxy).map_err(|e| ZerobusSinkError::ConfigError {
+                message: format!("Failed to create HTTP client: {e}"),
+            })?;
 
         Ok(Self {
             sdk: Arc::new(sdk),
@@ -352,7 +360,7 @@ impl ZerobusService {
         let (client_id, client_secret) = config.auth.credentials();
 
         let table_schema = unity_catalog_schema::fetch_table_schema(
-            &config.unity_catalog_endpoint,
+            &config.unity_catalog_endpoint.to_string(),
             &config.table_name,
             client_id,
             client_secret,
@@ -375,7 +383,7 @@ impl ZerobusService {
                 )
                 .build_batch_serializer()
                 .map_err(|e| ZerobusSinkError::ConfigError {
-                    message: format!("Failed to build batch serializer: {}", e),
+                    message: format!("Failed to build batch serializer: {e}"),
                 })?;
 
                 Ok(ResolvedSchema {
@@ -404,7 +412,7 @@ impl ZerobusService {
                 .encoder
                 .encode_batch(events)
                 .map_err(|e| ZerobusSinkError::EncodingError {
-                    message: format!("Failed to encode batch: {}", e),
+                    message: format!("Failed to encode batch: {e}"),
                 })?;
         Ok(batch)
     }
@@ -414,7 +422,7 @@ impl ZerobusService {
     /// Also used as the healthcheck: resolving the schema verifies the table
     /// and credentials against Unity Catalog, and creating the stream verifies
     /// connectivity to the Zerobus endpoint.
-    pub async fn ensure_stream(&self) -> Result<(), ZerobusSinkError> {
+    pub(super) async fn ensure_stream(&self) -> Result<(), ZerobusSinkError> {
         let schema = self.ensure_schema().await?;
         self.get_or_create_stream(schema).await.map(|_| ())
     }
@@ -433,8 +441,8 @@ impl ZerobusService {
             let (client_id, client_secret) = self.config.auth.credentials();
             let (client_id, client_secret) = (client_id.to_string(), client_secret.to_string());
 
-            // We override only the two timeouts that `stream_options` exposes and
-            // otherwise accept the SDK's Arrow-stream defaults — notably
+            // We override only the timeouts and compression that `stream_options`
+            // exposes and otherwise accept the SDK's Arrow-stream defaults — notably
             // `recovery = true`, so the SDK transparently reconnects and replays
             // in-flight batches on transient stream errors. That layers under
             // Vector's own retry: the SDK absorbs brief blips, and only surfaces a
@@ -450,7 +458,7 @@ impl ZerobusService {
                 .arrow(Arc::clone(&schema.arrow_schema))
                 .server_lack_of_ack_timeout_ms(stream_options.server_lack_of_ack_timeout_ms)
                 .flush_timeout_ms(stream_options.flush_timeout_ms)
-                .ipc_compression(stream_options.compression.into());
+                .compression(stream_options.compression.into());
             let stream = builder
                 .build_arrow()
                 .await
@@ -470,7 +478,7 @@ impl ZerobusService {
     /// flush + close runs. The slot lock is released before close starts so
     /// concurrent `get_or_create_stream` calls aren't blocked on the SDK
     /// shutdown path.
-    pub async fn close_stream(&self) {
+    pub(super) async fn close_stream(&self) {
         let stream = self.stream.lock().await.take();
         if let Some(stream) = stream {
             stream.close().await;
@@ -496,7 +504,7 @@ impl ZerobusService {
                     return Err(ZerobusSinkError::StreamClosed);
                 };
                 match s.ingest_batch(batch).await {
-                    Ok(offset) => s.wait_for_offset(offset).await.map(|_| ()),
+                    Ok(offset) => s.wait_for_offset(offset).await,
                     Err(e) => Err(e),
                 }
             }
@@ -574,29 +582,38 @@ impl Clone for ZerobusService {
 /// and permanent errors (invalid table name, invalid argument, invalid endpoint)
 /// as non-retriable.
 #[derive(Debug, Default, Clone)]
-pub struct ZerobusRetryLogic;
+pub(super) struct ZerobusRetryLogic;
 
 #[cfg(test)]
 impl ZerobusService {
     /// Create a service with a mock stream already installed for testing.
-    pub async fn new_with_mock(
+    fn new_with_mock(
         config: ZerobusSinkConfig,
         mock: MockStream,
     ) -> Result<Self, ZerobusSinkError> {
         config.validate()?;
 
         let sdk = ZerobusSdk::builder()
-            .endpoint(&config.ingestion_endpoint)
-            .unity_catalog_url(&config.unity_catalog_endpoint)
+            .endpoint(config.ingestion_endpoint.to_string())
+            .unity_catalog_url(
+                config
+                    .unity_catalog_endpoint
+                    .to_string()
+                    .trim_end_matches('/'),
+            )
             .build()
             .map_err(|e| ZerobusSinkError::ConfigError {
-                message: format!("Failed to create Zerobus SDK: {}", e),
+                message: format!("Failed to create Zerobus SDK: {e}"),
             })?;
 
-        let http_client = HttpClient::new(TlsSettings::default(), &ProxyConfig::default())
-            .map_err(|e| ZerobusSinkError::ConfigError {
-                message: format!("Failed to create HTTP client: {}", e),
-            })?;
+        let tls = TlsSettings::from_options(None).map_err(|e| ZerobusSinkError::ConfigError {
+            message: format!("Failed to create TLS settings: {e}"),
+        })?;
+        let http_client = HttpClient::new(tls.into(), &ProxyConfig::default()).map_err(|e| {
+            ZerobusSinkError::ConfigError {
+                message: format!("Failed to create HTTP client: {e}"),
+            }
+        })?;
 
         Ok(Self {
             sdk: Arc::new(sdk),
@@ -608,7 +625,7 @@ impl ZerobusService {
     }
 
     /// Returns true if the service currently has an active stream.
-    pub async fn has_active_stream(&self) -> bool {
+    async fn has_active_stream(&self) -> bool {
         self.stream.lock().await.is_some()
     }
 }
@@ -637,7 +654,7 @@ impl RetryLogic for ZerobusRetryLogic {
 /// `EventStatus::Rejected`, which would drop transient-but-exhausted failures
 /// as if they were permanent.
 #[derive(Clone, Debug, Default)]
-pub struct RetryableErrorAsErroredLayer;
+pub(super) struct RetryableErrorAsErroredLayer;
 
 impl<S> Layer<S> for RetryableErrorAsErroredLayer {
     type Service = RetryableErrorAsErrored<S>;
@@ -648,7 +665,7 @@ impl<S> Layer<S> for RetryableErrorAsErroredLayer {
 }
 
 #[derive(Clone, Debug)]
-pub struct RetryableErrorAsErrored<S> {
+pub(super) struct RetryableErrorAsErrored<S> {
     inner: S,
 }
 
@@ -703,23 +720,24 @@ mod tests {
     use crate::sinks::databricks_zerobus::config::{
         DatabricksAuthentication, ZerobusStreamOptions,
     };
+    use crate::sinks::util::HttpEndpoint;
     use databricks_zerobus_ingest_sdk::ZerobusError;
     use vector_lib::sensitive_string::SensitiveString;
 
     fn test_config() -> ZerobusSinkConfig {
         ZerobusSinkConfig {
-            ingestion_endpoint: "https://127.0.0.1:1".to_string(),
+            ingestion_endpoint: HttpEndpoint::parse("https://127.0.0.1:1").unwrap(),
             table_name: "test.default.logs".to_string(),
-            unity_catalog_endpoint: "https://127.0.0.1:1".to_string(),
+            unity_catalog_endpoint: HttpEndpoint::parse("https://127.0.0.1:1").unwrap(),
             auth: DatabricksAuthentication::OAuth {
                 client_id: SensitiveString::from("id".to_string()),
                 client_secret: SensitiveString::from("secret".to_string()),
             },
             user_agent: None,
             stream_options: ZerobusStreamOptions::default(),
-            batch: Default::default(),
-            request: Default::default(),
-            acknowledgements: Default::default(),
+            batch: crate::sinks::util::BatchConfig::default(),
+            request: crate::sinks::util::TowerRequestConfig::default(),
+            acknowledgements: crate::config::AcknowledgementsConfig::default(),
         }
     }
 
@@ -735,9 +753,8 @@ mod tests {
 
     #[tokio::test]
     async fn ingest_succeeds_with_mock_stream() {
-        let service = ZerobusService::new_with_mock(test_config(), MockStream::succeeding())
-            .await
-            .unwrap();
+        let service =
+            ZerobusService::new_with_mock(test_config(), MockStream::succeeding()).unwrap();
 
         let stream = current_stream(&service).await;
         let result = service
@@ -753,9 +770,7 @@ mod tests {
         let mock = MockStream::failing(ZerobusError::ChannelCreationError(
             "connection reset".to_string(),
         ));
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         assert!(service.has_active_stream().await);
 
@@ -774,9 +789,7 @@ mod tests {
     #[tokio::test]
     async fn non_retryable_error_keeps_stream() {
         let mock = MockStream::failing(ZerobusError::InvalidArgument("bad field".to_string()));
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         assert!(service.has_active_stream().await);
 
@@ -796,9 +809,7 @@ mod tests {
     async fn stream_recovers_after_retryable_failure() {
         // Simulate: success → retryable failure → success again.
         let mock = MockStream::succeeding();
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         // First ingest succeeds.
         let stream = current_stream(&service).await;
@@ -849,9 +860,7 @@ mod tests {
         let mock = MockStream::succeeding();
         let closed = mock.closed_flag();
 
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         assert!(service.has_active_stream().await);
         assert!(!closed.load(std::sync::atomic::Ordering::Relaxed));
@@ -876,9 +885,7 @@ mod tests {
         .with_gate();
         let closed = mock.closed_flag();
 
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         // Spawn two concurrent ingests. Each clones the same stream `Arc`,
         // then blocks in the gate.

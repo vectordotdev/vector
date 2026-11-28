@@ -8,7 +8,7 @@ components: transforms: delay: {
 		"""
 
 	classes: {
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      true
 	}
@@ -26,7 +26,6 @@ components: transforms: delay: {
 				items are emitted in the same millisecond.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.transforms.delay.configuration & {

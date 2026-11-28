@@ -55,7 +55,7 @@ ultimately delivered at least once.
 
 While rare, it is possible for an event to be delivered more than
 once. See the [Does Vector support exactly-once
-delivery?](#faq-at-least-once) FAQ below).
+delivery?](#does-vector-support-exactly-once-delivery) FAQ below.
 
 {{< warning >}}
 In order to achieve at-least-once delivery between restarts,
@@ -67,7 +67,7 @@ sinks:
     buffer:
       type: "disk"
       when_full: "block"
-      max_size: 104900000 # 100MiB
+      max_size: 536870912 # 512 MiB
 ```
 
 Refer to each [sink's][sinks] documentation for further guidance on its buffer options.
@@ -133,7 +133,7 @@ No, Vector does not support exactly once delivery. There are future plans to par
 Head over to the [components page][components] and use the guarantee
 filters.
 
-[bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22
+[bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+type%3ABug
 [components]: /components
 [e2e_acks]: /docs/architecture/end-to-end-acknowledgements
 [event]: /docs/architecture/data-model

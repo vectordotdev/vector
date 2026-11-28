@@ -3,6 +3,22 @@ use anyhow::{Result, bail};
 use indexmap::IndexMap;
 use serde_json::{Map, Value, json};
 
+/// Flattened optional enums replace the JSON-null branch with
+/// `{ "not": { "required": [<tag field>] } }`. That sentinel is not a
+/// documentable variant; drop it the same way we drop `"type": "null"`.
+fn is_absence_sentinel(schema: &Value) -> bool {
+    let Some(required) = schema.pointer("/not/required").and_then(Value::as_array) else {
+        return false;
+    };
+    !required.is_empty() && schema.get("type").is_none()
+}
+
+/// Optional wrappers encode absence as JSON `null` (a nullable property) or as the absence
+/// sentinel (a flattened optional). Neither is a documentable variant.
+fn is_absence_branch(schema: &Value) -> bool {
+    schema.get("type").and_then(Value::as_str) == Some("null") || is_absence_sentinel(schema)
+}
+
 fn enum_variant_value(ctx: &SchemaContext, schema: &Value) -> Value {
     let desc = ctx.get_rendered_description_from_schema(schema);
     // Check both the top-level `deprecated` flag (#[configurable(deprecated)]) and the
@@ -39,12 +55,9 @@ impl SchemaContext {
             ),
         };
 
-        let is_optional = get_schema_metadata(schema, "docs::optional")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false);
+        let is_optional = subschemas.iter().any(is_absence_branch);
         subschemas.retain(|sub| {
-            sub.get("type").and_then(|t| t.as_str()) != Some("null")
-                && get_schema_metadata(sub, "docs::hidden").is_none()
+            !is_absence_branch(sub) && get_schema_metadata(sub, "docs::hidden").is_none()
         });
 
         let subschema_count = subschemas.len();
@@ -388,7 +401,7 @@ impl SchemaContext {
 
         // Fallback schema pattern: mixed-mode enums.
         debug!("Resolved as 'fallback mixed-mode' enum schema.");
-        debug!("Tagging mode: {}", enum_tagging);
+        debug!("Tagging mode: {enum_tagging}");
 
         let mut resolved_subschemas: Vec<Value> = Vec::new();
         for subschema in &subschemas {
@@ -431,5 +444,105 @@ impl SchemaContext {
         }
 
         Ok(json!({ "_resolved": { "type": merged_type }, "annotations": "mixed_mode" }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Once;
+
+    use indexmap::IndexMap;
+    use log::LevelFilter;
+    use serde_json::json;
+
+    use super::*;
+    use crate::app;
+
+    fn test_context() -> SchemaContext {
+        static INIT: Once = Once::new();
+        INIT.call_once(|| app::set_global_verbosity(LevelFilter::Off));
+        SchemaContext {
+            root_schema: json!({}),
+            cue_binary_path: String::new(),
+            resolved_schema_cache: IndexMap::new(),
+            expanded_schema_cache: IndexMap::new(),
+        }
+    }
+
+    #[test]
+    fn absence_sentinel_matches_flattened_optional_not_required() {
+        assert!(is_absence_sentinel(&json!({
+            "not": { "required": ["type"] }
+        })));
+        assert!(!is_absence_sentinel(&json!({ "type": "null" })));
+        assert!(!is_absence_sentinel(&json!({
+            "not": { "type": "null" }
+        })));
+        assert!(!is_absence_sentinel(&json!({
+            "type": "object",
+            "not": { "required": ["type"] }
+        })));
+    }
+
+    #[test]
+    fn optional_absence_branches_unwrap_to_inner_schema() {
+        for absent in [
+            json!({ "type": "null" }),
+            json!({ "not": { "required": ["type"] } }),
+        ] {
+            let schema = json!({
+                "oneOf": [absent, { "type": "string" }]
+            });
+            let resolved = test_context().resolve_enum_schema(&schema).unwrap();
+            assert_eq!(
+                resolved,
+                json!({ "_resolved": { "type": { "string": {} } } })
+            );
+        }
+    }
+
+    #[test]
+    fn optional_absence_sentinel_with_inner_enum_resolves() {
+        // Shape produced by `generate_flattened_optional_schema`: optional wrapper with
+        // an absence sentinel plus the real internally-tagged enum. Without
+        // discarding the sentinel, this bails for missing `docs::enum_tagging`.
+        let schema = json!({
+            "oneOf": [
+                { "not": { "required": ["type"] } },
+                {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": ["type", "value"],
+                            "properties": {
+                                "type": { "const": "Foo" },
+                                "value": { "type": "string" }
+                            }
+                        },
+                        {
+                            "type": "object",
+                            "required": ["count", "type"],
+                            "properties": {
+                                "count": { "type": "integer" },
+                                "type": { "const": "Bar" }
+                            }
+                        }
+                    ],
+                    "_metadata": {
+                        "docs::enum_tagging": "internal",
+                        "docs::enum_tag_field": "type",
+                        "docs::enum_tag_description": "The variant to use."
+                    }
+                }
+            ]
+        });
+        let resolved = test_context().resolve_enum_schema(&schema).unwrap();
+        let options = resolved
+            .pointer("/_resolved/type/object/options")
+            .and_then(Value::as_object)
+            .expect("flattened optional enum should resolve to an object");
+        assert!(options.contains_key("type"));
+        assert!(options.contains_key("value"));
+        assert!(options.contains_key("count"));
     }
 }

@@ -9,7 +9,7 @@ sources:
     type: "internal_metrics"
 
   http_source:
-    type: "http"
+    type: "http_server"
     acknowledgements: true
     address: "0.0.0.0:8282"
 
@@ -34,4 +34,3 @@ sinks:
     buffer:
       type: "disk"
       max_size: 4294967296 # 4GB
-

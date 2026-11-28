@@ -29,6 +29,10 @@ pub struct TimedCacheConfig {
     pub refresh_on_drop: bool,
 }
 
+#[must_use]
+/// # Panics
+///
+/// Panics if the fixed non-zero default is changed to zero.
 pub const fn default_cache_config() -> CacheConfig {
     CacheConfig {
         num_events: NonZeroUsize::new(5000).expect("static non-zero number"),
@@ -77,6 +81,7 @@ pub enum FieldMatchConfig {
     ),
 }
 
+#[must_use]
 pub fn fill_default_fields_match(maybe_fields: Option<&FieldMatchConfig>) -> FieldMatchConfig {
     // We provide a default value on `fields`, based on `default_match_fields`, in order to
     // drive the configuration schema and documentation. Since we're getting the values from the

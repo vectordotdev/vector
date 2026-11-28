@@ -12,7 +12,7 @@ pub(super) struct StackdriverLogsRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for StackdriverLogsRequestBuilder {
-    type Metadata = EventFinalizers;
+    type Metadata = ();
     type Events = Vec<Event>;
     type Encoder = StackdriverLogsEncoder;
     type Payload = Bytes;
@@ -27,21 +27,24 @@ impl RequestBuilder<Vec<Event>> for StackdriverLogsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut events: Vec<Event>,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut events: Vec<Event>) -> RequestParts<Self::Metadata, Self::Events> {
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        (finalizers, builder, events)
+        RequestParts {
+            metadata: (),
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
-        metadata: Self::Metadata,
+        (): Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
+        HttpRequest::new(payload.into_payload(), finalizers, request_metadata, ())
     }
 }

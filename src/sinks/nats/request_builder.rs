@@ -40,7 +40,6 @@ impl encoding::Encoder<Event> for NatsEncoder {
 pub(super) struct NatsMetadata {
     subject: String,
     headers: HeaderMap,
-    finalizers: EventFinalizers,
 }
 
 pub(super) struct NatsRequestBuilder {
@@ -89,10 +88,7 @@ impl RequestBuilder<NatsEvent> for NatsRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        mut input: NatsEvent,
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, mut input: NatsEvent) -> RequestParts<Self::Metadata, Self::Events> {
         let builder = RequestMetadataBuilder::from_event(&input.event);
         let headers = self
             .headers
@@ -100,18 +96,24 @@ impl RequestBuilder<NatsEvent> for NatsRequestBuilder {
             .map(|config| config.build_headers(&input.event))
             .unwrap_or_default();
 
+        let finalizers = input.event.take_finalizers();
         let metadata = NatsMetadata {
             subject: input.subject,
             headers,
-            finalizers: input.event.take_finalizers(),
         };
 
-        (metadata, builder, input.event)
+        RequestParts {
+            metadata,
+            request_metadata_builder: builder,
+            events: input.event,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         nats_metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -120,7 +122,7 @@ impl RequestBuilder<NatsEvent> for NatsRequestBuilder {
             bytes: body,
             subject: nats_metadata.subject,
             headers: nats_metadata.headers,
-            finalizers: nats_metadata.finalizers,
+            finalizers,
             metadata,
         }
     }

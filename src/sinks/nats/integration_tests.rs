@@ -29,16 +29,16 @@ use crate::{
 
 fn generate_sink_config(url: &str, subject: &str) -> NatsSinkConfig {
     NatsSinkConfig {
-        acknowledgements: Default::default(),
+        acknowledgements: AcknowledgementsConfig::default(),
         encoding: TextSerializerConfig::default().into(),
-        connection_name: "".to_owned(),
+        connection_name: String::new(),
         subject: Template::try_from(subject).unwrap(),
         url: url.to_string(),
         tls: None,
         auth: None,
-        request: Default::default(),
+        request: TowerRequestConfig::default(),
         jetstream: false.into(),
-        confinement: Default::default(),
+        confinement: crate::template::ConfinementConfig::default(),
     }
 }
 
@@ -54,7 +54,10 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
         .clone()
         .confine(&conf.confinement, "nats", "subject")
         .expect("subject should confine");
-    let sink = NatsSink::new(conf.clone(), confined_subject).await?;
+    let server_addresses = conf
+        .parse_server_addresses()
+        .expect("server addresses should parse");
+    let sink = NatsSink::new(conf.clone(), confined_subject, server_addresses.clone()).await?;
     let sink = VectorSink::from_event_streamsink(sink);
 
     // Establish the consumer subscription.
@@ -62,7 +65,7 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     let options: async_nats::ConnectOptions = (&conf).try_into().context(ConfigSnafu)?;
     let consumer = conf
         .clone()
-        .connect(options)
+        .connect(options, server_addresses)
         .await
         .expect("failed to connect with test consumer");
     let mut sub = consumer
@@ -86,7 +89,7 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
 
     let mut output: Vec<String> = Vec::new();
     while let Some(msg) = sub.next().await {
-        output.push(String::from_utf8_lossy(&msg.payload).to_string())
+        output.push(String::from_utf8_lossy(&msg.payload).to_string());
     }
 
     assert_eq!(output.len(), input.len());
@@ -455,7 +458,7 @@ async fn nats_jetstream_message_id_valid() {
         name: stream_name.clone(),
         subjects: vec![subject.clone()],
         storage: StorageType::Memory,
-        duplicate_window: std::time::Duration::from_secs(60),
+        duplicate_window: std::time::Duration::from_mins(1),
         ..Default::default()
     })
     .await
@@ -478,7 +481,12 @@ async fn nats_jetstream_message_id_valid() {
         .clone()
         .confine(&conf.confinement, "nats", "subject")
         .expect("subject should confine");
-    let sink = NatsSink::new(conf.clone(), confined_subject).await.unwrap();
+    let server_addresses = conf
+        .parse_server_addresses()
+        .expect("server addresses should parse");
+    let sink = NatsSink::new(conf.clone(), confined_subject, server_addresses)
+        .await
+        .unwrap();
     let sink = VectorSink::from_event_streamsink(sink);
 
     let event_id = "123";

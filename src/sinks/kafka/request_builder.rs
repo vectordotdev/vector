@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use rdkafka::message::{Header, OwnedHeaders};
+use vector_lib::internal_event::emit;
 use vector_lib::lookup::OwnedTargetPath;
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
     },
 };
 
-pub struct KafkaRequestBuilder {
+pub(crate) struct KafkaRequestBuilder {
     pub key_field: Option<OwnedTargetPath>,
     pub headers_key: Option<OwnedTargetPath>,
     pub encoder: (Transformer, Encoder<()>),
@@ -32,31 +33,35 @@ impl RequestBuilder<(String, Event)> for KafkaRequestBuilder {
         &self.encoder
     }
 
-    fn split_input(
-        &self,
-        input: (String, Event),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    fn split_input(&self, input: (String, Event)) -> RequestParts<Self::Metadata, Self::Events> {
         let (topic, mut event) = input;
         let builder = RequestMetadataBuilder::from_event(&event);
 
+        let finalizers = event.take_finalizers();
         let metadata = KafkaRequestMetadata {
-            finalizers: event.take_finalizers(),
             key: get_key(&event, self.key_field.as_ref()),
             timestamp_millis: get_timestamp_millis(&event),
             headers: get_headers(&event, self.headers_key.as_ref()),
             topic,
         };
 
-        (metadata, builder, event)
+        RequestParts {
+            metadata,
+            request_metadata_builder: builder,
+            events: event,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         KafkaRequest {
+            finalizers,
             body: payload.into_payload(),
             metadata,
             request_metadata,
@@ -66,8 +71,12 @@ impl RequestBuilder<(String, Event)> for KafkaRequestBuilder {
 
 fn get_key(event: &Event, key_field: Option<&OwnedTargetPath>) -> Option<Bytes> {
     key_field.and_then(|key_field| match event {
-        Event::Log(log) => log.get(key_field).map(|value| value.coerce_to_bytes()),
-        Event::Trace(trace) => trace.get(key_field).map(|value| value.coerce_to_bytes()),
+        Event::Log(log) => log
+            .get(key_field)
+            .map(vector_lib::event::Value::coerce_to_bytes),
+        Event::Trace(trace) => trace
+            .get(key_field)
+            .map(vector_lib::event::Value::coerce_to_bytes),
         Event::Metric(metric) => metric
             .tags()
             .and_then(|tags| tags.get(key_field.to_string().as_str()))
@@ -101,22 +110,22 @@ fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<O
                 Value::Object(headers_map) => {
                     let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
                     for (key, value) in headers_map {
-                        if let Value::Bytes(value_bytes) = value {
+                        if let Some(value_bytes) = value.as_bytes() {
                             owned_headers = owned_headers.insert(Header {
                                 key,
                                 value: Some(value_bytes.as_ref()),
                             });
                         } else {
-                            emit!(KafkaHeaderExtractionError {
-                                header_field: headers_key
+                            emit(KafkaHeaderExtractionError {
+                                header_field: headers_key,
                             });
                         }
                     }
                     return Some(owned_headers);
                 }
                 _ => {
-                    emit!(KafkaHeaderExtractionError {
-                        header_field: headers_key
+                    emit(KafkaHeaderExtractionError {
+                        header_field: headers_key,
                     });
                 }
             }
@@ -138,7 +147,7 @@ mod tests {
         let headers_key = OwnedTargetPath::try_from("headers".to_string()).unwrap();
         let mut header_values = ObjectMap::new();
         header_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
-        header_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
+        header_values.insert("b-key".into(), Value::from("b-value"));
 
         let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert(&headers_key, header_values);
@@ -155,7 +164,7 @@ mod tests {
         let headers_key = OwnedTargetPath::try_from("headers".to_string()).unwrap();
         let mut header_values = ObjectMap::new();
         header_values.insert("a-key".into(), Value::Bytes(Bytes::from("a-value")));
-        header_values.insert("b-key".into(), Value::Bytes(Bytes::from("b-value")));
+        header_values.insert("b-key".into(), Value::from("b-value"));
 
         let mut event = Event::Trace(TraceEvent::from(LogEvent::from("hello")));
         event.as_mut_trace().insert(&headers_key, header_values);

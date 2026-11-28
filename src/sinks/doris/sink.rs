@@ -1,10 +1,11 @@
 use crate::sinks::{
-    doris::{DorisConfig, common::DorisCommon, request_builder::DorisRequestBuilder},
-    prelude::*,
-    util::http::HttpRequest,
+    doris::request_builder::DorisRequestBuilder, prelude::*, util::http::HttpRequest,
 };
+use vector_lib::internal_event::emit;
 
-pub struct DorisSink<S> {
+use crate::sinks::util::partitioner::render_partition_value;
+
+pub(super) struct DorisSink<S> {
     batch_settings: BatcherSettings,
     service: S,
     request_builder: DorisRequestBuilder,
@@ -19,25 +20,20 @@ where
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub fn new(service: S, config: &DorisConfig, common: &DorisCommon) -> crate::Result<Self> {
-        let batch_settings = config.batch.into_batcher_settings()?;
-        let database =
-            config
-                .database
-                .clone()
-                .confine(&config.confinement, DorisConfig::NAME, "database")?;
-        let table =
-            config
-                .table
-                .clone()
-                .confine(&config.confinement, DorisConfig::NAME, "table")?;
-        Ok(DorisSink {
+    pub(super) const fn new(
+        service: S,
+        batch_settings: BatcherSettings,
+        database: ConfinedTemplate,
+        table: ConfinedTemplate,
+        request_builder: DorisRequestBuilder,
+    ) -> Self {
+        DorisSink {
             batch_settings,
             service,
-            request_builder: common.request_builder.clone(),
+            request_builder,
             database,
             table,
-        })
+        }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -47,7 +43,7 @@ where
             .batched_partitioned(key_partitioner, batch_settings.timeout, |_| {
                 batch_settings.as_byte_size_config()
             })
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|result| async move { result.ok() })
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -55,7 +51,7 @@ where
             .filter_map(|request| async {
                 match request {
                     Err(error) => {
-                        emit!(SinkRequestBuildError { error });
+                        emit(SinkRequestBuildError { error });
                         None
                     }
                     Ok(req) => Some(req),
@@ -83,14 +79,14 @@ where
     }
 }
 
-/// PartitionKey used to partition events by (database, table) pair.
+/// `PartitionKey` used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub struct DorisPartitionKey {
+pub(super) struct DorisPartitionKey {
     pub database: String,
     pub table: String,
 }
 
-/// KeyPartitioner that partitions events by (database, table) pair.
+/// `KeyPartitioner` that partitions events by (database, table) pair.
 struct DorisKeyPartitioner {
     database: ConfinedTemplate,
     table: ConfinedTemplate,
@@ -100,28 +96,30 @@ impl DorisKeyPartitioner {
     const fn new(database: ConfinedTemplate, table: ConfinedTemplate) -> Self {
         Self { database, table }
     }
-
-    fn render(template: &ConfinedTemplate, item: &Event, field: &'static str) -> Option<String> {
-        template
-            .render_string(item)
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some(field),
-                    drop_event: true,
-                });
-            })
-            .ok()
-    }
 }
 
 impl Partitioner for DorisKeyPartitioner {
     type Item = Event;
-    type Key = Option<DorisPartitionKey>;
+    type Key = DorisPartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        let database = Self::render(&self.database, item, "database_key")?;
-        let table = Self::render(&self.table, item, "table_key")?;
-        Some(DorisPartitionKey { database, table })
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        let PartitionDecision::Route(database) =
+            render_partition_value(self.database.render_string(item), "database_key")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
+        let PartitionDecision::Route(table) =
+            render_partition_value(self.table.render_string(item), "table_key")?
+        else {
+            return Ok(PartitionDecision::Discard);
+        };
+        Ok(PartitionDecision::Route(DorisPartitionKey {
+            database,
+            table,
+        }))
     }
 }

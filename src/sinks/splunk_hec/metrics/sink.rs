@@ -1,4 +1,5 @@
 use std::{fmt, sync::Arc};
+use vector_lib::internal_event::emit;
 
 use serde::Serialize;
 use vector_lib::event::{Metric, MetricValue};
@@ -14,7 +15,7 @@ use crate::{
     },
 };
 
-pub struct HecMetricsSink<S> {
+pub(super) struct HecMetricsSink<S> {
     pub service: S,
     pub batch_settings: BatcherSettings,
     pub request_builder: HecMetricsRequestBuilder,
@@ -56,6 +57,7 @@ where
             .batched_partitioned(EventPartitioner, batch_settings.timeout, |_| {
                 batch_settings.as_byte_size_config()
             })
+            .unwrap_infallible()
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -63,7 +65,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build HEC Metrics request: {:?}.", e);
+                        error!("Failed to build HEC Metrics request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),
@@ -94,9 +96,15 @@ struct EventPartitioner;
 impl Partitioner for EventPartitioner {
     type Item = HecProcessedEvent;
     type Key = Option<Arc<str>>;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.event.metadata().splunk_hec_token()
+    fn partition(
+        &self,
+        item: &Self::Item,
+    ) -> Result<PartitionDecision<Self::Key>, PreparationError<Self::Error>> {
+        Ok(PartitionDecision::Route(
+            item.event.metadata().splunk_hec_token(),
+        ))
     }
 }
 
@@ -128,10 +136,9 @@ impl HecMetricsProcessedEventMetadata {
 
     fn extract_metric_value(metric: &Metric) -> Option<f64> {
         match *metric.value() {
-            MetricValue::Counter { value } => Some(value),
-            MetricValue::Gauge { value } => Some(value),
+            MetricValue::Counter { value } | MetricValue::Gauge { value } => Some(value),
             _ => {
-                emit!(SplunkInvalidMetricReceivedError {
+                emit(SplunkInvalidMetricReceivedError {
                     value: metric.value(),
                     kind: &metric.kind(),
                     error: "Metric kind not supported.".into(),
@@ -142,9 +149,9 @@ impl HecMetricsProcessedEventMetadata {
     }
 }
 
-pub type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
+pub(super) type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMetadata>;
 
-pub fn process_metric(
+pub(super) fn process_metric(
     metric: Metric,
     event_byte_size: usize,
     sourcetype: Option<&ConfinedTemplate>,
@@ -165,7 +172,7 @@ pub fn process_metric(
         match t.render_string(&metric) {
             Ok(s) => Some(Some(s)),
             Err(error @ crate::template::TemplateRenderingError::Confined { .. }) => {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: true,
@@ -173,7 +180,7 @@ pub fn process_metric(
                 None
             }
             Err(error) => {
-                emit!(TemplateRenderingError {
+                emit(TemplateRenderingError {
                     error,
                     field: Some(field),
                     drop_event: false,

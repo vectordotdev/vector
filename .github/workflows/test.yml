@@ -33,20 +33,34 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' || needs.changes.outputs.prettier == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
           prettier: true
       - run: make check-fmt
 
+  check-actionlint:
+    name: Check GitHub Actions workflows
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.actionlint == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          vdev: false
+          actionlint: true
+      - run: make check-actionlint
+
   check-clippy:
     name: Check clippy
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -54,6 +68,27 @@ jobs:
           libsasl2: true
           cargo-cache: true
       - run: make check-clippy
+
+  check-package-repositories:
+    name: Check package repository tooling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    if: ${{ needs.changes.outputs.package_repositories == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Default-off and opt-in CLI checks require neither signing material nor AWS access.
+      - run: |
+          cargo build --locked --package vdev
+          target/debug/vdev release --help
+          if target/debug/vdev release repositories --help; then
+            echo 'Package repository commands must be disabled by default.' >&2
+            exit 1
+          fi
+          cargo build --locked --package vdev --features package-repositories
+          target/debug/vdev release repositories --help
 
   test:
     needs: changes
@@ -67,13 +102,53 @@ jobs:
       component-validation: true
     secrets: inherit
 
+  test-tls-providers:
+    name: Test Rustls providers (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: none
+            features: ""
+          - name: ring
+            features: tls-ring
+          - name: aws-lc
+            features: tls-aws-lc
+            check-no-ring: true
+          - name: ring and aws-lc
+            features: tls-ring,tls-aws-lc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          cargo-cache: true
+      - name: Run provider tests
+        run: cargo test --locked -p vector-core --no-default-features --features "${FEATURES}" --lib tls::tests
+        env:
+          FEATURES: ${{ matrix.features }}
+      - name: Check that Ring is absent
+        if: ${{ matrix.check-no-ring }}
+        run: |
+          tree="$(cargo tree --locked -p vector-core --no-default-features --features "${FEATURES}" -e normal --target all --prefix none)"
+          if grep -E '^ring v' <<<"${tree}"; then
+            echo "Ring is in the normal dependency tree" >&2
+            exit 1
+          fi
+        env:
+          FEATURES: ${{ matrix.features }}
+
   check-scripts:
     name: Check scripts
     runs-on: ubuntu-24.04
     if: ${{ needs.changes.outputs.scripts == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           mold: false
@@ -82,11 +157,11 @@ jobs:
 
   check-events:
     name: Check events
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           mold: false
@@ -99,7 +174,7 @@ jobs:
     if: ${{ needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           mold: false
@@ -113,7 +188,7 @@ jobs:
     if: ${{ needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -128,7 +203,7 @@ jobs:
     if: ${{ needs.changes.outputs.markdown == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -137,40 +212,28 @@ jobs:
 
   check-generated-docs:
     name: Check Generated Docs
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
           protoc: true
           cue: true
+          prettier: true
           libsasl2: true
           cargo-cache: true
       - run: make check-generated-docs
 
-  check-rust-docs:
-    name: Check Rust Docs
-    runs-on: ubuntu-24.04-8core
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
-    needs: changes
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: ./.github/actions/setup
-        with:
-          rust: true
-          cargo-cache: true
-      - run: cd rust-doc && make ci-docs-build
-
   test-vrl:
     name: VRL - Linux
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -181,11 +244,11 @@ jobs:
 
   build-vrl-playground:
     name: Build VRL Playground
-    runs-on: ubuntu-24.04-8core
+    runs-on: ${{ github.repository == 'vectordotdev/vector' && 'ubuntu-24.04-8core' || 'ubuntu-24.04' }}
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -195,6 +258,14 @@ jobs:
           rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
 
+  test-website:
+    if: ${{ github.event_name == 'merge_group' && (needs.changes.outputs.website_tests == 'true' || needs.changes.outputs.test-yml == 'true') }}
+    needs: changes
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/website-tests.yml
+
   all-checks:
     name: Test Suite
     runs-on: ubuntu-24.04
@@ -202,17 +273,20 @@ jobs:
     needs:
       - changes
       - check-fmt
+      - check-actionlint
       - check-clippy
+      - check-package-repositories
       - test
+      - test-tls-providers
       - check-scripts
       - check-events
       - check-licenses
       - check-docs
       - check-markdown
       - check-generated-docs
-      - check-rust-docs
       - test-vrl
       - build-vrl-playground
+      - test-website
     steps:
       - name: Check all jobs status
         run: |

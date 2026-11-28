@@ -12,7 +12,10 @@
   {{ $opts := merge $cssOpts (dict "targetPath" .output) }}
   
   {{ $postProcess := .post_process }}
-  {{ $css := resources.Get .input | resources.ExecuteAsTemplate .input $ctx | toCSS $opts }}
+  {{ $css := resources.Get .input | resources.ExecuteAsTemplate .input $ctx }}
+  {{ if or (hasSuffix .input ".sass") (hasSuffix .input ".scss") }}
+    {{ $css = $css | toCSS $opts }}
+  {{ end }}
   
   {{ if .postcss }}
     {{ $css = $css | postCSS $postCssOpts }}

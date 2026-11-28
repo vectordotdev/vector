@@ -1,0 +1,14 @@
+transforms:
+  my_transform_id:
+    type: aws_ec2_metadata
+    inputs:
+      - my-source-or-transform-id
+    endpoint: http://169.254.169.254
+    fields:
+      - instance-id
+    measure_cpu_usage: false
+    refresh_interval_secs: 10
+    refresh_timeout_secs: 1
+    required: true
+    tags:
+      - Name

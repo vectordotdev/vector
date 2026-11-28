@@ -1,16 +1,20 @@
+use std::collections::{BTreeMap, HashMap};
+
 use bytes::Bytes;
 use chrono::Utc;
+use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use uuid::Uuid;
 use vector_lib::{codecs::encoding::Framer, request_metadata::RequestMetadata};
 
 use crate::{
     codecs::{Encoder, Transformer},
-    event::{Event, Finalizable},
+    event::{Event, EventFinalizers, Finalizable},
     sinks::{
-        azure_blob::config::{AzureBlobMetadata, AzureBlobRequest},
+        azure_blob::config::{AzureBlobMetadata, AzureBlobRequest, AzureBlobType},
         util::{
-            Compression, RequestBuilder, metadata::RequestMetadataBuilder,
-            request_builder::EncodeResult,
+            Compression, RequestBuilder,
+            metadata::RequestMetadataBuilder,
+            request_builder::{EncodeResult, RequestParts},
         },
     },
 };
@@ -20,8 +24,11 @@ pub struct AzureBlobRequestOptions {
     pub container_name: String,
     pub blob_time_format: String,
     pub blob_append_uuid: bool,
+    pub blob_type: AzureBlobType,
     pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
+    pub tags: Option<BTreeMap<String, String>>,
+    pub metadata: Option<HashMap<String, String>>,
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
@@ -43,23 +50,28 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
     fn split_input(
         &self,
         input: (String, Vec<Event>),
-    ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+    ) -> RequestParts<Self::Metadata, Self::Events> {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
         let azure_metadata = AzureBlobMetadata {
             partition_key,
             count: events.len(),
-            finalizers,
         };
 
         let builder = RequestMetadataBuilder::from_events(&events);
 
-        (azure_metadata, builder, events)
+        RequestParts {
+            metadata: azure_metadata,
+            request_metadata_builder: builder,
+            events,
+            finalizers,
+        }
     }
 
     fn build_request(
         &self,
         mut azure_metadata: Self::Metadata,
+        finalizers: EventFinalizers,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
@@ -71,10 +83,8 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         };
 
         let extension = self.compression.extension();
-        azure_metadata.partition_key = format!(
-            "{}{}.{}",
-            azure_metadata.partition_key, blob_name, extension
-        );
+        azure_metadata.partition_key =
+            format!("{}{blob_name}.{extension}", azure_metadata.partition_key);
 
         let blob_data = payload.into_payload();
 
@@ -87,11 +97,36 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         );
 
         AzureBlobRequest {
+            finalizers,
             blob_data,
             content_encoding: self.compression.content_encoding(),
             content_type: self.encoder.1.content_type(),
             metadata: azure_metadata,
             request_metadata,
+            // SDK 0.10.1 has no `with_tags()` helper, so we set the pre-encoded
+            // `x-ms-tags` header value directly. Match the Azure SDK's own encoding
+            // (`percent_encoding::NON_ALPHANUMERIC`, which emits `%20` for spaces) rather
+            // than `url::form_urlencoded` (which emits `+`).
+            tags: self
+                .tags
+                .as_ref()
+                .filter(|m| !m.is_empty())
+                .map(encode_tags),
+            blob_metadata: self.metadata.as_ref().filter(|m| !m.is_empty()).cloned(),
+            blob_type: self.blob_type,
         }
     }
+}
+
+fn encode_tags(tags: &BTreeMap<String, String>) -> String {
+    let mut out = String::new();
+    for (k, v) in tags {
+        if !out.is_empty() {
+            out.push('&');
+        }
+        out.push_str(&utf8_percent_encode(k, NON_ALPHANUMERIC).to_string());
+        out.push('=');
+        out.push_str(&utf8_percent_encode(v, NON_ALPHANUMERIC).to_string());
+    }
+    out
 }

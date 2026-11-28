@@ -17,7 +17,6 @@ components: sinks: postgres: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -55,7 +54,6 @@ components: sinks: postgres: {
 			to catch the exception and set the desired default value.
 			""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.postgres.configuration & {
