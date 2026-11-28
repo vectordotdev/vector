@@ -10,14 +10,13 @@ use vector_lib::{codecs::TextSerializerConfig, lookup};
 use vrl::event_path;
 
 use super::*;
-use crate::sinks::aws_cloudwatch_logs::config::CloudWatchLogGroupClass;
 use crate::{
     aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
     config::{AcknowledgementsConfig, ProxyConfig, SinkConfig, SinkContext, log_schema},
     event::{Event, LogEvent, Value},
     sinks::{
         aws_cloudwatch_logs::{
-            config::{CloudwatchLogsClientBuilder, Retention},
+            config::{CloudWatchLogGroupClass, CloudwatchLogsClientBuilder, Retention},
             healthcheck::healthcheck,
         },
         util::{BatchConfig, Compression, http::RequestConfig},
