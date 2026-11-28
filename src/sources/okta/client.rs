@@ -47,6 +47,18 @@ use crate::{
 };
 use vector_lib::codecs::internal_events::DecoderDeserializeError;
 
+const fn default_limit() -> u16 {
+    100
+}
+
+pub(super) fn validate_limit(limit: u16) -> crate::Result<()> {
+    if (1..=1000).contains(&limit) {
+        Ok(())
+    } else {
+        Err(format!("Invalid limit: {limit}. Must be between 1 and 1000.").into())
+    }
+}
+
 /// Configuration for the `okta` source.
 #[serde_as]
 #[configurable_component(source("okta", "Pull Okta system logs via the Okta API",))]
@@ -59,6 +71,11 @@ pub struct OktaConfig {
     /// API token for authentication
     #[configurable(metadata(docs::examples = "00xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"))]
     pub token: String,
+
+    /// The maximum number of events to request per page.
+    #[serde(default = "default_limit")]
+    #[configurable(validation(range(min = 1, max = 1000)))]
+    pub limit: u16,
 
     /// The interval between scrapes. Requests are run concurrently so if a scrape takes longer
     /// than the interval, a new scrape will be started. This can take extra resources, set the timeout
@@ -95,6 +112,7 @@ impl Default for OktaConfig {
         Self {
             domain: String::new(),
             token: String::new(),
+            limit: default_limit(),
             interval: default_interval(),
             timeout: default_timeout(),
             since: None,
@@ -124,14 +142,17 @@ fn find_rel_next_link(header: &str) -> Option<String> {
 #[typetag::serde(name = "okta")]
 impl SourceConfig for OktaConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        validate_limit(self.limit)?;
+
         let since = match self.since {
             Some(since) => Utc::now() - Duration::from_secs(since),
             _ => Utc::now(),
         };
 
         let path_and_query = format!(
-            "/api/v1/logs?since={}",
-            utf8_percent_encode(&since.to_rfc3339(), percent_encoding::NON_ALPHANUMERIC)
+            "/api/v1/logs?since={}&limit={}",
+            utf8_percent_encode(&since.to_rfc3339(), percent_encoding::NON_ALPHANUMERIC),
+            self.limit,
         );
 
         let mut url_parts = Uri::try_from(&self.domain)

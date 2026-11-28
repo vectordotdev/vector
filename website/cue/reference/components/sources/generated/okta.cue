@@ -6,6 +6,13 @@ generated: components: sources: okta: configuration: {
 		required:    true
 		type: string: examples: ["foo.okta.com"]
 	}
+	limit: {
+		description: "The maximum number of events to request per page."
+		required:    false
+		type: uint: {
+			default: 100
+		}
+	}
 	scrape_interval_secs: {
 		description: """
 			The interval between scrapes. Requests are run concurrently so if a scrape takes longer
