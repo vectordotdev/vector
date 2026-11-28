@@ -333,7 +333,7 @@ impl SerializerConfig {
             SerializerConfig::Cef(config) => Ok(Serializer::Cef(config.build()?)),
             SerializerConfig::Csv(config) => Ok(Serializer::Csv(config.build()?)),
             SerializerConfig::Gelf(config) => Ok(Serializer::Gelf(config.build())),
-            SerializerConfig::Influxdb(config) => Ok(Serializer::Influxdb(config.build())),
+            SerializerConfig::Influxdb(config) => Ok(Serializer::Influxdb(config.build()?)),
             SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
             SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),

@@ -4,6 +4,7 @@ use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use snafu::Snafu;
+use vector_common::internal_event::emit;
 use vector_config::configurable_component;
 use vector_core::{
     config::DataType,
@@ -13,6 +14,8 @@ use vector_core::{
     },
     schema,
 };
+
+use crate::internal_events::EncoderSerializeError;
 
 /// Representation of a field value in the Influx line protocol.
 #[derive(Clone, Debug)]
@@ -72,8 +75,11 @@ pub struct InfluxLineProtocolSerializerConfig {
 
 impl InfluxLineProtocolSerializerConfig {
     /// Build the serializer from this configuration.
-    #[must_use]
-    pub fn build(&self) -> InfluxLineProtocolSerializer {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any configured quantile is outside `[0, 1]`.
+    pub fn build(&self) -> Result<InfluxLineProtocolSerializer, InfluxLineProtocolSerializerError> {
         InfluxLineProtocolSerializer::new(self.clone())
     }
 
@@ -107,14 +113,21 @@ pub struct InfluxLineProtocolSerializer {
 
 impl InfluxLineProtocolSerializer {
     /// Creates a new serializer from the provided configuration.
-    #[must_use]
-    pub fn new(config: InfluxLineProtocolSerializerConfig) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any configured quantile is outside `[0, 1]`.
+    pub fn new(
+        config: InfluxLineProtocolSerializerConfig,
+    ) -> Result<Self, InfluxLineProtocolSerializerError> {
+        validate_quantiles(&config.quantiles)?;
+
+        Ok(Self {
             protocol_version: config.protocol_version,
             default_namespace: config.default_namespace,
             tags: config.tags.map(Arc::new),
             quantiles: config.quantiles.into(),
-        }
+        })
     }
 
     fn encode_metric(
@@ -127,6 +140,16 @@ impl InfluxLineProtocolSerializer {
         let timestamp = encode_timestamp(metric.timestamp());
         let tags = merge_tags(metric, self.tags.as_deref());
         let (metric_type, fields) = get_type_and_fields(metric.value(), &self.quantiles);
+
+        // A distribution without any positive-rate samples has no fields to encode. Like the
+        // `influxdb_metrics` sink, skip just this event (reporting it as an error and a dropped
+        // event) instead of failing, so that the rest of the batch is still sent.
+        if fields.as_ref().is_none_or(HashMap::is_empty) {
+            let error: vector_common::Error =
+                InfluxLineProtocolSerializerError::EmptyFields { metric_type }.into();
+            emit(EncoderSerializeError { error: &error });
+            return Ok(());
+        }
 
         let mut merged_tags = tags.unwrap_or_default();
         merged_tags.replace("metric_type".to_owned(), metric_type.to_owned());
@@ -168,12 +191,33 @@ pub enum InfluxLineProtocolSerializerError {
         /// The kind of non-metric event encountered.
         actual: &'static str,
     },
+    /// A configured quantile is outside of `[0, 1]`.
+    #[snafu(display("Quantiles must be in range [0.0,1.0]"))]
+    QuantileOutOfRange,
+    /// The metric produced no fields, so no line could be encoded for it.
+    #[snafu(display("Influx line protocol error: {metric_type} metric has no fields to encode"))]
+    EmptyFields {
+        /// The type of the metric that produced no fields.
+        metric_type: &'static str,
+    },
     /// The encoder could not construct a valid line protocol frame.
     #[snafu(display("Influx line protocol error: {message}"))]
     LineProtocol {
         /// The message describing why line protocol generation failed.
         message: &'static str,
     },
+}
+
+/// Validates that all quantiles lie within `[0, 1]`, matching the `influxdb_metrics` sink.
+fn validate_quantiles(quantiles: &[f64]) -> Result<(), InfluxLineProtocolSerializerError> {
+    if quantiles
+        .iter()
+        .all(|&quantile| (0.0..=1.0).contains(&quantile))
+    {
+        Ok(())
+    } else {
+        Err(InfluxLineProtocolSerializerError::QuantileOutOfRange)
+    }
 }
 
 fn merge_tags(metric: &Metric, extra: Option<&HashMap<String, String>>) -> Option<MetricTags> {
@@ -583,7 +627,8 @@ mod tests {
             InfluxLineProtocolSerializer::new(InfluxLineProtocolSerializerConfig {
                 default_namespace: Some("ns".to_string()),
                 ..Default::default()
-            });
+            })
+            .unwrap();
         let metric = Metric::new(
             "total",
             MetricKind::Incremental,
@@ -785,7 +830,8 @@ mod tests {
     #[test]
     fn encode_histogram_without_sum_omits_sum_field() {
         let mut serializer =
-            InfluxLineProtocolSerializer::new(InfluxLineProtocolSerializerConfig::default());
+            InfluxLineProtocolSerializer::new(InfluxLineProtocolSerializerConfig::default())
+                .unwrap();
         let metric = Metric::new(
             "requests",
             MetricKind::Absolute,
@@ -809,7 +855,8 @@ mod tests {
     #[test]
     fn encode_log_is_rejected() {
         let mut serializer =
-            InfluxLineProtocolSerializer::new(InfluxLineProtocolSerializerConfig::default());
+            InfluxLineProtocolSerializer::new(InfluxLineProtocolSerializerConfig::default())
+                .unwrap();
         let mut buffer = BytesMut::new();
         assert!(
             serializer
@@ -829,6 +876,111 @@ mod tests {
             parts.next().unwrap(),
             parts.next().unwrap(),
         )
+    }
+
+    #[test]
+    fn out_of_range_quantiles_are_rejected() {
+        for quantiles in [vec![2.0], vec![0.5, -0.1], vec![f64::NAN]] {
+            let config = InfluxLineProtocolSerializerConfig {
+                quantiles: quantiles.clone(),
+                ..Default::default()
+            };
+            assert!(
+                matches!(
+                    config.build(),
+                    Err(InfluxLineProtocolSerializerError::QuantileOutOfRange)
+                ),
+                "quantiles {quantiles:?} should be rejected"
+            );
+            assert!(
+                crate::encoding::SerializerConfig::Influxdb(config)
+                    .build()
+                    .is_err(),
+                "quantiles {quantiles:?} should be rejected by SerializerConfig::build"
+            );
+        }
+
+        let config = InfluxLineProtocolSerializerConfig {
+            quantiles: vec![0.0, 0.5, 1.0],
+            ..Default::default()
+        };
+        assert!(config.build().is_ok());
+    }
+
+    #[test]
+    fn encode_summary_distribution_with_boundary_quantiles() {
+        let mut serializer =
+            InfluxLineProtocolSerializer::new(InfluxLineProtocolSerializerConfig {
+                quantiles: vec![0.0, 1.0],
+                ..Default::default()
+            })
+            .unwrap();
+        let metric = Metric::new(
+            "latency",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: vector_core::samples![1.0 => 1, 2.0 => 1, 3.0 => 1],
+                statistic: StatisticKind::Summary,
+            },
+        )
+        .with_timestamp(Some(ts()));
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(Event::Metric(metric), &mut buffer)
+            .unwrap();
+        let line = String::from_utf8(buffer.to_vec()).unwrap();
+        let (_, fields, _) = split_line(&line);
+        assert_fields(
+            fields,
+            &[
+                "avg=2",
+                "count=3",
+                "max=3",
+                "median=2",
+                "min=1",
+                "quantile_0.00=1",
+                "quantile_1.00=3",
+                "sum=6",
+            ],
+        );
+    }
+
+    #[test]
+    fn encode_distribution_without_positive_samples_is_skipped() {
+        let mut serializer =
+            InfluxLineProtocolSerializer::new(InfluxLineProtocolSerializerConfig::default())
+                .unwrap();
+        let empty = Metric::new(
+            "latency",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: vector_core::samples![1.0 => 0, 2.0 => 0],
+                statistic: StatisticKind::Summary,
+            },
+        )
+        .with_timestamp(Some(ts()));
+        let gauge = Metric::new(
+            "temperature",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 21.5 },
+        )
+        .with_timestamp(Some(ts()));
+
+        let mut buffer = BytesMut::new();
+        serializer
+            .encode(Event::Metric(empty), &mut buffer)
+            .expect("an event without fields is skipped, not an error");
+        assert!(buffer.is_empty());
+
+        serializer
+            .encode(Event::Metric(gauge), &mut buffer)
+            .unwrap();
+        let output = String::from_utf8(buffer.to_vec()).unwrap();
+        assert_eq!(
+            output,
+            "temperature,metric_type=gauge value=21.5 1542182950000000011\n"
+        );
     }
 
     #[test]
