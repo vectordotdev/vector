@@ -468,7 +468,7 @@ struct DockerLogsSource {
     ///  mappings of seen `container_id` to their data
     containers: HashMap<ContainerId, ContainerState>,
     ///receives `ContainerLogInfo` coming from event stream futures
-    main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>,
+    main_recv: mpsc::UnboundedReceiver<StreamResult>,
     /// It may contain shortened container id.
     hostname: Option<String>,
     backoff_duration: Duration,
@@ -499,8 +499,7 @@ impl DockerLogsSource {
         info!(message = "Listening to docker log events.");
 
         // Channel of communication between main future and event_stream futures
-        let (main_send, main_recv) =
-            mpsc::unbounded_channel::<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>();
+        let (main_send, main_recv) = mpsc::unbounded_channel::<StreamResult>();
 
         // Starting with logs from now.
         // TODO: Is this exception acceptable?
@@ -603,15 +602,21 @@ impl DockerLogsSource {
                                 self.esb.restart(state);
                             }
                         },
-                        Some(Err((id,persistence))) => {
+                        Some(Err((id, persistence, info))) => {
                             let state = self
                                 .containers
                                 .remove(&id)
                                 .expect("Every started ContainerId has it's ContainerState");
                             match persistence{
                                 ErrorPersistence::Transient => if state.is_running() {
-                                    let backoff= Some(self.backoff_duration);
-                                    self.containers.insert(id.clone(), self.esb.start(id, backoff));
+                                    // Resume from the last read log instead of from when Vector started.
+                                    let info = info.map(|mut info| {
+                                        info.generation = state.generation;
+                                        info
+                                    });
+                                    let backoff = Some(self.backoff_duration);
+                                    self.esb.spawn(id.clone(), backoff, info);
+                                    self.containers.insert(id, state);
                                 }
                                 // Forget the container since the error is permanent.
                                 ErrorPersistence::Permanent => (),
@@ -732,7 +737,7 @@ struct EventStreamBuilder {
     /// Event stream futures send events through this
     out: SourceSender,
     /// End through which event stream futures send `ContainerLogInfo` to main future
-    main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>,
+    main_send: mpsc::UnboundedSender<StreamResult>,
     /// Self and event streams will end on this.
     shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
@@ -741,6 +746,12 @@ struct EventStreamBuilder {
 impl EventStreamBuilder {
     /// Spawn a task to runs event stream until shutdown.
     fn start(&self, id: ContainerId, backoff: Option<Duration>) -> ContainerState {
+        self.spawn(id, backoff, None);
+        ContainerState::new_running()
+    }
+
+    /// Spawn a task that runs the event stream, resuming from `resume` when given.
+    fn spawn(&self, id: ContainerId, backoff: Option<Duration>, resume: Option<ContainerLogInfo>) {
         let this = self.clone();
         crate::spawn_in_current_span(async move {
             if let Some(duration) = backoff {
@@ -755,7 +766,13 @@ impl EventStreamBuilder {
             {
                 Ok(details) => match ContainerMetadata::from_details(details) {
                     Ok(metadata) => {
-                        let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                        let info = match resume {
+                            Some(mut info) => {
+                                info.metadata = metadata;
+                                info
+                            }
+                            None => ContainerLogInfo::new(id, metadata, this.core.now_timestamp),
+                        };
                         this.run_event_stream(info).await;
                         return;
                     }
@@ -770,10 +787,8 @@ impl EventStreamBuilder {
                 }),
             }
 
-            this.finish(Err((id, ErrorPersistence::Transient)));
+            this.finish(Err((id, ErrorPersistence::Transient, resume)));
         });
-
-        ContainerState::new_running()
     }
 
     /// If info is present, restarts event stream which will run until shutdown.
@@ -889,14 +904,22 @@ impl EventStreamBuilder {
 
         let result = match (result, error) {
             (Ok(()), None) => Ok(info),
-            (Err(()), _) => Err((info.id, ErrorPersistence::Permanent)),
-            (_, Some(occurrence)) => Err((info.id, occurrence)),
+            (Ok(()), Some(ErrorPersistence::Transient)) => {
+                // Resume before an unfinished partial message so the retry reads all of it.
+                if partial_event_merge_state.is_some() {
+                    info.last_log = info.last_complete_log;
+                }
+                Err((info.id.clone(), ErrorPersistence::Transient, Some(info)))
+            }
+            (Err(()), _) | (_, Some(ErrorPersistence::Permanent)) => {
+                Err((info.id, ErrorPersistence::Permanent, None))
+            }
         };
 
         self.finish(result);
     }
 
-    fn finish(self, result: Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>) {
+    fn finish(self, result: StreamResult) {
         // This can legally fail when shutting down, and any other
         // reason should have been logged in the main future.
         _ = self.main_send.send(result);
@@ -929,6 +952,10 @@ enum ErrorPersistence {
     Transient,
     Permanent,
 }
+
+/// Sent to main when an `event_stream` ends; a transient error carries the info to resume from.
+type StreamResult =
+    Result<ContainerLogInfo, (ContainerId, ErrorPersistence, Option<ContainerLogInfo>)>;
 
 /// Container ID as assigned by Docker.
 /// Is actually a string.
@@ -1006,6 +1033,8 @@ struct ContainerLogInfo {
     created: DateTime<Utc>,
     /// Timestamp of last log message with it's generation
     last_log: Option<(DateTime<FixedOffset>, u64)>,
+    /// `last_log` as of the last event this info returned
+    last_complete_log: Option<(DateTime<FixedOffset>, u64)>,
     /// generation of `ContainerState` at `event_stream` creation
     generation: u64,
     metadata: ContainerMetadata,
@@ -1019,6 +1048,7 @@ impl ContainerLogInfo {
             id,
             created,
             last_log: None,
+            last_complete_log: None,
             generation: 0,
             metadata,
         }
@@ -1293,6 +1323,8 @@ impl ContainerLogInfo {
             // Return the log event as is, partial or not. No merging here.
             log
         };
+
+        self.last_complete_log = self.last_log;
 
         // Partial or not partial - we return the event we got here, because all
         // other cases were handled earlier.

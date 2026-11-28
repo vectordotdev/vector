@@ -5,6 +5,256 @@ fn generate_config() {
     crate::test_util::test_generate_config::<DockerLogsConfig>();
 }
 
+mod mock_docker {
+    use std::{
+        sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
+    };
+
+    use chrono::{DateTime, SecondsFormat, Utc};
+    use futures::{Stream, StreamExt};
+    use wiremock::{
+        Mock, MockServer, Request, Respond, ResponseTemplate,
+        matchers::{method, path_regex},
+    };
+
+    use crate::{
+        SourceSender,
+        config::{SourceConfig, SourceContext},
+        event::Event,
+        sources::docker_logs::DockerLogsConfig,
+    };
+
+    const ID: &str = "0123456789ab";
+
+    fn stdout_frame(line: &str) -> Vec<u8> {
+        let mut frame = vec![1, 0, 0, 0];
+        frame.extend_from_slice(&u32::try_from(line.len()).unwrap().to_be_bytes());
+        frame.extend_from_slice(line.as_bytes());
+        frame
+    }
+
+    fn inspect_ok() -> ResponseTemplate {
+        ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "Id": ID,
+            "Name": "/mock",
+            "Created": "2026-01-01T00:00:00Z",
+            "Config": { "Image": "mock:latest", "Labels": {} },
+        }))
+    }
+
+    fn server_error() -> ResponseTemplate {
+        ResponseTemplate::new(500).set_body_json(serde_json::json!({ "message": "stream cut" }))
+    }
+
+    fn line(at: DateTime<Utc>, text: &str) -> String {
+        format!("{} {text}", at.to_rfc3339_opts(SecondsFormat::Nanos, true))
+    }
+
+    async fn mount_running_container(server: &MockServer) {
+        Mock::given(method("GET"))
+            .and(path_regex("/containers/json$"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!([{ "Id": ID, "Names": ["/mock"] }])),
+            )
+            .mount(server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex("/events$"))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(3600)))
+            .mount(server)
+            .await;
+    }
+
+    async fn start_source(
+        server: &MockServer,
+    ) -> (
+        tokio::task::JoinHandle<()>,
+        impl Stream<Item = Event> + Unpin,
+    ) {
+        let (sender, recv) = SourceSender::new_test();
+        let config = DockerLogsConfig {
+            docker_host: Some(server.uri()),
+            retry_backoff_secs: Duration::ZERO,
+            ..DockerLogsConfig::default()
+        };
+        let source = config
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        (tokio::spawn(async move { source.await.unwrap() }), recv)
+    }
+
+    fn since(request: &Request) -> i64 {
+        request
+            .url
+            .query_pairs()
+            .find(|(key, _)| key == "since")
+            .and_then(|(_, value)| value.parse().ok())
+            .expect("logs request has a since parameter")
+    }
+
+    #[tokio::test]
+    async fn transient_error_resumes_from_last_log() {
+        let server = MockServer::start().await;
+        let logs = format!("/containers/{ID}/logs$");
+        let inspect = format!("/containers/{ID}/json$");
+
+        // Far enough after the source starts that `since` tells the two positions apart.
+        let logged_at = Utc::now() + chrono::Duration::hours(1);
+        mount_running_container(&server).await;
+
+        // Initial start, then a failed inspect on the first transient retry, then success.
+        Mock::given(method("GET"))
+            .and(path_regex(inspect.as_str()))
+            .respond_with(inspect_ok())
+            .up_to_n_times(1)
+            .with_priority(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(inspect.as_str()))
+            .respond_with(server_error())
+            .up_to_n_times(1)
+            .with_priority(2)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(inspect.as_str()))
+            .respond_with(inspect_ok())
+            .with_priority(3)
+            .mount(&server)
+            .await;
+
+        // One line then a clean end, then a transient error, then a stream that stays open.
+        Mock::given(method("GET"))
+            .and(path_regex(logs.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(
+                stdout_frame(&line(logged_at, "hello\n")),
+                "application/vnd.docker.multiplexed-stream",
+            ))
+            .up_to_n_times(1)
+            .with_priority(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(logs.as_str()))
+            .respond_with(server_error())
+            .up_to_n_times(1)
+            .with_priority(2)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(logs.as_str()))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(3600)))
+            .with_priority(3)
+            .mount(&server)
+            .await;
+
+        let (source, _recv) = start_source(&server).await;
+
+        let logs_requests = tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let requests: Vec<Request> = server
+                    .received_requests()
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .filter(|request| request.url.path().ends_with("/logs"))
+                    .collect();
+                if requests.len() >= 3 {
+                    return requests;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("source reattached after the transient error");
+        source.abort();
+
+        let resume_since = logged_at.timestamp() - 1;
+        assert_eq!(since(&logs_requests[1]), resume_since);
+        assert_eq!(since(&logs_requests[2]), resume_since);
+    }
+
+    /// Serves the frames at or after `since` like Docker, cutting the first response mid frame.
+    struct ReplayLogs {
+        frames: Vec<(DateTime<Utc>, String)>,
+        calls: AtomicUsize,
+    }
+
+    impl Respond for ReplayLogs {
+        fn respond(&self, request: &Request) -> ResponseTemplate {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst);
+            if call > 1 {
+                return ResponseTemplate::new(200).set_delay(Duration::from_secs(3600));
+            }
+            let since = since(request);
+            let take = if call == 0 {
+                self.frames.len() - 1
+            } else {
+                self.frames.len()
+            };
+            let mut body: Vec<u8> = self.frames[..take]
+                .iter()
+                .filter(|(at, _)| at.timestamp() >= since)
+                .flat_map(|(at, text)| stdout_frame(&line(*at, text)))
+                .collect();
+            if call == 0 {
+                // A truncated frame header makes the log stream fail mid message.
+                body.extend_from_slice(&[1, 0, 0]);
+            }
+            ResponseTemplate::new(200)
+                .set_body_raw(body, "application/vnd.docker.multiplexed-stream")
+        }
+    }
+
+    #[tokio::test]
+    async fn transient_error_keeps_unfinished_partial_message() {
+        let server = MockServer::start().await;
+        mount_running_container(&server).await;
+        Mock::given(method("GET"))
+            .and(path_regex(format!("/containers/{ID}/json$").as_str()))
+            .respond_with(inspect_ok())
+            .mount(&server)
+            .await;
+
+        // Fragments of one long line, with timestamps in different seconds.
+        let base = Utc::now() + chrono::Duration::hours(1);
+        let at = |secs| base + chrono::Duration::seconds(secs);
+        Mock::given(method("GET"))
+            .and(path_regex(format!("/containers/{ID}/logs$").as_str()))
+            .respond_with(ReplayLogs {
+                frames: vec![
+                    (at(0), "first\n".to_owned()),
+                    (at(10), "aaa".to_owned()),
+                    (at(20), "bbb".to_owned()),
+                    (at(30), "ccc\n".to_owned()),
+                ],
+                calls: AtomicUsize::new(0),
+            })
+            .mount(&server)
+            .await;
+
+        let (source, mut recv) = start_source(&server).await;
+        let merged = tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let event = recv.next().await.expect("source is running");
+                let message = event.as_log()["message"].to_string_lossy().into_owned();
+                if message.ends_with("ccc") {
+                    return message;
+                }
+            }
+        })
+        .await
+        .expect("source emitted the long line");
+        source.abort();
+
+        assert_eq!(merged, "aaabbbccc");
+    }
+}
+
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
     #[test]
